@@ -13,3 +13,10 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 [2] pov you are in a battle with an orc:
 
 <img src="resources/dungeon-battle.jpg" width="520" height="400"/>
+
+<br />
+
+## Known Bugs:
+
+1. After moving to a square with a dropped item, `you have chosen an invalid choice` error :/
+2. An unknown inventory bug.
