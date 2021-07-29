@@ -15,7 +15,12 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 
 <br />
 
-## Known Bugs:
+## Changelog:
 
-1. After moving to a square with a dropped item, `you have chosen an invalid choice` error :/
-2. An unknown inventory bug.
+29/7/21 v1.1
+- major bugfix
+  - fixed the bug where when the user comes to the same square after killing an enemy, an array error comes up.
+
+28/7.21 v1.0
+- minor bugfix
+  - fixed the bug where player could not finish the game due to an annoying array error.
