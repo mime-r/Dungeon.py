@@ -17,6 +17,9 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 
 ## Changelog:
 
+29/7/21 v1.1.5
+- major noticible change of files and directory stuff, and fixed a minor bug with importing files :/
+
 29/7/21 v1.1
 - major bugfix
   - fixed the bug where when the user comes to the same square after killing an enemy, an array error comes up.
