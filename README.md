@@ -1,6 +1,6 @@
-# Dungeon
+# Dungeon.py
 Welcome to the Dungeon, the underground maze full of battle and exploration.
-
+<p align="center"><img src="/resources/Dungeon.gif?raw=true"/></p>
 <br />
 
 ## Screenshots:
