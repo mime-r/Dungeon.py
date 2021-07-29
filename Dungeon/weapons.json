@@ -1,0 +1,28 @@
+{
+    "_default": {
+        "1": {
+            "name": "fists",
+            "object": "weapons",
+            "type": "melee",
+            "base-attack": 2,
+            "random-attack": [0, 1],
+            "chance-of-hit": 50,
+            "cost": 0,
+            "text-critical": "You deliver a smashing blow with your {}.",
+            "text-normal": "You hit the {0} with your {1}.",
+            "text-miss": "You flail your arms, failing to even touch the {}."
+        },
+        "2": {
+            "name": "dagger",
+            "object": "weapons",
+            "type": "melee",
+            "base-attack": 1,
+            "random-attack": [0, 4],
+            "chance-of-hit": 50,
+            "cost": 4,
+            "text-critical": "You stab viciously with your {}.",
+            "text-normal": "You hit the {0} with your {1}.",
+            "text-miss": "You flail your dagger, failing to even touch the {}."
+        }
+    }
+}
