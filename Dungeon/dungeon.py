@@ -148,7 +148,7 @@ class Dungeon:
                 to maintain at least a solid 13 distance between goal and player
                 """
                 # if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > 13:
-                if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > 12:
+                if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > 13:
                     #self.Matrix[x][y] = ["$", 0, self.Matrix[x][y]]
                     self.Matrix[x][y] = ["$", 0]
                     found = True
@@ -166,8 +166,9 @@ class Dungeon:
         # print(DataFrame(self.Matrix))
 
     def event(self):
-        time.sleep(0.15)
+        time.sleep(0.1)  # Time Lag
         self.moves += 1
+        # print("\n"*100) # comment thi to make it smoother, unless your pc does not support cls
         os.system("cls")
         self.printmap()
         self.check()
@@ -175,7 +176,7 @@ class Dungeon:
     def check(self):
         self.playerontile_type = self.Matrix[self.current_loc[0]
                                              ][self.current_loc[1]][2][0]
-        print(self.playerontile_type)
+        # print(self.playerontile_type)
         if self.playerontile_type == self.symbol_target:
             self.gameOver("exit")
         if self.playerontile_type == self.symbol_orcs:
@@ -192,8 +193,8 @@ class Dungeon:
 
     def print_tile_inv(self):
         constructor = ""
-        print(self.playerontile_inv)
-        time.sleep(1)
+        # print(self.playerontile_inv)
+        # time.sleep(1)
         if len(self.playerontile_inv) == 1:
             constructor = self.playerontile_inv[0]
         elif len(self.playerontile_inv) > 1:
@@ -269,7 +270,7 @@ class Dungeon:
                     self.printmap()
                     self.gameloop()
             except IndexError:
-                print("You have chosen an invalid choice.3")
+                print("You have chosen an invalid choice.")
                 time.sleep(0.5)
 
     def attack(self, enemy_type):  # He protecc he attacc he also like to snacc
@@ -300,7 +301,10 @@ class Dungeon:
             self.xp += self.orcs.xp_gained
             print(self.orcs.texts[3].format(self.orcs.name))
             self.Matrix[self.current_loc[0]][self.current_loc[1]][2] = [
-                self.symbol_empty, 1]
+                self.symbol_empty, 1, []]
+
+            # print(self.Matrix[self.current_loc[0]][self.current_loc[1]])
+
             print(color("The {0} drops {1} coins.".format(
                 self.orcs.name, self.orcs.coins), "yellow"))
             self.coins += self.orcs.coins
@@ -402,7 +406,7 @@ class Dungeon:
                     self.printmap()
                     self.gameloop()
             except IndexError:
-                print("You have chosen an invalid choice.2")
+                print("You have chosen an invalid choice.")
                 time.sleep(0.5)
 
     def dropmenu(self):
@@ -410,45 +414,24 @@ class Dungeon:
         print(color("Drop Menu", "green"))
         self.printinventory()
         print(color("Press [e] to exit.", "magenta"))
-        pressed = keyboard.read_key()
-        if pressed.isnumeric():
-            pressed = int(pressed)
-            self.to_use = self.inventory[pressed-1]
-            print("Do you want to drop the {0}?\n{1}".format(self.to_use["name"].title(
-            ), color("Press [y] for Yes and [n] for No.", "magenta")))
-            while True:
-                if keyboard.is_pressed("y"):
-                    del self.inventory[pressed-1]
-
-                    print("You have dropped the {}!".format(
-                        self.to_use["name"].title()))
-                    break
-                elif keyboard.is_pressed("n"):
-                    print("You do not drop the {}.".format(
-                        self.to_use["name"].title()))
-                    break
-            time.sleep(0.2)
-            self.printinventory()
-        if pressed == "e":
-            os.system("cls")
-            self.printmap()
-            self.gameloop()
-        """
         while True:
             try:
                 pressed = keyboard.read_key()
                 if pressed.isnumeric():
                     pressed = int(pressed)
                     self.to_use = self.inventory[pressed-1]
-                    print("Do you want to drop the {0}?\n{1}".format(self.to_use["name"].title(), color("Press [y] for Yes and [n] for No.", "magenta")))
+                    print("Do you want to drop the {0}?\n{1}".format(self.to_use["name"].title(
+                    ), color("Press [y] for Yes and [n] for No.", "magenta")))
                     while True:
                         if keyboard.is_pressed("y"):
                             del self.inventory[pressed-1]
-                            
-                            print("You have dropped the {}!".format(self.to_use["name"].title()))
+
+                            print("You have dropped the {}!".format(
+                                self.to_use["name"].title()))
                             break
                         elif keyboard.is_pressed("n"):
-                            print("You do not drop the {}.".format(self.to_use["name"].title()))
+                            print("You do not drop the {}.".format(
+                                self.to_use["name"].title()))
                             break
                     time.sleep(0.2)
                     self.printinventory()
@@ -457,9 +440,8 @@ class Dungeon:
                     self.printmap()
                     self.gameloop()
             except IndexError:
-                print("You have chosen an invalid choice. 1")
+                print("You have chosen an invalid choice.")
                 time.sleep(0.5)
-        """
 
     def printinventory(self):
         print(color(
