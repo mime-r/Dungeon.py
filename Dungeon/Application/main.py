@@ -4,11 +4,11 @@ import sys
 import time
 import keyboard
 import fuckit
-from Application.src.get import get
+from src.get import get
 import operator
-from Application.src.weapons import weapons
-from Application.src.people import people
-from Application.src.enemies import orc
+from src.weapons import weapons
+from src.people import people
+from src.enemies import orc
 from tinydb import TinyDB, Query
 from pandas import *
 from termcolor import colored as color
@@ -83,7 +83,7 @@ class Dungeon:
 
         # Generate blank map
 
-        from Application.maze import Maze
+        from maze import Maze
         m = Maze(int(self.w/2), int(self.h/2))
         m.randomize()
         self.Matrix = []
