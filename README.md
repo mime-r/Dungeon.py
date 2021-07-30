@@ -17,6 +17,9 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 
 ## Changelog:
 
+30/7/21 v1.1.6
+- fixed bugs regarding the change of the order of files in v1.1.5
+
 29/7/21 v1.1.5
 - major noticible change of files and directory stuff, and fixed a minor bug with importing files :/
 
