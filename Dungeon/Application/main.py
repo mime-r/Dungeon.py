@@ -25,8 +25,27 @@ chemist = people().chemist
 
 
 class Dungeon:
+    rich_theme = {
+        "wall": "bold #666666",
+        "grid_num": "#444444",
+        "blank_space": "#000000",
+        "game_header": "bold red",
+        "move_count": "bold green",
+        "health_count": "bold cyan",
+        "xp_count": "bold magenta",
+        "coin_count": "bold yellow",
+        "inventory_count": "bold green",
+        "time_count": "bold green"
+    }
     def __init__(self):
-        os.system("cls")
+        os.system("mode 100, 35 && cls")
+
+        # Set up rich styles
+        from rich.console import Console
+        from rich.theme import Theme
+        self.rich_console = Console(
+            theme=Theme(self.rich_theme)
+        )
 
         # Game Map [Start]
 
@@ -113,7 +132,7 @@ class Dungeon:
             found = False
             while not found:
                 x, y = random.randint(1, self.w-2), random.randint(1, self.h-2)
-                if not self.Matrix[x][y][0] == "#":
+                if not self.Matrix[x][y][0] == self.symbol_walls:
                     self.Matrix[x][y] = [
                         self.symbol_chemists, 0, [people().chemist()]]
                     found = True
@@ -124,7 +143,7 @@ class Dungeon:
             found = False
             while not found:
                 x, y = random.randint(1, self.w-2), random.randint(1, self.h-2)
-                if not self.Matrix[x][y][0] == "#":
+                if not self.Matrix[x][y][0] == self.symbol_walls:
                     rc_num = random.randint(0, 6)
                     if rc_num < 3:
                         chosen_potion = get().get("potions", "weak healing potion")
@@ -144,7 +163,7 @@ class Dungeon:
         found = False
         while not found:
             x, y = random.randint(1, self.w-2), random.randint(1, self.h-2)
-            if self.Matrix[x][y][0] != "#":
+            if self.Matrix[x][y][0] != self.symbol_walls:
                 """
                 to maintain at least a solid 13 distance between goal and player
                 """
@@ -470,7 +489,7 @@ class Dungeon:
     def player_move(self, direction):
         if direction == "e":
             if self.current_loc[1] < (self.w-1):
-                if self.Matrix[self.current_loc[0]][self.current_loc[1]+1][0] != "#":
+                if self.Matrix[self.current_loc[0]][self.current_loc[1]+1][0] != self.symbol_walls:
                     self.Matrix[self.current_loc[0]][self.current_loc[1]
                                                      ] = self.Matrix[self.current_loc[0]][self.current_loc[1]][2]
                     self.Matrix[self.current_loc[0]][self.current_loc[1]+1] = ["@",
@@ -479,7 +498,7 @@ class Dungeon:
                         self.current_loc[0], self.current_loc[1]+1]
         if direction == "w":
             if self.current_loc[1] > 0:
-                if self.Matrix[self.current_loc[0]][self.current_loc[1]-1][0] != "#":
+                if self.Matrix[self.current_loc[0]][self.current_loc[1]-1][0] != self.symbol_walls:
                     self.Matrix[self.current_loc[0]][self.current_loc[1]
                                                      ] = self.Matrix[self.current_loc[0]][self.current_loc[1]][2]
                     self.Matrix[self.current_loc[0]][self.current_loc[1]-1] = ["@",
@@ -488,7 +507,7 @@ class Dungeon:
                         self.current_loc[0], self.current_loc[1]-1]
         if direction == "n":
             if self.current_loc[0] > 0:
-                if self.Matrix[self.current_loc[0]-1][self.current_loc[1]][0] != "#":
+                if self.Matrix[self.current_loc[0]-1][self.current_loc[1]][0] != self.symbol_walls:
                     self.Matrix[self.current_loc[0]][self.current_loc[1]
                                                      ] = self.Matrix[self.current_loc[0]][self.current_loc[1]][2]
                     self.Matrix[self.current_loc[0]-1][self.current_loc[1]] = ["@",
@@ -497,7 +516,7 @@ class Dungeon:
                         self.current_loc[0]-1, self.current_loc[1]]
         if direction == "s":
             if self.current_loc[0] < (self.h-1):
-                if self.Matrix[self.current_loc[0]+1][self.current_loc[1]][0] != "#":
+                if self.Matrix[self.current_loc[0]+1][self.current_loc[1]][0] != self.symbol_walls:
                     self.Matrix[self.current_loc[0]][self.current_loc[1]
                                                      ] = self.Matrix[self.current_loc[0]][self.current_loc[1]][2]
                     self.Matrix[self.current_loc[0]+1][self.current_loc[1]] = ["@",
@@ -507,8 +526,13 @@ class Dungeon:
         self.deactivateSeentiles()
 
     def printmap(self):
-        print("{0} {1} {2} {3} {4} {5} {6}".format(color("[Dungeon]", "red"), color("Move: {}".format(self.moves), "green"), color("Health: ({0} / {1})".format(self.health, self.maxhealth), "cyan"), color("XP: {}".format(
-            self.xp), "magenta"), color("Coins: {}".format(self.coins), "yellow"), color("Inventory ({0} / {1})".format(len(self.inventory), self.maxinventory), "green"), color("Time: {}".format(time.time()-self.time), "green")))
+        self.rich_console.print("[Dungeon]", style="game_header", end=" ", highlight=False)
+        self.rich_console.print(f"Move: {self.moves}", style="move_count", end=" ", highlight=False)
+        self.rich_console.print(f"Health: ({self.health} / {self.maxhealth})", style="health_count", end=" ", highlight=False)
+        self.rich_console.print(f"XP: {self.xp}", style="xp_count", end=" ", highlight=False)
+        self.rich_console.print(f"Coins: {self.coins}", style="coin_count", end=" ", highlight=False)
+        self.rich_console.print(f"Inventory ({len(self.inventory)} / {self.maxinventory})", style="inventory_count", end=" ", highlight=False)
+        self.rich_console.print(f"Time: {(time.time()-self.time):.2f}s", style="time_count", highlight=False)
         self.Map = []
         index = -1
         for row in self.Matrix:
@@ -541,7 +565,12 @@ class Dungeon:
                 else:
                     # Assume Player is there
                     self.Map[index].append(cell[0])
-        print(DataFrame(self.Map))
+
+        map_str = str(DataFrame(self.Map))
+        map_str = map_str.replace(self.symbol_walls, f"[wall]{self.symbol_walls}[/wall]").replace("⠀", "[blank_space]⠀[/blank_space]")
+        for num in "0123456789":
+            map_str = map_str.replace(num, f"[grid_num]{num}[/grid_num]")
+        self.rich_console.print(map_str, highlight=False)
         print("""Press [arrow keys] to move.
 Press [i] for inventory.
 Press [esc] to exit.
@@ -556,7 +585,7 @@ Press [d] to drop items.
             while not found:
                 global x, y
                 x, y = random.randint(0, self.w-1), random.randint(0, self.h-1)
-                if not self.Matrix[x][y][0] == "#":
+                if not self.Matrix[x][y][0] == self.symbol_walls:
                     self.Matrix[x][y] = ["@", 1, self.Matrix[x][y]]
                     found = True
             self.current_loc = [x, y]
