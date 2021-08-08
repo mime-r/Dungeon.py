@@ -17,13 +17,15 @@ class people:
                     self.stuff.append(potion)
 
     def generate_name(self):
-        from random import randint as r
-        import names
-        if r(1, 2) == 1:
-            gender = "male"
-        else:
-            gender = "female"
-        return str(names.get_full_name(gender))
+        try:
+            import names
+            if randint(1, 2) == 1:
+                gender = "male"
+            else:
+                gender = "female"
+            return str(names.get_full_name(gender))
+        except:
+            return "John Doe"
 
 
 class things:

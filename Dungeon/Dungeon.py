@@ -2,7 +2,19 @@
 from subprocess import call
 import os
 import Application.checkmodules as c
-dependencies = ["fuckit", "pandas", "tinydb", "termcolor", "keyboard", "rich"]
+dependencies = {
+	"required": [
+		"fuckit",
+		"pandas",
+		"tinydb",
+		"termcolor",
+		"keyboard",
+		"rich"
+	],
+	"optional": [
+		"names"
+	]
+}
 
 
 c.check(dependencies, "dungeon")
