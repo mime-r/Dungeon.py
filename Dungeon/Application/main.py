@@ -21,13 +21,6 @@ from config import config
 
 import random
 print("Loading...")
-
-
-# Game objects
-
-# Get
-
-
 chemist = people().chemist
 
 
@@ -294,7 +287,7 @@ class Dungeon:
                     if self.health <= 0:
                         self.game_over("dead")
             self.xp += self.orcs.xp_gained
-            print(self.orcs.texts[3].format(self.orcs.name))
+            self.rich_console.print(self.orcs.texts.death)
             self.matrix[self.current_loc[0]][self.current_loc[1]][2] = [
                 config.symbols.empty, 1, []]
 
@@ -314,12 +307,12 @@ class Dungeon:
                 random.randint(enemy.attack_range[0], enemy.attack_range[1])
             if self.current_attack_damage == enemy.attack_base + enemy.attack_range[1]:
                 # Max Damage
-                print(enemy.texts[0].format(enemy.name))
+                self.rich_console.print(enemy.texts.critical_hit)
             else:
-                print(enemy.texts[1].format(enemy.name))
+                self.rich_console.print(enemy.texts.hit)
             return (self.health - self.current_attack_damage)
         else:
-            print(enemy.texts[2].format(enemy.name))
+            self.rich_console.print(enemy.texts.missed_hit)
             return self.health
 
     def hit(self, enemy):
@@ -547,7 +540,8 @@ class Dungeon:
             (config.symbols.wall, "wall"),
             (config.symbols.chemist, "chemist"),
             (config.symbols.player, "player"),
-            (config.symbols.target, "target")
+            (config.symbols.target, "target"),
+            (config.symbols.empty, "empty")
         ]
         for symbol, style in styling:
             map_str = map_str.replace(symbol, f"[{style}]{symbol}[/{style}]")

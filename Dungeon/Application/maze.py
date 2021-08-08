@@ -146,6 +146,12 @@ class Maze(object):
             if E not in cell and x + 1 < self.width:
                 str_matrix[y][x + 1] = ' '
 
+        new_matrix = str_matrix
+        for row_index, row in enumerate(str_matrix):
+            for element_index, element in enumerate(row):
+                if element == "O" and random.randint(1, 4) == 1:
+                    new_matrix[row_index][element_index] = " "
+
         return str_matrix
 
     def __repr__(self):
