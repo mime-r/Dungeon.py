@@ -1,10 +1,13 @@
-# Workflow
-from subprocess import call
+# Standard Imports
 import os
-import Application.checkmodules as c
+
+# App Imports
+from Application.checkmodules import check_modules
+from Application.loggers import Logger
+
+
 dependencies = {
 	"required": [
-		"fuckit",
 		"pandas",
 		"tinydb",
 		"termcolor",
@@ -16,8 +19,15 @@ dependencies = {
 	]
 }
 
+if __name__ == "__main__":
+	logger = Logger()
+	check_modules(
+		modules=dependencies,
+		name="dungeon",
+		logger=logger
+	)
 
-c.check(dependencies, "dungeon")
-os.system("cls")
-
-call(["python", "Application/main.py"])
+	import Application.main as dungeon
+	dungeon.main(
+		logger=logger
+	)

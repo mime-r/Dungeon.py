@@ -149,89 +149,10 @@ class Maze(object):
         new_matrix = str_matrix
         for row_index, row in enumerate(str_matrix):
             for element_index, element in enumerate(row):
-                if element == "O" and random.randint(1, 4) == 1:
+                if element == "O" and random.randint(1, 3) == 1:
                     new_matrix[row_index][element_index] = " "
 
         return str_matrix
-
-    def __repr__(self):
-        """
-        Returns an Unicode representation of the maze. Size is doubled
-        horizontally to avoid a stretched look. Example 5x5:
-        ┌───┬───────┬───────┐
-        │   │       │       │
-        │   │   ╷   ╵   ╷   │
-        │   │   │       │   │
-        │   │   └───┬───┘   │
-        │   │       │       │
-        │   └───────┤   ┌───┤
-        │           │   │   │
-        │   ╷   ╶───┘   ╵   │
-        │   │               │
-        └───┴───────────────┘
-        """
-        # Starts with regular representation. Looks stretched because chars are
-        # twice as high as they are wide (look at docs example in
-        # `Maze._to_str_matrix`).
-        skinny_matrix = self._to_str_matrix()
-
-        # Simply duplicate each character in each line.
-        double_wide_matrix = []
-        for line in skinny_matrix:
-            double_wide_matrix.append([])
-            for char in line:
-                double_wide_matrix[-1].append(char)
-                double_wide_matrix[-1].append(char)
-
-        # The last two chars of each line are walls, and we will need only one.
-        # So we remove the last char of each line.
-        matrix = [line[:-1] for line in double_wide_matrix]
-
-        def g(x, y):
-            """
-            Returns True if there is a wall at (x, y). Values outside the valid
-            range always return false.
-            This is a temporary helper function.
-            """
-            if 0 <= x < len(matrix[0]) and 0 <= y < len(matrix):
-                return matrix[y][x] != ' '
-            else:
-                return False
-
-        # Fix double wide walls, finally giving the impression of a symmetric
-        # maze.
-        for y, line in enumerate(matrix):
-            for x, char in enumerate(line):
-                if not g(x, y) and g(x - 1, y):
-                    matrix[y][x - 1] = ' '
-
-        # Right now the maze has the correct aspect ratio, but is still using
-        # 'O' to represent walls.
-
-        # Finally we replace the walls with Unicode characters depending on
-        # their context.
-        for y, line in enumerate(matrix):
-            for x, char in enumerate(line):
-                if not g(x, y):
-                    continue
-
-                connections = set((N, S, E, W))
-                if not g(x, y + 1):
-                    connections.remove(S)
-                if not g(x, y - 1):
-                    connections.remove(N)
-                if not g(x + 1, y):
-                    connections.remove(E)
-                if not g(x - 1, y):
-                    connections.remove(W)
-
-                str_connections = ''.join(sorted(connections))
-                # Note we are changing the matrix we are reading. We need to be
-                # careful as to not break the `g` function implementation.
-                matrix[y][x] = Maze.UNICODE_BY_CONNECTIONS[str_connections]
-
-        # Simple double join to transform list of lists into string.
-        return '\n'.join(''.join(line) for line in matrix) + '\n'
 
     def randomize(self):
         """

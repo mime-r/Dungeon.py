@@ -4,40 +4,48 @@ import os
 import sys
 import time
 import operator
+import traceback
 
 # Lib Imports
 import keyboard
-import fuckit
 from tinydb import TinyDB, Query
 from pandas import *
 from termcolor import colored as color
+from rich.console import Console
+from rich.theme import Theme
 
 # App Imports
-from src.get import get
-from src.weapons import weapons
-from src.people import people
-from src.enemies import orc
-from config import config
+from Application.classes.get import get
+from Application.classes.weapons import weapons
+from Application.classes.people import people
+from Application.classes.enemies import orc
+from Application.config import config
+from Application.maze import Maze
+from Application.loggers import LogType
 
 import random
 print("Loading...")
 chemist = people().chemist
 
-
 class Dungeon:
-    def __init__(self):
+    def __init__(self, logger):
+
+        # instantiate logger
+        self.logger = logger
+        self.log_info = lambda info: self.logger.log(LogType.INFO, info)
+        self.log_debug = lambda debug: self.logger.log(LogType.DEBUG, debug)
+        self.log_fatal = lambda fatal: self.logger.log(LogType.FATAL, fatal)
+        self.log_info("logging functions set up is done")
+
         #sets console size and clears console
         os.system("mode 100, 38 && cls")
+        self.log_info("resized console & cleared")
 
         # Set up rich styles
-        from rich.console import Console
-        from rich.theme import Theme
         self.rich_console = Console(
             theme=Theme(config.styles)
         )
-
-        # Game Map [Start]
-
+        self.log_info("rich console & styles set up")
 
         # Empty tile
         self.current_loc = []
@@ -45,6 +53,7 @@ class Dungeon:
         # Game vars init
         self.moves = 1
         self.firsttime = True
+        self.start_time = time.time()
 
         # Init Player Stat Vars
         self.inventory = []
@@ -57,35 +66,33 @@ class Dungeon:
         # Leaderboard
         self.leaderboard = TinyDB("leaderboard.json")
         self.leaderboardQuery = Query()
+
+        # init weapons
+        # name, base attack, startrandom, endrandom, chanceofhit, hittextsucessful, hittextweak, hittextmiss
+        self.equipped = weapons().give("default")
+
+        # Fill inventory with starter potions
+        for i in range(2):
+            self.inventory.append(get().get("potions", "weak healing potion"))
+
+        self.log_info("init dungeon variables")
         
         # generate unique session id for highscore leaderboard
         while True:
             self.session_id = random.getrandbits(10000)
             if len(self.leaderboard.search(self.leaderboardQuery.session_id == self.session_id)) == 0:  # check for repeating
                 break
-
-        # init weapons
-        # name, base attack, startrandom, endrandom, chanceofhit, hittextsucessful, hittextweak, hittextmiss
-        self.equipped = weapons().give("default")
+        self.log_info("generated session id")
 
         self.generate_map()
-        # Game Map [End]
-
-        # Fill inventory with starter potions
-        for i in range(2):
-            self.inventory.append(get().get("potions", "weak healing potion"))
-        os.system("cls")
-        self.start_time = time.time()
+        self.log_info("generated map")
         self.print_map()
-
-        # self.leaderboard.truncate()
-        # print(DataFrame(self.matrix))
+        self.log_debug(f"Raw Map String:\n{self.base_map_str}")
 
     def generate_map(self):
         '''
         generates the game map
         '''
-        from maze import Maze
         m = Maze(int(config.map.width/2), int(config.map.height/2))
         m.randomize()
         self.matrix = []
@@ -98,6 +105,7 @@ class Dungeon:
                     self.matrix[i].append([config.symbols.wall, 0, []])
                 else:
                     self.matrix[i].append([config.symbols.empty, 0, []])
+        self.log_info("generated base map string")
 
         #self.matrix = [[[config.symbols.empty, 0, []] for x in range(config.map.width)] for y in range(config.map.height)]
 
@@ -109,6 +117,7 @@ class Dungeon:
                 if self.matrix[x][y][0] != config.symbols.wall:
                     self.matrix[x][y] = [config.symbols.orc, 0, []]
                     found = True
+        self.log_info("filled map with orcs")
 
         # Fill map (chemists)
         for count in range(config.count.chemist):
@@ -119,10 +128,10 @@ class Dungeon:
                     self.matrix[x][y] = [
                         config.symbols.chemist, 0, [people().chemist()]]
                     found = True
+        self.log_info("filled map with chemists")
 
         # Scatter potions
-        self.count_floor_potions = 6
-        for count in range(config.count.chemist):
+        for count in range(config.count.floor_potions):
             found = False
             while not found:
                 x, y = random.randint(1, config.map.width-2), random.randint(1, config.map.height-2)
@@ -136,9 +145,23 @@ class Dungeon:
                         chosen_potion = get().get("potions", "strong healing potion")
                     self.matrix[x][y][2].append(chosen_potion)
                     found = True
+        self.log_info("filled map with potions")
 
         # init player
-        self.init_player(1)
+        found = False
+        while not found:
+            x, y = random.randint(0, config.map.width-1), random.randint(0, config.map.height-1)
+            if not self.matrix[x][y][0] == config.symbols.wall:
+                self.matrix[x][y] = [config.symbols.player, 1, self.matrix[x][y]]
+                found = True
+        self.current_loc = [x, y]
+
+        self.name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
+        if not self.name:
+            self.name = people().generate_name()
+            print("Your name is: {}".format(self.name))
+        self.deactivate_seen_tiles()
+        self.log_info("initiated player")
 
         # init target
         found = False
@@ -149,16 +172,35 @@ class Dungeon:
                 to maintain at least a solid 13 distance between goal and player
                 """
                 # if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > 13:
-                if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > 13:
+                if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > config.map.min_distance:
                     #self.matrix[x][y] = [config.symbols.target, 0, self.matrix[x][y]]
                     self.matrix[x][y] = [config.symbols.target, 0]
                     found = True
+
+        self.log_info("put target on map")
+        
+        base_map = []
+        index = -1
+        for row in self.matrix:
+            base_map.append([])
+            index += 1
+            for cell in row:
+                if cell[0] != config.symbols.empty:
+                    base_map[index].append(cell[0])
+                elif len(cell[2]) > 0 and isinstance(cell[2][0], dict):
+                    obj_type = cell[2][0]["object"]
+                    base_map[index].append({
+                        "weapons": config.symbols.weapons,
+                        "potions": config.symbols.potions
+                    }.get(obj_type))
+                else:
+                    base_map[index].append(cell[0])
+        self.base_map_str = str(DataFrame(base_map)).replace(config.symbols.unknown, ' ')
 
     def event(self):
         time.sleep(0.1)  # Time Lag
         self.moves += 1
         # print("\n"*100) # comment thi to make it smoother, unless your pc does not support cls
-        os.system("cls")
         self.print_map()
         self.check()
 
@@ -214,6 +256,7 @@ class Dungeon:
 
     def game_over(self, how):
         if how == "exit":
+            os.system('cls')
             self.rich_console.print(r"You have [success]successfully[/success] escaped the [game_header][DUNGEON][/game_header]", highlight=False)
             self.print_leaderboard()
         elif how == "dead":
@@ -453,7 +496,6 @@ class Dungeon:
         self.print_map()
         self.gameloop()
 
-    @fuckit
     def player_move(self, direction):
         if direction == "e":
             if self.current_loc[1] < (config.map.width-1):
@@ -494,6 +536,7 @@ class Dungeon:
         self.deactivate_seen_tiles()
 
     def print_map(self):
+        os.system('cls')
         self.rich_console.print("[Dungeon]", style="game_header", end=" ", highlight=False)
         self.rich_console.print(f"Move: {self.moves}", style="move_count", end=" ", highlight=False)
         self.rich_console.print(f"Health: ({self.health} / {self.max_health})", style="health_count", end=" ", highlight=False)
@@ -501,47 +544,39 @@ class Dungeon:
         self.rich_console.print(f"Coins: {self.coins}", style="coin_count", end=" ", highlight=False)
         self.rich_console.print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory_count", end=" ", highlight=False)
         self.rich_console.print(f"Time: {(time.time()-self.start_time):.2f}s", style="time_count", highlight=False)
-        self.Map = []
+        temp_map = []
         index = -1
         for row in self.matrix:
-            self.Map.append([])
+            temp_map.append([])
             index += 1
             for cell in row:
-                if len(cell) < 4:
-                    if cell[1] == 0:
-                        self.Map[index].append("⠀")
-                    elif cell[1] == 1:
-                        # Make enemy hidden
-                        if cell[0] in config.symbols.enemies:
-                            self.Map[index].append(config.symbols.empty)
-                        else:
-                            self.Map[index].append(cell[0])
-                            continue
-                        # Display item inv
-                        # TYPES OF OBJECTS
-                        if cell[0] == config.symbols.player:  # if scanning player
-                            # print(cell[2])
-                            temp_cell = cell[2][2]
-                        else:
-                            temp_cell = cell[2]
-                        if len(temp_cell) > 0:  # cell[2][0] is obj
-                            get_obj = temp_cell[0]["object"]
-                            if get_obj == "weapons":
-                                self.Map[index].append("\\")
-                            elif get_obj == "potions":
-                                self.Map[index].append("!")
-                else:
-                    # Assume Player is there
-                    self.Map[index].append(cell[0])
+                if cell[1] == 0:
+                    temp_map[index].append(config.symbols.unknown)
+                elif cell[1] == 1:
+                    # Make enemy hidden
+                    if cell[0] in config.symbols.enemies:
+                        temp_map[index].append(config.symbols.empty)
+                    elif cell[0] != config.symbols.empty:
+                        temp_map[index].append(cell[0])
+                    elif len(cell[2]) > 0 and isinstance(cell[2][0], dict):
+                        obj_type = cell[2][0]["object"]
+                        temp_map[index].append({
+                            "weapons": config.symbols.weapons,
+                            "potions": config.symbols.potions
+                        }.get(obj_type))
+                    else:
+                        temp_map[index].append(cell[0])
 
-        map_str = str(DataFrame(self.Map))
+        map_str = str(DataFrame(temp_map))
         styling = [
-            ("⠀", "unknown"),
+            (config.symbols.unknown, "unknown"),
             (config.symbols.wall, "wall"),
             (config.symbols.chemist, "chemist"),
             (config.symbols.player, "player"),
             (config.symbols.target, "target"),
-            (config.symbols.empty, "empty")
+            (config.symbols.empty, "empty"),
+            (config.symbols.potions, "potions"),
+            (config.symbols.weapons, "weapons")
         ]
         for symbol, style in styling:
             map_str = map_str.replace(symbol, f"[{style}]{symbol}[/{style}]")
@@ -556,28 +591,6 @@ Press [controls]\[u][/controls] to [action]equip/use items[/action].
 Press [controls]\[d][/controls] to [action]drop items[/action].
 """, highlight=False)
 
-    def init_player(self, state):
-
-        if state == 1:
-            found = False
-            while not found:
-                global x, y
-                x, y = random.randint(0, config.map.width-1), random.randint(0, config.map.height-1)
-                if not self.matrix[x][y][0] == config.symbols.wall:
-                    self.matrix[x][y] = [config.symbols.player, 1, self.matrix[x][y]]
-                    found = True
-            self.current_loc = [x, y]
-
-            self.name = input(
-                "Hello adventurer, what is your name? (Enter for random name)\n> ")
-
-            if not self.name:
-                self.name = people().generate_name()
-                print("Your name is: {}".format(self.name))
-            time.sleep(1)
-        self.deactivate_seen_tiles()
-
-    # @fuckit
     def deactivate_seen_tiles(self):
         self.matrix[self.current_loc[0] -
                     1][self.current_loc[1]-1][1] = 1  # North West
@@ -613,9 +626,15 @@ Press [controls]\[d][/controls] to [action]drop items[/action].
 
 
 # if __name__ == "__main__":
-try:
-    d = Dungeon()
-    d.gameloop()
-except KeyboardInterrupt:
-    print("Exiting [Dungeon]...")
-    sys.exit()
+def main(logger):
+    try:
+        d = Dungeon(
+            logger=logger
+        )
+        d.log_info("dungeon set up is done")
+        d.gameloop()
+    except KeyboardInterrupt:
+        print("Exiting [Dungeon]...")
+        sys.exit()
+    except Exception as e:
+        logger.log(LogType.FATAL, f"\n{''.join(traceback.format_tb(e.__traceback__))}\n\n{str(e)}")

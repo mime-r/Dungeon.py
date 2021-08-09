@@ -1,7 +1,9 @@
 class StyleConfig:
     wall = "bold #666666"
-    empty = "dim #333333"
+    empty = "dim #444444"
     grid_num = "#444444"
+    potions = "#ff6bf8"
+    weapons = "#6bc6ff"
     controls = "#61B3FF"
     action = "#61D5FF"
     player = "#FFB300"
@@ -25,6 +27,9 @@ class SymbolConfig:
     empty = "."
     wall = "#"
     target = "$"
+    unknown = '⠀'
+    potions = "!"
+    weapons = "\\"
 
     # Player Symbol
     player = "@"
@@ -42,10 +47,12 @@ class SymbolConfig:
 class DungeonCountConfig:
     orc = 20
     chemist = 5
+    floor_potions = 6
 
 class MapConfig:
     width = 25
     height = 25
+    min_distance = 13
 
 class PlayerConfig:
     max_inventory = 3
