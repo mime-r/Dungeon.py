@@ -14,12 +14,13 @@ class StyleConfig:
     move_count = "#FF63D6"
     health_count = "#00F521"
     xp_count = "#00C8FF"
-    coin_count = "#FFDD00"
-    inventory_count = "#00FFC8"
+    coin = "#FFDD00"
+    inventory = "#00FFC8"
     time_count = "#B199FF"
     fail = "#FF0000"
     success = "#00FF00"
-    enemy = "#FF2424"
+    enemy = "bold #FF2424"
+    menu_header = "bold green"
 
 class SymbolConfig:
     
@@ -53,6 +54,9 @@ class MapConfig:
     width = 25
     height = 25
     min_distance = 13
+
+    max_x = width-1
+    max_y = height-1
 
 class PlayerConfig:
     max_inventory = 3

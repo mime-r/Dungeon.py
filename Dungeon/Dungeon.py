@@ -10,7 +10,6 @@ dependencies = {
 	"required": [
 		"pandas",
 		"tinydb",
-		"termcolor",
 		"keyboard",
 		"rich"
 	],

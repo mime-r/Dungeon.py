@@ -10,7 +10,6 @@ import traceback
 import keyboard
 from tinydb import TinyDB, Query
 from pandas import *
-from termcolor import colored as color
 from rich.console import Console
 from rich.theme import Theme
 
@@ -20,11 +19,12 @@ from Application.classes.weapons import weapons
 from Application.classes.people import people
 from Application.classes.enemies import orc
 from Application.config import config
-from Application.maze import Maze
+from Application.classes.map import Map, DungeonCell
 from Application.loggers import LogType
 
 import random
 print("Loading...")
+random_yx = lambda: (random.randint(1, config.map.max_y), random.randint(1, config.map.max_x))
 chemist = people().chemist
 
 class Dungeon:
@@ -45,10 +45,11 @@ class Dungeon:
         self.rich_console = Console(
             theme=Theme(config.styles)
         )
+        self.rich_print = self.rich_console.print
         self.log_info("rich console & styles set up")
 
         # Empty tile
-        self.current_loc = []
+        self.player_loc = []
 
         # Game vars init
         self.moves = 1
@@ -86,14 +87,13 @@ class Dungeon:
 
         self.generate_map()
         self.log_info("generated map")
-        self.print_map()
         self.log_debug(f"Raw Map String:\n{self.base_map_str}")
 
     def generate_map(self):
         '''
         generates the game map
         '''
-        m = Maze(int(config.map.width/2), int(config.map.height/2))
+        m = Map(int(config.map.width/2), int(config.map.height/2))
         m.randomize()
         self.matrix = []
 
@@ -102,40 +102,40 @@ class Dungeon:
             self.matrix.append([])
             for n, cell in enumerate(row):
                 if cell == "O":
-                    self.matrix[i].append([config.symbols.wall, 0, []])
+                    self.matrix[i].append(DungeonCell(symbol=config.symbols.wall))
                 else:
-                    self.matrix[i].append([config.symbols.empty, 0, []])
+                    self.matrix[i].append(DungeonCell(symbol=config.symbols.empty))
         self.log_info("generated base map string")
 
         #self.matrix = [[[config.symbols.empty, 0, []] for x in range(config.map.width)] for y in range(config.map.height)]
 
         # Fill map (Bad Orcs)
         for count in range(config.count.orc):
-            found = False
-            while not found:
-                x, y = random.randint(1, config.map.width-2), random.randint(1, config.map.height-2)
-                if self.matrix[x][y][0] != config.symbols.wall:
-                    self.matrix[x][y] = [config.symbols.orc, 0, []]
-                    found = True
+            while True:
+                x, y = random_yx()
+                if self.matrix[y][x].symbol != config.symbols.wall:
+                    self.matrix[y][x] = DungeonCell(symbol=config.symbols.orc)
+                    break
         self.log_info("filled map with orcs")
 
         # Fill map (chemists)
         for count in range(config.count.chemist):
-            found = False
-            while not found:
-                x, y = random.randint(1, config.map.width-2), random.randint(1, config.map.height-2)
-                if not self.matrix[x][y][0] == config.symbols.wall:
-                    self.matrix[x][y] = [
-                        config.symbols.chemist, 0, [people().chemist()]]
-                    found = True
+            while True:
+                x, y = random_yx()
+                if self.matrix[y][x].symbol != config.symbols.wall:
+                    self.matrix[y][x] = DungeonCell(
+                        symbol=config.symbols.chemist,
+                        inventory=[people().chemist()]
+                    )
+                    break
         self.log_info("filled map with chemists")
 
         # Scatter potions
         for count in range(config.count.floor_potions):
-            found = False
-            while not found:
-                x, y = random.randint(1, config.map.width-2), random.randint(1, config.map.height-2)
-                if not self.matrix[x][y][0] == config.symbols.wall:
+            while True:
+                y, x = random_yx()
+                if self.matrix[y][x].symbol != config.symbols.wall:
+                    cell = self.matrix[y][x]
                     rc_num = random.randint(0, 6)
                     if rc_num < 3:
                         chosen_potion = get().get("potions", "weak healing potion")
@@ -143,59 +143,62 @@ class Dungeon:
                         chosen_potion = get().get("potions", "medium healing potion")
                     else:
                         chosen_potion = get().get("potions", "strong healing potion")
-                    self.matrix[x][y][2].append(chosen_potion)
-                    found = True
+                    self.matrix[y][x].inventory.append(chosen_potion)
+                    break
         self.log_info("filled map with potions")
 
         # init player
-        found = False
-        while not found:
-            x, y = random.randint(0, config.map.width-1), random.randint(0, config.map.height-1)
-            if not self.matrix[x][y][0] == config.symbols.wall:
-                self.matrix[x][y] = [config.symbols.player, 1, self.matrix[x][y]]
-                found = True
-        self.current_loc = [x, y]
+        while True:
+            y, x = random_yx()
+            if self.matrix[y][x].symbol != config.symbols.wall:
+                self.matrix[y][x] = DungeonCell(
+                    symbol=config.symbols.player,
+                    explored=True,
+                    inventory=self.matrix[y][x]
+                )
+                break
+        self.player_loc = (y, x)
 
-        self.name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
-        if not self.name:
-            self.name = people().generate_name()
-            print("Your name is: {}".format(self.name))
+        self.player_name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
+        if not self.player_name:
+            self.player_name = people().generate_name()
+            print("Your name is: {}".format(self.player_name))
         self.deactivate_seen_tiles()
         self.log_info("initiated player")
 
         # init target
-        found = False
-        while not found:
-            x, y = random.randint(1, config.map.width-2), random.randint(1, config.map.height-2)
-            if self.matrix[x][y][0] != config.symbols.wall:
+        while True:
+            y, x = random_yx()
+            if self.matrix[y][x].symbol != config.symbols.wall:
                 """
                 to maintain at least a solid 13 distance between goal and player
                 """
-                # if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > 13:
-                if abs(x-self.current_loc[0])+abs(y-self.current_loc[1]) > config.map.min_distance:
+                # if abs(x-self.player_loc[0])+abs(y-self.player_loc[1]) > 13:
+                if abs(y-self.player_loc[0])+abs(x-self.player_loc[1]) > config.map.min_distance:
                     #self.matrix[x][y] = [config.symbols.target, 0, self.matrix[x][y]]
-                    self.matrix[x][y] = [config.symbols.target, 0]
-                    found = True
-
+                    self.matrix[y][x] = DungeonCell(symbol=config.symbols.target)
+                    break
         self.log_info("put target on map")
-        
+        self.base_map_str = self.gen_debug_map()       
+
+    def gen_debug_map(self):
         base_map = []
         index = -1
         for row in self.matrix:
             base_map.append([])
             index += 1
             for cell in row:
-                if cell[0] != config.symbols.empty:
-                    base_map[index].append(cell[0])
-                elif len(cell[2]) > 0 and isinstance(cell[2][0], dict):
-                    obj_type = cell[2][0]["object"]
+                if cell.symbol != config.symbols.empty:
+                    base_map[index].append(cell.symbol)
+                elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], dict):
+                    obj_type = cell.inventory[0]["object"]
                     base_map[index].append({
                         "weapons": config.symbols.weapons,
                         "potions": config.symbols.potions
                     }.get(obj_type))
                 else:
-                    base_map[index].append(cell[0])
-        self.base_map_str = str(DataFrame(base_map)).replace(config.symbols.unknown, ' ')
+                    base_map[index].append(cell.symbol)
+        return str(DataFrame(base_map)).replace(config.symbols.unknown, ' ')
 
     def event(self):
         time.sleep(0.1)  # Time Lag
@@ -205,39 +208,35 @@ class Dungeon:
         self.check()
 
     def check(self):
-        self.playerontile_type = self.matrix[self.current_loc[0]
-                                             ][self.current_loc[1]][2][0]
+        self.player_cell = self.matrix[self.player_loc[0]][self.player_loc[1]].inventory
         # print(self.playerontile_type)
-        if self.playerontile_type == config.symbols.target:
+        if self.player_cell.symbol == config.symbols.target:
             self.game_over("exit")
-        if self.playerontile_type == config.symbols.orc:
+        if self.player_cell.symbol == config.symbols.orc:
             self.attack("orc")
-        if self.playerontile_type == config.symbols.chemist:
-            thechemist = self.matrix[self.current_loc[0]
-                                     ][self.current_loc[1]][2][2][0]
+        if self.player_cell.symbol == config.symbols.chemist:
+            thechemist = self.player_cell.inventory[0]
             self.trader_screen("chemist", thechemist)
         # inv list
-        self.playerontile_inv = self.matrix[self.current_loc[0]
-                                            ][self.current_loc[1]][2][2]
-        if len(self.playerontile_inv) > 0:
-            self.print_tile_inv()
+        if len(self.player_cell.inventory) > 0:
+            self.print_cell_inv(cell=self.player_cell)
 
-    def print_tile_inv(self):
+    def print_cell_inv(self, cell):
         constructor = ""
         # print(self.playerontile_inv)
         # time.sleep(1)
-        if len(self.playerontile_inv) == 1:
-            constructor = self.playerontile_inv[0]
-        elif len(self.playerontile_inv) > 1:
+        if len(cell.inventory) == 1:
+            constructor = cell.inventory[0]
+        elif len(cell.inventory) > 1:
             # Credits: https://stackoverflow.com/questions/32008737/how-to-efficiently-join-a-list-with-commas-and-add-and-before-the-last-element
-            constructor = '{} and {}'.format(
-                ', '.join(self.playerontile_inv[:-1]), self.playerontile_inv[-1])
-        if not self.playerontile_type == config.symbols.chemist:
+            
+            constructor = '{} and {}'.format(', '.join(cell.inventory[:-1]), str(cell.inventory[-1]))
+        if cell.symbol != config.symbols.chemist:
             print("You see a {} here.".format(constructor["name"]))
 
     def print_leaderboard(self):
         self.leaderboard.insert({
-            "name": self.name,
+            "name": self.player_name,
             "time": round(time.time() - self.start_time, 3),
             "moves": self.moves,
             "datetime": str(datetime.datetime.now()),
@@ -246,37 +245,41 @@ class Dungeon:
         self.leaderboardList = self.leaderboard.all()
 
         self.leaderboardList.sort(key=operator.itemgetter('time'))
-        print(color("[Leaderboard]\n", "magenta"))
+        self.rich_print("[magenta][Leaderboard][/magenta]\n", highlight=False)
         for i, element in enumerate(self.leaderboardList):
             self.prefix_text = ""
             if element["sessionid"] == self.session_id:  # show current game score
-                self.prefix_text = color("< This Game > ", "green")
-            print("{the_prefix}{index}: [{name}]\n\tTime: {time}\n\tMoves: {moves}\n\tDate and Time: {datetime}".format(
-                the_prefix=self.prefix_text, index=str(i+1), name=element["name"], time=element["time"], moves=element["moves"], datetime=element["datetime"]))
+                self.prefix_text = "[green]< This Game >[/green] "
+            self.rich_print("{the_prefix}{index}: [{name}]\n\tTime: {time}\n\tMoves: {moves}\n\tDate and Time: {datetime}".format(
+                the_prefix=self.prefix_text,
+                index=str(i+1),
+                name=element["name"],
+                time=element["time"],
+                moves=element["moves"],
+                datetime=element["datetime"]
+            ), highlight=False)
 
     def game_over(self, how):
         if how == "exit":
             os.system('cls')
-            self.rich_console.print(r"You have [success]successfully[/success] escaped the [game_header][DUNGEON][/game_header]", highlight=False)
+            self.rich_print(r"You have [success]successfully[/success] escaped the [game_header][DUNGEON][/game_header]", highlight=False)
             self.print_leaderboard()
         elif how == "dead":
-            self.rich_console.print(r"You have [fail]failed[/fail] to escape the [game_header][DUNGEON][/game_header], you'll do better next time.", highlight=False)
+            self.rich_print(r"You have [fail]failed[/fail] to escape the [game_header][DUNGEON][/game_header], you'll do better next time.", highlight=False)
         self.rich_console.input(r"[controls][Enter][/controls] to [action]exit[/action]")
         sys.exit()
 
-    def trader_screen(self, typeofperson, obj):
-        print("You have met a {0}, a {1}!".format(obj.name, typeofperson))
+    def trader_screen(self, person_type, obj):
+        print("You have met a {0}, a {1}!".format(obj.name, person_type))
         time.sleep(1)
         self.traders = obj
         os.system("cls")
-        print("{0} - {1}".format(color(obj.name, "magenta"),
-              color(typeofperson.title(), "green")))
+        self.rich_print(f"[magenta]{obj.name}[/magenta] - [green]{person_type.title()}[/green]", highlight=False)
         for index, item in enumerate(self.traders.stuff):
-            print("{0}: {1} {2}".format(
-                index+1, item["name"].title(), color("[{}]".format(item["cost"]), "magenta")))
-            print(color("\t {}".format(item["description"])))
+            self.rich_print(f"{index+1}: {item['name'].title()} [coin]{item['cost']}[/coin]", highlight=False)
+            self.rich_print(f"\t {item['description']}")
         self.print_inventory()
-        print(color("Press [e] to exit.", "magenta"))
+        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
 
         while True:
             try:
@@ -298,7 +301,6 @@ class Dungeon:
                     time.sleep(0.3)
                 if pressed == "e":
                     os.system("cls")
-                    self.print_map()
                     self.gameloop()
             except IndexError:
                 print("You have chosen an invalid choice.")
@@ -310,38 +312,35 @@ class Dungeon:
             self.orcs = orc()
             time.sleep(1)
             os.system("cls")
-            print(color("Enemy: ", "red") + color(self.orcs.name, "green"))
-            print("{0}: Health - {1}".format(self.orcs.name, self.orcs.health))
-            print("You: Health - {0}\n".format(self.health))
-            print(color("Press [a] to attack.", "green"))
+            self.rich_print(f"Enemy: {self.orcs.name}", style="enemy", highlight=False)
+            self.rich_print(f"{self.orcs.name}: Health - {self.orcs.health}", highlight=False)
+            self.rich_print(f"You: Health - {self.health}\n", highlight=False)
+            self.rich_print(r"Press [controls]\[a][/controls] to [action]attack[/action].", highlight=False)
             while self.orcs.health > 0:
                 if keyboard.is_pressed("a"):
                     self.orcs.health = self.hit(self.orcs)
-                    print(
-                        "{0}: Health - {1}".format(self.orcs.name, self.orcs.health))
-                    print("You: Health - {0}\n".format(self.health))
+                    self.rich_print(f"{self.orcs.name}: Health - {self.orcs.health}", highlight=False)
+                    self.rich_print(f"You: Health - {self.health}\n", highlight=False)
                     if self.orcs.health <= 0:
                         break
                     self.health = self.enemy_hit(self.orcs)
-                    print(
-                        "\n{0}: Health - {1}".format(self.orcs.name, self.orcs.health))
-                    print("You: Health - {0}\n".format(self.health))
+                    self.rich_print(f"{self.orcs.name}: Health - {self.orcs.health}", highlight=False)
+                    self.rich_print(f"You: Health - {self.health}\n", highlight=False)
                     time.sleep(0.15)
                     if self.health <= 0:
                         self.game_over("dead")
             self.xp += self.orcs.xp_gained
-            self.rich_console.print(self.orcs.texts.death)
-            self.matrix[self.current_loc[0]][self.current_loc[1]][2] = [
-                config.symbols.empty, 1, []]
+            self.rich_print(self.orcs.texts.death)
+            self.matrix[self.player_loc[0]][self.player_loc[1]].inventory = DungeonCell(
+                symbol=config.symbols.empty,
+                explored=1
+            )
 
-            # print(self.matrix[self.current_loc[0]][self.current_loc[1]])
-
-            print(color("The {0} drops {1} coins.".format(
-                self.orcs.name, self.orcs.coins), "yellow"))
+            # print(self.matrix[self.player_loc[0]][self.player_loc[1]])
+            self.rich_print(f"The [enemy]{self.orcs.name}[/enemy] drops [coin]{self.orcs.coins}[/coin] coins.", highlight=False)
             self.coins += self.orcs.coins
             time.sleep(1.5)
             os.system("cls")
-            self.print_map()
             self.gameloop()
 
     def enemy_hit(self, enemy):
@@ -350,12 +349,12 @@ class Dungeon:
                 random.randint(enemy.attack_range[0], enemy.attack_range[1])
             if self.current_attack_damage == enemy.attack_base + enemy.attack_range[1]:
                 # Max Damage
-                self.rich_console.print(enemy.texts.critical_hit)
+                self.rich_print(enemy.texts.critical_hit)
             else:
-                self.rich_console.print(enemy.texts.hit)
+                self.rich_print(enemy.texts.hit)
             return (self.health - self.current_attack_damage)
         else:
-            self.rich_console.print(enemy.texts.missed_hit)
+            self.rich_print(enemy.texts.missed_hit)
             return self.health
 
     def hit(self, enemy):
@@ -375,6 +374,7 @@ class Dungeon:
             return enemy.health
 
     def gameloop(self):
+        self.print_map()
         self.inventoryscreen = False
         while True:
             if keyboard.is_pressed("right"):
@@ -403,9 +403,9 @@ class Dungeon:
 
     def equip_menu(self):
         os.system("cls")
-        print(color("Use/Equip Menu", "green"))
+        self.rich_print("Use/Equip Menu", style="menu_header", highlight=False)
         self.print_inventory()
-        print(color("Press [e] to exit.", "magenta"))
+        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
         while True:
             try:
                 pressed = keyboard.read_key()
@@ -434,7 +434,6 @@ class Dungeon:
                     self.print_inventory()
                 if pressed == "e":
                     os.system("cls")
-                    self.print_map()
                     self.gameloop()
             except IndexError:
                 print("You have chosen an invalid choice.")
@@ -442,41 +441,35 @@ class Dungeon:
 
     def drop_menu(self):
         os.system("cls")
-        print(color("Drop Menu", "green"))
+        self.rich_print("Drop Menu", style="menu_header", highlight=False)
         self.print_inventory()
-        print(color("Press [e] to exit.", "magenta"))
+        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
         while True:
             try:
                 pressed = keyboard.read_key()
                 if pressed.isnumeric():
                     pressed = int(pressed)
                     self.to_use = self.inventory[pressed-1]
-                    print("Do you want to drop the {0}?\n{1}".format(self.to_use["name"].title(
-                    ), color("Press [y] for Yes and [n] for No.", "magenta")))
+                    self.rich_print(fr"Do you want to drop the {self.to_use['name'].title()}?\nPress [controls]\[y][/controls] for [action]Yes[/action] and [controls]\[n][/controls] for [action]No[/action].", highlight=False)
                     while True:
                         if keyboard.is_pressed("y"):
                             del self.inventory[pressed-1]
-
-                            print("You have dropped the {}!".format(
-                                self.to_use["name"].title()))
+                            self.rich_print(f"You have dropped the {self.to_use['name'].title()}!")
                             break
                         elif keyboard.is_pressed("n"):
-                            print("You do not drop the {}.".format(
-                                self.to_use["name"].title()))
+                            self.rich_print(f"You do not drop the {self.to_use['name'].title()}.")
                             break
                     time.sleep(0.2)
                     self.print_inventory()
                 if pressed == "e":
                     os.system("cls")
-                    self.print_map()
                     self.gameloop()
             except IndexError:
                 print("You have chosen an invalid choice.")
                 time.sleep(0.5)
 
     def print_inventory(self):
-        print(color(
-            "Inventory ({0} / {1})".format(len(self.inventory), self.max_inventory), "green"))
+        self.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", highlight=False)
         if len(self.inventory) == 0:
             print("You have nothing in your inventory!")
         else:
@@ -487,85 +480,65 @@ class Dungeon:
     def print_inventory_wrapper(self, *args):
         os.system("cls")
         self.print_inventory()
-        print(color("Press [e] to exit.", "magenta"))
+        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
         # time.sleep(0.5)
         while True:
             if keyboard.is_pressed("e"):
                 break
         os.system("cls")
-        self.print_map()
         self.gameloop()
 
     def player_move(self, direction):
-        if direction == "e":
-            if self.current_loc[1] < (config.map.width-1):
-                if self.matrix[self.current_loc[0]][self.current_loc[1]+1][0] != config.symbols.wall:
-                    self.matrix[self.current_loc[0]][self.current_loc[1]
-                                                     ] = self.matrix[self.current_loc[0]][self.current_loc[1]][2]
-                    self.matrix[self.current_loc[0]][self.current_loc[1]+1] = [config.symbols.player,
-                                                                               1, self.matrix[self.current_loc[0]][self.current_loc[1]+1]]
-                    self.current_loc = [
-                        self.current_loc[0], self.current_loc[1]+1]
-        if direction == "w":
-            if self.current_loc[1] > 0:
-                if self.matrix[self.current_loc[0]][self.current_loc[1]-1][0] != config.symbols.wall:
-                    self.matrix[self.current_loc[0]][self.current_loc[1]
-                                                     ] = self.matrix[self.current_loc[0]][self.current_loc[1]][2]
-                    self.matrix[self.current_loc[0]][self.current_loc[1]-1] = [config.symbols.player,
-                                                                               1, self.matrix[self.current_loc[0]][self.current_loc[1]-1]]
-                    self.current_loc = [
-                        self.current_loc[0], self.current_loc[1]-1]
-        if direction == "n":
-            if self.current_loc[0] > 0:
-                if self.matrix[self.current_loc[0]-1][self.current_loc[1]][0] != config.symbols.wall:
-                    self.matrix[self.current_loc[0]][self.current_loc[1]
-                                                     ] = self.matrix[self.current_loc[0]][self.current_loc[1]][2]
-                    self.matrix[self.current_loc[0]-1][self.current_loc[1]] = [config.symbols.player,
-                                                                               1, self.matrix[self.current_loc[0]-1][self.current_loc[1]]]
-                    self.current_loc = [
-                        self.current_loc[0]-1, self.current_loc[1]]
-        if direction == "s":
-            if self.current_loc[0] < (config.map.height-1):
-                if self.matrix[self.current_loc[0]+1][self.current_loc[1]][0] != config.symbols.wall:
-                    self.matrix[self.current_loc[0]][self.current_loc[1]
-                                                     ] = self.matrix[self.current_loc[0]][self.current_loc[1]][2]
-                    self.matrix[self.current_loc[0]+1][self.current_loc[1]] = [config.symbols.player,
-                                                                               1, self.matrix[self.current_loc[0]+1][self.current_loc[1]]]
-                    self.current_loc = [
-                        self.current_loc[0]+1, self.current_loc[1]]
+        y, x = self.player_loc
+        condition, new_y, new_x = {
+            "e": ((x < (config.map.max_x)), y, x+1),
+            "w": ((x > 0), y, x-1),
+            "n": ((y > 0), y-1, x),
+            "s": ((y < (config.map.max_y)), y+1, x)
+        }.get(direction)
+        if condition:
+            if self.matrix[new_y][new_x].symbol != config.symbols.wall:
+                self.matrix[y][x] = self.matrix[y][x].inventory
+                self.matrix[new_y][new_x] = DungeonCell(
+                    symbol=config.symbols.player,
+                    explored=True,
+                    inventory=self.matrix[new_y][new_x]
+                )
+
+                self.player_loc = (new_y, new_x)
         self.deactivate_seen_tiles()
 
     def print_map(self):
         os.system('cls')
-        self.rich_console.print("[Dungeon]", style="game_header", end=" ", highlight=False)
-        self.rich_console.print(f"Move: {self.moves}", style="move_count", end=" ", highlight=False)
-        self.rich_console.print(f"Health: ({self.health} / {self.max_health})", style="health_count", end=" ", highlight=False)
-        self.rich_console.print(f"XP: {self.xp}", style="xp_count", end=" ", highlight=False)
-        self.rich_console.print(f"Coins: {self.coins}", style="coin_count", end=" ", highlight=False)
-        self.rich_console.print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory_count", end=" ", highlight=False)
-        self.rich_console.print(f"Time: {(time.time()-self.start_time):.2f}s", style="time_count", highlight=False)
+        self.rich_print("[Dungeon]", style="game_header", end=" ", highlight=False)
+        self.rich_print(f"Move: {self.moves}", style="move_count", end=" ", highlight=False)
+        self.rich_print(f"Health: ({self.health} / {self.max_health})", style="health_count", end=" ", highlight=False)
+        self.rich_print(f"XP: {self.xp}", style="xp_count", end=" ", highlight=False)
+        self.rich_print(f"Coins: {self.coins}", style="coin", end=" ", highlight=False)
+        self.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", end=" ", highlight=False)
+        self.rich_print(f"Time: {(time.time()-self.start_time):.2f}s", style="time_count", highlight=False)
         temp_map = []
         index = -1
         for row in self.matrix:
             temp_map.append([])
             index += 1
             for cell in row:
-                if cell[1] == 0:
+                if cell.explored == False:
                     temp_map[index].append(config.symbols.unknown)
-                elif cell[1] == 1:
+                else:
                     # Make enemy hidden
-                    if cell[0] in config.symbols.enemies:
+                    if cell.symbol in config.symbols.enemies:
                         temp_map[index].append(config.symbols.empty)
-                    elif cell[0] != config.symbols.empty:
-                        temp_map[index].append(cell[0])
-                    elif len(cell[2]) > 0 and isinstance(cell[2][0], dict):
-                        obj_type = cell[2][0]["object"]
+                    elif cell.symbol != config.symbols.empty:
+                        temp_map[index].append(cell.symbol)
+                    elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], dict):
+                        obj_type = cell.inventory[0]["object"]
                         temp_map[index].append({
                             "weapons": config.symbols.weapons,
                             "potions": config.symbols.potions
                         }.get(obj_type))
                     else:
-                        temp_map[index].append(cell[0])
+                        temp_map[index].append(cell.symbol)
 
         map_str = str(DataFrame(temp_map))
         styling = [
@@ -582,8 +555,8 @@ class Dungeon:
             map_str = map_str.replace(symbol, f"[{style}]{symbol}[/{style}]")
         for num in "0123456789":
             map_str = map_str.replace(num, f"[grid_num]{num}[/grid_num]")
-        self.rich_console.print(map_str, highlight=False)
-        self.rich_console.print(r"""
+        self.rich_print(map_str, highlight=False)
+        self.rich_print(r"""
 Press [controls]\[arrow keys][/controls] to [action]move[/action].
 Press [controls]\[i][/controls] for [action]inventory[/action].
 Press [controls]\[esc][/controls] to [action]exit[/action].
@@ -592,36 +565,35 @@ Press [controls]\[d][/controls] to [action]drop items[/action].
 """, highlight=False)
 
     def deactivate_seen_tiles(self):
-        self.matrix[self.current_loc[0] -
-                    1][self.current_loc[1]-1][1] = 1  # North West
-        self.matrix[self.current_loc[0] +
-                    1][self.current_loc[1]-1][1] = 1  # South West
-        self.matrix[self.current_loc[0]][self.current_loc[1]-1][1] = 1  # West
-        self.matrix[self.current_loc[0] -
-                    1][self.current_loc[1]+1][1] = 1  # North East
-        self.matrix[self.current_loc[0] +
-                    1][self.current_loc[1]+1][1] = 1  # South East
-        self.matrix[self.current_loc[0]][self.current_loc[1]+1][1] = 1  # East
-        self.matrix[self.current_loc[0]-1][self.current_loc[1]][1] = 1  # North
-        self.matrix[self.current_loc[0]+1][self.current_loc[1]][1] = 1  # South
+        y, x = self.player_loc
+        adjacent_cells = [
+            (y-1, x-1), (y-1, x), (y-1, x+1),
+            (y, x-1), (y, x), (y, x+1),
+            (y+1, x-1), (y+1, x), (y+1, x+1)
+        ]
+        for y, x in adjacent_cells:
+            if (y < 0 or y > config.map.max_y) or (x < 0 or x > config.map.max_x):
+                continue
+            self.matrix[y][x].explored = True
+
         """
         # Prevent Border Sneak-peaking
-        if not self.current_loc[1] == 0:
-            if not self.current_loc[0] == 0:
-                self.matrix[self.current_loc[0]-1][self.current_loc[1]-1][1] = 1 # North West
-            if not self.current_loc[1] == (config.map.height - 1):
-                self.matrix[self.current_loc[0]+1][self.current_loc[1]-1][1] = 1 # South West
-            self.matrix[self.current_loc[0]][self.current_loc[1]-1][1] = 1 # West
-        if not self.current_loc[1] == (config.map.width):
-            if not self.current_loc[0] == 0:
-                self.matrix[self.current_loc[0]-1][self.current_loc[1]+1][1] = 1 # North East
-            if not self.current_loc[1] == (config.map.height - 1): ###
-                self.matrix[self.current_loc[0]+1][self.current_loc[1]+1][1] = 1 # South East
-            self.matrix[self.current_loc[0]][self.current_loc[1]+1][1] = 1 # East
-        if not self.current_loc[0] == 0:
-            self.matrix[self.current_loc[0]-1][self.current_loc[1]][1] = 1 # North
-        if not self.current_loc[1] == (config.map.height - 1):
-            self.matrix[self.current_loc[0]+1][self.current_loc[1]][1] = 1 # South
+        if not self.player_loc[1] == 0:
+            if not self.player_loc[0] == 0:
+                self.matrix[self.player_loc[0]-1][self.player_loc[1]-1][1] = 1 # North West
+            if not self.player_loc[1] == (config.map.height - 1):
+                self.matrix[self.player_loc[0]+1][self.player_loc[1]-1][1] = 1 # South West
+            self.matrix[self.player_loc[0]][self.player_loc[1]-1][1] = 1 # West
+        if not self.player_loc[1] == (config.map.width):
+            if not self.player_loc[0] == 0:
+                self.matrix[self.player_loc[0]-1][self.player_loc[1]+1][1] = 1 # North East
+            if not self.player_loc[1] == (config.map.height - 1): ###
+                self.matrix[self.player_loc[0]+1][self.player_loc[1]+1][1] = 1 # South East
+            self.matrix[self.player_loc[0]][self.player_loc[1]+1][1] = 1 # East
+        if not self.player_loc[0] == 0:
+            self.matrix[self.player_loc[0]-1][self.player_loc[1]][1] = 1 # North
+        if not self.player_loc[1] == (config.map.height - 1):
+            self.matrix[self.player_loc[0]+1][self.player_loc[1]][1] = 1 # South
         """
 
 
@@ -631,10 +603,11 @@ def main(logger):
         d = Dungeon(
             logger=logger
         )
-        d.log_info("dungeon set up is done")
+        d.log_info("dungeon set up is done, starting game")
         d.gameloop()
     except KeyboardInterrupt:
         print("Exiting [Dungeon]...")
+        logger.log(LogType.INFO, "game exited")
         sys.exit()
     except Exception as e:
         logger.log(LogType.FATAL, f"\n{''.join(traceback.format_tb(e.__traceback__))}\n\n{str(e)}")
