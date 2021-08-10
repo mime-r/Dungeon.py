@@ -214,12 +214,15 @@ class Dungeon:
             self.game_over("exit")
         if player_cell.symbol in config.symbols.enemies:
             self.attack(player_cell.symbol)
+            self.print_map()
         if player_cell.symbol == config.symbols.chemist:
             thechemist = player_cell.inventory[0]
             self.trader_screen("chemist", thechemist)
+            self.print_map()
         # inv list
         if len(player_cell.inventory) > 0:
             self.print_cell_inv(cell=player_cell)
+
 
     def print_cell_inv(self, cell):
         constructor = ""
@@ -300,8 +303,7 @@ class Dungeon:
                             self.traders.stuff[pressed-1]["name"].title()))
                     time.sleep(0.3)
                 if pressed == "e":
-                    os.system("cls")
-                    self.gameloop()
+                    break
             except IndexError:
                 print("You have chosen an invalid choice.")
                 time.sleep(0.5)
@@ -311,9 +313,9 @@ class Dungeon:
             config.symbols.orc: Orc
         }.get(enemy_symbol)()
         print_header = lambda: self.rich_print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
-        def print_health():
-            self.rich_print(f"[enemy]{enemy.name}[/enemy]: Health - {enemy.health}", highlight=False)
-            self.rich_print(f"[player]You[/player]: Health - {self.health}\n", highlight=False)
+        def print_health(enemy_hp_drop=None, player_hp_drop=None):
+            self.rich_print(f"[enemy]{enemy.name}[/enemy]: Health - [health]{enemy.health}[/health]{' [hp_drop]( -'+str(enemy_hp_drop)+' )[/hp_drop]' if enemy_hp_drop else ''}", highlight=False)
+            self.rich_print(f"[player]You[/player]: Health - [health]{self.health}[/health]{' [hp_drop]( -'+str(player_hp_drop)+' )[/hp_drop]' if player_hp_drop else ''}\n", highlight=False)
         print_footer = lambda: self.rich_print(r"Press [controls]\[a][/controls] to [action]attack[/action].", highlight=False)
 
         self.rich_print(f"You have met an [enemy]{enemy.name}[/enemy]!", highlight=False)
@@ -325,13 +327,13 @@ class Dungeon:
                 os.system('cls')
                 print_header()
                 time.sleep(0.15)
-                enemy.health = self.hit(enemy)
-                print_health()
+                enemy.health, enemy_hp_drop = self.hit(enemy)
+                print_health(enemy_hp_drop=enemy_hp_drop)
                 if enemy.health <= 0:
                     break
                 time.sleep(0.15)
-                self.health = self.enemy_hit(enemy)
-                print_health()
+                self.health, player_hp_drop = self.enemy_hit(enemy)
+                print_health(player_hp_drop=player_hp_drop)
                 print_footer()
                 time.sleep(0.15)
                 if self.health <= 0:
@@ -346,9 +348,7 @@ class Dungeon:
         # print(self.matrix[self.player_loc[0]][self.player_loc[1]])
         self.rich_print(f"The [enemy]{enemy.name}[/enemy] drops [coin]{enemy.coin_drop}[/coin] coins.", highlight=False)
         self.coins += enemy.coin_drop
-        time.sleep(1.5)
-        os.system("cls")
-        self.gameloop()
+        time.sleep(2)
 
     def enemy_hit(self, enemy):
         if random.randint(1, 100) < enemy.accuracy:
@@ -360,10 +360,10 @@ class Dungeon:
             else:
                 self.rich_print(enemy.texts.hit)
             #self.rich_print(f"\n[player]Your[/player] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
-            return (self.health - attack_damage)
+            return (self.health - attack_damage), attack_damage
         else:
             self.rich_print(enemy.texts.missed_hit)
-            return self.health
+            return self.health, 0
 
     def hit(self, enemy):
         if not random.randint(1, 100) < self.equipped["chance-of-hit"]:
@@ -377,14 +377,13 @@ class Dungeon:
                 print(
                     self.equipped["text-normal"].format(enemy.name, self.equipped["name"]))
             #self.rich_print(f"\n[enemy]{enemy.name}\'s[/enemy] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
-            return (enemy.health - attack_damage)
+            return (enemy.health - attack_damage), attack_damage
         else:
             print(self.equipped["text-miss"].format(enemy.name))
-            return enemy.health
+            return enemy.health, 0
 
     def gameloop(self):
         self.print_map()
-        self.inventoryscreen = False
         while True:
             if keyboard.is_pressed("right"):
                 self.player_move("e")
@@ -403,12 +402,13 @@ class Dungeon:
                 sys.exit()
             elif keyboard.is_pressed("u"):
                 self.equip_menu()
+                self.print_map()
             elif keyboard.is_pressed("d"):
                 self.drop_menu()
-            elif not self.inventoryscreen:
-                if keyboard.is_pressed("i"):
-                    self.inventoryscreen = True
-                    self.print_inventory_wrapper()
+                self.print_map()
+            elif keyboard.is_pressed("i"):
+                self.print_inventory_wrapper()
+                self.print_map()
 
     def equip_menu(self):
         os.system("cls")
@@ -442,8 +442,7 @@ class Dungeon:
                     time.sleep(0.2)
                     self.print_inventory()
                 if pressed == "e":
-                    os.system("cls")
-                    self.gameloop()
+                    break
             except IndexError:
                 print("You have chosen an invalid choice.")
                 time.sleep(0.5)
@@ -471,8 +470,7 @@ class Dungeon:
                     time.sleep(0.2)
                     self.print_inventory()
                 if pressed == "e":
-                    os.system("cls")
-                    self.gameloop()
+                    break
             except IndexError:
                 print("You have chosen an invalid choice.")
                 time.sleep(0.5)
@@ -494,8 +492,6 @@ class Dungeon:
         while True:
             if keyboard.is_pressed("e"):
                 break
-        os.system("cls")
-        self.gameloop()
 
     def player_move(self, direction):
         y, x = self.player_loc
