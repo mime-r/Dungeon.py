@@ -17,7 +17,7 @@ from rich.theme import Theme
 from Application.classes.get import get
 from Application.classes.weapons import weapons
 from Application.classes.people import people
-from Application.classes.enemies import orc
+from Application.classes.enemies import Orc
 from Application.config import config
 from Application.classes.map import Map, DungeonCell
 from Application.loggers import LogType
@@ -208,18 +208,18 @@ class Dungeon:
         self.check()
 
     def check(self):
-        self.player_cell = self.matrix[self.player_loc[0]][self.player_loc[1]].inventory
+        player_cell = self.matrix[self.player_loc[0]][self.player_loc[1]].inventory
         # print(self.playerontile_type)
-        if self.player_cell.symbol == config.symbols.target:
+        if player_cell.symbol == config.symbols.target:
             self.game_over("exit")
-        if self.player_cell.symbol == config.symbols.orc:
-            self.attack("orc")
-        if self.player_cell.symbol == config.symbols.chemist:
-            thechemist = self.player_cell.inventory[0]
+        if player_cell.symbol in config.symbols.enemies:
+            self.attack(player_cell.symbol)
+        if player_cell.symbol == config.symbols.chemist:
+            thechemist = player_cell.inventory[0]
             self.trader_screen("chemist", thechemist)
         # inv list
-        if len(self.player_cell.inventory) > 0:
-            self.print_cell_inv(cell=self.player_cell)
+        if len(player_cell.inventory) > 0:
+            self.print_cell_inv(cell=player_cell)
 
     def print_cell_inv(self, cell):
         constructor = ""
@@ -306,69 +306,78 @@ class Dungeon:
                 print("You have chosen an invalid choice.")
                 time.sleep(0.5)
 
-    def attack(self, enemy_type):  # He protecc he attacc he also like to snacc
-        if enemy_type == "orc":
-            print("You have met an orc!")
-            self.orcs = orc()
-            time.sleep(1)
-            os.system("cls")
-            self.rich_print(f"Enemy: {self.orcs.name}", style="enemy", highlight=False)
-            self.rich_print(f"{self.orcs.name}: Health - {self.orcs.health}", highlight=False)
-            self.rich_print(f"You: Health - {self.health}\n", highlight=False)
-            self.rich_print(r"Press [controls]\[a][/controls] to [action]attack[/action].", highlight=False)
-            while self.orcs.health > 0:
-                if keyboard.is_pressed("a"):
-                    self.orcs.health = self.hit(self.orcs)
-                    self.rich_print(f"{self.orcs.name}: Health - {self.orcs.health}", highlight=False)
-                    self.rich_print(f"You: Health - {self.health}\n", highlight=False)
-                    if self.orcs.health <= 0:
-                        break
-                    self.health = self.enemy_hit(self.orcs)
-                    self.rich_print(f"{self.orcs.name}: Health - {self.orcs.health}", highlight=False)
-                    self.rich_print(f"You: Health - {self.health}\n", highlight=False)
-                    time.sleep(0.15)
-                    if self.health <= 0:
-                        self.game_over("dead")
-            self.xp += self.orcs.xp_gained
-            self.rich_print(self.orcs.texts.death)
-            self.matrix[self.player_loc[0]][self.player_loc[1]].inventory = DungeonCell(
-                symbol=config.symbols.empty,
-                explored=1
-            )
+    def attack(self, enemy_symbol):  # He protecc he attacc he also like to snacc
+        enemy = {
+            config.symbols.orc: Orc
+        }.get(enemy_symbol)()
+        print_header = lambda: self.rich_print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
+        def print_health():
+            self.rich_print(f"[enemy]{enemy.name}[/enemy]: Health - {enemy.health}", highlight=False)
+            self.rich_print(f"[player]You[/player]: Health - {self.health}\n", highlight=False)
+        print_footer = lambda: self.rich_print(r"Press [controls]\[a][/controls] to [action]attack[/action].", highlight=False)
 
-            # print(self.matrix[self.player_loc[0]][self.player_loc[1]])
-            self.rich_print(f"The [enemy]{self.orcs.name}[/enemy] drops [coin]{self.orcs.coins}[/coin] coins.", highlight=False)
-            self.coins += self.orcs.coins
-            time.sleep(1.5)
-            os.system("cls")
-            self.gameloop()
+        self.rich_print(f"You have met an [enemy]{enemy.name}[/enemy]!", highlight=False)
+        time.sleep(1)
+        os.system("cls")
+        print_header();print_health();print_footer()
+        while enemy.health > 0:
+            if keyboard.is_pressed("a"):
+                os.system('cls')
+                print_header()
+                time.sleep(0.15)
+                enemy.health = self.hit(enemy)
+                print_health()
+                if enemy.health <= 0:
+                    break
+                time.sleep(0.15)
+                self.health = self.enemy_hit(enemy)
+                print_health()
+                print_footer()
+                time.sleep(0.15)
+                if self.health <= 0:
+                    self.game_over("dead")
+        self.xp += enemy.xp_drop
+        self.rich_print(f"{enemy.texts.death}")
+        self.matrix[self.player_loc[0]][self.player_loc[1]].inventory = DungeonCell(
+            symbol=config.symbols.empty,
+            explored=True
+        )
+
+        # print(self.matrix[self.player_loc[0]][self.player_loc[1]])
+        self.rich_print(f"The [enemy]{enemy.name}[/enemy] drops [coin]{enemy.coin_drop}[/coin] coins.", highlight=False)
+        self.coins += enemy.coin_drop
+        time.sleep(1.5)
+        os.system("cls")
+        self.gameloop()
 
     def enemy_hit(self, enemy):
-        if not random.randint(1, 100) < enemy.percentage:
-            self.current_attack_damage = enemy.attack_base + \
+        if random.randint(1, 100) < enemy.accuracy:
+            attack_damage = enemy.attack_base + \
                 random.randint(enemy.attack_range[0], enemy.attack_range[1])
-            if self.current_attack_damage == enemy.attack_base + enemy.attack_range[1]:
+            if attack_damage == enemy.attack_base + enemy.attack_range[1]:
                 # Max Damage
                 self.rich_print(enemy.texts.critical_hit)
             else:
                 self.rich_print(enemy.texts.hit)
-            return (self.health - self.current_attack_damage)
+            #self.rich_print(f"\n[player]Your[/player] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
+            return (self.health - attack_damage)
         else:
             self.rich_print(enemy.texts.missed_hit)
             return self.health
 
     def hit(self, enemy):
         if not random.randint(1, 100) < self.equipped["chance-of-hit"]:
-            self.current_attack_damage = self.equipped["base-attack"] + random.randint(
+            attack_damage = self.equipped["base-attack"] + random.randint(
                 self.equipped["random-attack"][0], self.equipped["random-attack"][1])
-            if self.current_attack_damage == self.equipped["base-attack"] + self.equipped["random-attack"][1]:
+            if attack_damage == self.equipped["base-attack"] + self.equipped["random-attack"][1]:
                 # Max Damage
                 print(
                     self.equipped["text-critical"].format(self.equipped["name"]))
             else:
                 print(
                     self.equipped["text-normal"].format(enemy.name, self.equipped["name"]))
-            return (enemy.health - self.current_attack_damage)
+            #self.rich_print(f"\n[enemy]{enemy.name}\'s[/enemy] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
+            return (enemy.health - attack_damage)
         else:
             print(self.equipped["text-miss"].format(enemy.name))
             return enemy.health
@@ -512,7 +521,7 @@ class Dungeon:
         os.system('cls')
         self.rich_print("[Dungeon]", style="game_header", end=" ", highlight=False)
         self.rich_print(f"Move: {self.moves}", style="move_count", end=" ", highlight=False)
-        self.rich_print(f"Health: ({self.health} / {self.max_health})", style="health_count", end=" ", highlight=False)
+        self.rich_print(f"Health: ({self.health} / {self.max_health})", style="health", end=" ", highlight=False)
         self.rich_print(f"XP: {self.xp}", style="xp_count", end=" ", highlight=False)
         self.rich_print(f"Coins: {self.coins}", style="coin", end=" ", highlight=False)
         self.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", end=" ", highlight=False)
