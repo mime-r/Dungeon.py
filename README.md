@@ -34,3 +34,7 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 
 ## Todo (aka submit pull requests thank you):
 - pick up items on the ground
+
+## Credits:
+- @mime-r
+- @nj
