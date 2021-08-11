@@ -1,11 +1,10 @@
-from database import db
 from random import randint
-from .items import DungeonItemDatabase
+from .database import DungeonItemDatabase
 
 
 class people:
     def __init__(self):
-        self.potions = db().allOfIt("potions")
+        pass
 
     class chemist:
         def __init__(self):

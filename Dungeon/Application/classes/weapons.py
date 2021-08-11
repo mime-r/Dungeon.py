@@ -1,11 +1,10 @@
-from tinydb import TinyDB, Query
-class weapons:
-    
-    def __init__(self):
-        
-        self.weapons = TinyDB('weapons.json')
-    
-    def give(self, type_):
-        chooser = Query()
-        if type_ == "default":
-            return self.weapons.search(chooser.name == "fists")[0]
+
+class WeaponType:
+    MELEE = "melee"
+    RANGED = "ranged"
+
+class DungeonWeaponTexts:
+    def __init__(self, critical_hit, hit, missed_hit):
+        self.critical_hit = critical_hit
+        self.hit = hit
+        self.missed_hit = missed_hit

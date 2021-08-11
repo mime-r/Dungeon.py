@@ -15,13 +15,14 @@ from rich.theme import Theme
 
 # App Imports
 from Application.classes.get import get
-from Application.classes.weapons import weapons
+from Application.classes.weapons import *
 from Application.classes.people import people
 from Application.classes.enemies import Orc
 from Application.config import config
 from Application.classes.map import Map, DungeonCell
 from Application.loggers import LogType
 from Application.classes.items import *
+from Application.classes.database import DungeonItemDatabase
 
 import random
 print("Loading...")
@@ -75,7 +76,7 @@ class Dungeon:
 
         # init weapons
         # name, base attack, startrandom, endrandom, chanceofhit, hittextsucessful, hittextweak, hittextmiss
-        self.equipped = weapons().give("default")
+        self.equipped = DungeonItemDatabase.search_item(name="Fists")
 
         # Fill inventory with starter potions
         for i in range(2):
@@ -235,7 +236,7 @@ class Dungeon:
             self.trader_screen("chemist", thechemist)
             self.print_map()
         # inv list
-        if len(player_cell.inventory) > 0:
+        if len(player_cell.inventory) > 0 and isinstance(player_cell.inventory[0], DungeonItem):
             self.print_cell_inv(
                 inventory=list(filter(
                     lambda x: isinstance(x, DungeonItem),
@@ -384,20 +385,20 @@ class Dungeon:
             return self.health, 0
 
     def hit(self, enemy):
-        if not random.randint(1, 100) < self.equipped["chance-of-hit"]:
-            attack_damage = self.equipped["base-attack"] + random.randint(
-                self.equipped["random-attack"][0], self.equipped["random-attack"][1])
-            if attack_damage == self.equipped["base-attack"] + self.equipped["random-attack"][1]:
+        if not random.randint(1, 100) < self.equipped.accuracy:
+            attack_damage = self.equipped.base_attack + random.randint(
+                self.equipped.attack_range[0], self.equipped.attack_range[1])
+            if attack_damage == self.equipped.base_attack + self.equipped.attack_range[1]:
                 # Max Damage
-                print(
-                    self.equipped["text-critical"].format(self.equipped["name"]))
+                self.rich_print(
+                    self.equipped.texts.critical_hit.format(style_text(self.equipped.name, 'weapons')), highlight=False)
             else:
-                print(
-                    self.equipped["text-normal"].format(enemy.name, self.equipped["name"]))
+                self.rich_print(
+                    self.equipped.texts.hit.format(style_text(enemy.name, 'enemy'), style_text(self.equipped.name, 'weapons')), highlight=False)
             #self.rich_print(f"\n[enemy]{enemy.name}\'s[/enemy] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
             return (enemy.health - attack_damage), attack_damage
         else:
-            print(self.equipped["text-miss"].format(enemy.name))
+            self.rich_print(self.equipped.texts.missed_hit.format(style_text(enemy.name, 'enemy')), highlight=False)
             return enemy.health, 0
 
     def gameloop(self):
