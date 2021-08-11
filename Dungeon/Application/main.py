@@ -21,6 +21,7 @@ from Application.classes.enemies import Orc
 from Application.config import config
 from Application.classes.map import Map, DungeonCell
 from Application.loggers import LogType
+from Application.classes.items import *
 
 import random
 print("Loading...")
@@ -78,7 +79,11 @@ class Dungeon:
 
         # Fill inventory with starter potions
         for i in range(2):
-            self.inventory.append(get().get("potions", "weak healing potion"))
+            self.inventory.append(
+                DungeonItemDatabase.search_item(
+                    name="Weak Healing Potion"
+                )
+            )
 
         self.log_info("init dungeon variables")
         
@@ -142,11 +147,17 @@ class Dungeon:
                     cell = self.matrix[y][x]
                     rc_num = random.randint(0, 6)
                     if rc_num < 3:
-                        chosen_potion = get().get("potions", "weak healing potion")
+                        chosen_potion = DungeonItemDatabase.search_item(
+                            name="Weak Healing Potion"
+                        )
                     elif rc_num < 6:
-                        chosen_potion = get().get("potions", "medium healing potion")
+                        chosen_potion = DungeonItemDatabase.search_item(
+                            name="Medium Healing Potion"
+                        )
                     else:
-                        chosen_potion = get().get("potions", "strong healing potion")
+                        chosen_potion = DungeonItemDatabase.search_item(
+                            name="Strong Healing Potion"
+                        )
                     self.matrix[y][x].inventory.append(chosen_potion)
                     break
         self.log_info("filled map with potions")
@@ -194,11 +205,11 @@ class Dungeon:
             for cell in row:
                 if cell.symbol != config.symbols.empty:
                     base_map[index].append(cell.symbol)
-                elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], dict):
-                    obj_type = cell.inventory[0]["object"]
+                elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], DungeonItem):
+                    obj_type = type(cell.inventory[0])
                     base_map[index].append({
                         "weapons": config.symbols.weapons,
-                        "potions": config.symbols.potions
+                        DungeonPotion: config.symbols.potions
                     }.get(obj_type))
                 else:
                     base_map[index].append(cell.symbol)
@@ -225,21 +236,23 @@ class Dungeon:
             self.print_map()
         # inv list
         if len(player_cell.inventory) > 0:
-            self.print_cell_inv(cell=player_cell)
+            self.print_cell_inv(
+                inventory=list(filter(
+                    lambda x: isinstance(x, DungeonItem),
+                    player_cell.inventory
+                ))
+            )
 
 
-    def print_cell_inv(self, cell):
+    def print_cell_inv(self, inventory):
         constructor = ""
         # print(self.playerontile_inv)
         # time.sleep(1)
-        if len(cell.inventory) == 1:
-            constructor = cell.inventory[0]
-        elif len(cell.inventory) > 1:
-            # Credits: https://stackoverflow.com/questions/32008737/how-to-efficiently-join-a-list-with-commas-and-add-and-before-the-last-element
-            
-            constructor = '{} and {}'.format(', '.join(cell.inventory[:-1]), str(cell.inventory[-1]))
-        if cell.symbol != config.symbols.chemist:
-            print("You see a {} here.".format(constructor["name"]))
+        if len(inventory) == 1:
+            constructor = inventory[0].name
+        elif len(inventory) > 1:
+            constructor = '{} and {}'.format(', '.join(map(lambda obj: obj.name, inventory[:-1])), str(inventory[-1].name))
+        print("You see a {} here.".format(constructor))
 
     def print_leaderboard(self):
         self.leaderboard.insert({
@@ -283,8 +296,8 @@ class Dungeon:
         os.system("cls")
         self.rich_print(f"{style_text(obj.name, 'magenta')} - {style_text(person_type.title(), 'green')}", highlight=False)
         for index, item in enumerate(self.traders.stuff):
-            self.rich_print(f"{index+1}: {item['name'].title()} {style_text(item['cost'], 'coin')}", highlight=False)
-            self.rich_print(f"\t {item['description']}")
+            self.rich_print(f"{index+1}: {item.name} {style_text(item.cost, 'coin')}", highlight=False)
+            self.rich_print(f"\t {item.description}")
         self.print_inventory()
         self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
 
@@ -293,18 +306,19 @@ class Dungeon:
                 pressed = keyboard.read_key()
                 if pressed.isdigit():
                     pressed = int(pressed)
-                    if self.coins >= self.traders.stuff[pressed-1]["cost"]:
+                    selected_item = self.traders.stuff[pressed-1]
+                    if self.coins >= selected_item.cost:
                         if len(self.inventory) == self.max_inventory:
                             print("Your inventory is full.")
                         else:
                             print("You have bought the {}".format(
-                                self.traders.stuff[pressed-1]["name"].title()))
+                                selected_item.name))
                             self.inventory.append(
-                                self.traders.stuff[pressed-1])
+                                selected_item)
                             self.print_inventory()
                     else:
                         print("You do not have enough money to buy the {}.".format(
-                            self.traders.stuff[pressed-1]["name"].title()))
+                            selected_item.name))
                     time.sleep(0.3)
                 if pressed == "e":
                     break
@@ -424,23 +438,23 @@ class Dungeon:
                 pressed = keyboard.read_key()
                 if pressed.isnumeric():
                     pressed = int(pressed)
-                    self.to_use = self.inventory[pressed-1]
-                    if self.to_use["type"] == "bag":
+                    selected_item = self.inventory[pressed-1]
+                    if isinstance(selected_item, DungeonInventory):
                         print("You sling the {} over your shoulders.".format(
-                            self.to_use["name"]))
+                            selected_item.name))
                         del self.inventory[pressed-1]
-                        self.max_inventory += 4
-                    elif self.to_use["type"] == "health-potion":
+                        self.max_inventory += selected_item.inventory
+                    elif isinstance(selected_item, DungeonPotion):
                         if self.health == self.max_health:
                             print(
                                 "You are already at maximum health. Try drinking a maximum-health increasing potion.")
                         else:
-                            if (self.health + self.to_use["increase-health-by"]) > self.max_health:
+                            if (self.health + selected_item.hp_change) > self.max_health:
                                 self.health = self.max_health
                             else:
-                                self.health += self.to_use["increase-health-by"]
+                                self.health += selected_item.hp_change
                             print("You drink the {}. The strong elixir makes you feel rejuvenated.\n".format(
-                                self.to_use["name"]))
+                                selected_item.name))
                             del self.inventory[pressed-1]
 
                     time.sleep(0.2)
@@ -461,15 +475,15 @@ class Dungeon:
                 pressed = keyboard.read_key()
                 if pressed.isnumeric():
                     pressed = int(pressed)
-                    self.to_use = self.inventory[pressed-1]
-                    self.rich_print(f"Do you want to drop the {self.to_use['name'].title()}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
+                    selected_item = self.inventory[pressed-1]
+                    self.rich_print(f"Do you want to drop the {selected_item.name}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
                     while True:
                         if keyboard.is_pressed("y"):
                             del self.inventory[pressed-1]
-                            self.rich_print(f"You have dropped the {self.to_use['name'].title()}!")
+                            self.rich_print(f"You have dropped the {selected_item.name}!")
                             break
                         elif keyboard.is_pressed("n"):
-                            self.rich_print(f"You do not drop the {self.to_use['name'].title()}.")
+                            self.rich_print(f"You do not drop the {selected_item.name}.")
                             break
                     time.sleep(0.2)
                     self.print_inventory()
@@ -486,7 +500,7 @@ class Dungeon:
         else:
             for index, item in enumerate(self.inventory):
                 print("{0}: {1}\n\t{2}".format(
-                    index+1, item["name"].title(), item["description"]))
+                    index+1, item.name, item.description))
 
     def print_inventory_wrapper(self, *args):
         os.system("cls")
@@ -536,18 +550,16 @@ class Dungeon:
                     temp_map[index].append(config.symbols.unknown)
                 else:
                     # Make enemy hidden
-                    if cell.symbol in config.symbols.enemies:
-                        temp_map[index].append(config.symbols.empty)
-                    elif cell.symbol != config.symbols.empty:
+                    if cell.symbol != config.symbols.empty and cell.symbol not in config.symbols.enemies:
                         temp_map[index].append(cell.symbol)
-                    elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], dict):
-                        obj_type = cell.inventory[0]["object"]
+                    elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], DungeonItem):
+                        obj_type = type(cell.inventory[0])
                         temp_map[index].append({
                             "weapons": config.symbols.weapons,
-                            "potions": config.symbols.potions
+                            DungeonPotion: config.symbols.potions
                         }.get(obj_type))
                     else:
-                        temp_map[index].append(cell.symbol)
+                        temp_map[index].append(config.symbols.empty)
 
         map_str = str(DataFrame(temp_map))
         styling = [

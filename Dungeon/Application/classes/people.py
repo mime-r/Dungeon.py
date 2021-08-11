@@ -1,5 +1,6 @@
 from database import db
 from random import randint
+from .items import DungeonItemDatabase
 
 
 class people:
@@ -12,9 +13,27 @@ class people:
             self.type = "chemist"
             self.name = people().generate_name()
             self.stuff = []
-            for potion in p.potions:
-                if randint(1, 100) <= potion["probability"]:
-                    self.stuff.append(potion)
+            self.potential_sales = [
+                TraderSales(
+                    item=DungeonItemDatabase.search_item(name="Weak Healing Potion"),
+                    chance=100
+                ),
+                TraderSales(
+                    item=DungeonItemDatabase.search_item(name="Medium Healing Potion"),
+                    chance=100
+                ),
+                TraderSales(
+                    item=DungeonItemDatabase.search_item(name="Strong Healing Potion"),
+                    chance=50
+                ),
+                TraderSales(
+                    item=DungeonItemDatabase.search_item(name="Cloth Bag"),
+                    chance=50
+                )
+            ]
+            for sell in self.potential_sales:
+                if randint(1, 100) < sell.chance:
+                    self.stuff.append(sell.item)
 
     def generate_name(self):
         try:
@@ -27,6 +46,10 @@ class people:
         except:
             return "John Doe"
 
+class TraderSales:
+    def __init__(self, item, chance):
+        self.item = item
+        self.chance = chance
 
 class things:
     def __init__(self):
