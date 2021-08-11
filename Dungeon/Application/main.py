@@ -14,19 +14,17 @@ from rich.console import Console
 from rich.theme import Theme
 
 # App Imports
-from Application.classes.get import get
-from Application.classes.weapons import *
-from Application.classes.people import people
-from Application.classes.enemies import Orc
-from Application.config import config
-from Application.classes.map import Map, DungeonCell
-from Application.loggers import LogType
-from Application.classes.items import *
-from Application.classes.database import DungeonItemDatabase
+from .classes.weapons import *
+from .classes.people import *
+from .classes.enemies import Orc
+from .config import config
+from .classes.map import Map, DungeonCell
+from .loggers import LogType
+from .classes.items import *
+from .classes.database import DungeonItemDatabase
 
 import random
 print("Loading...")
-chemist = people().chemist
 
 # convenient lambda functions
 random_yx = lambda: (random.randint(1, config.map.max_y), random.randint(1, config.map.max_x))
@@ -135,7 +133,7 @@ class Dungeon:
                 if self.matrix[y][x].symbol != config.symbols.wall:
                     self.matrix[y][x] = DungeonCell(
                         symbol=config.symbols.chemist,
-                        inventory=[people().chemist()]
+                        inventory=[Chemist()]
                     )
                     break
         self.log_info("filled map with chemists")
@@ -177,7 +175,7 @@ class Dungeon:
 
         self.player_name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
         if not self.player_name:
-            self.player_name = people().generate_name()
+            self.player_name = People.generate_name()
             print("Your name is: {}".format(self.player_name))
         self.deactivate_seen_tiles()
         self.log_info("initiated player")
@@ -209,7 +207,7 @@ class Dungeon:
                 elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], DungeonItem):
                     obj_type = type(cell.inventory[0])
                     base_map[index].append({
-                        "weapons": config.symbols.weapons,
+                        DungeonWeapon: config.symbols.weapons,
                         DungeonPotion: config.symbols.potions
                     }.get(obj_type))
                 else:
@@ -229,11 +227,10 @@ class Dungeon:
         if player_cell.symbol == config.symbols.target:
             self.game_over("exit")
         if player_cell.symbol in config.symbols.enemies:
-            self.attack(player_cell.symbol)
+            self.attack(enemy_symbol=player_cell.symbol)
             self.print_map()
-        if player_cell.symbol == config.symbols.chemist:
-            thechemist = player_cell.inventory[0]
-            self.trader_screen("chemist", thechemist)
+        if player_cell.symbol in config.symbols.traders:
+            self.trader_screen(trader=player_cell.inventory[0])
             self.print_map()
         # inv list
         if len(player_cell.inventory) > 0 and isinstance(player_cell.inventory[0], DungeonItem):
@@ -290,13 +287,12 @@ class Dungeon:
         self.rich_console.input(f"{style_text('[Enter]', 'controls')} to {style_text('exit', 'action')}")
         sys.exit()
 
-    def trader_screen(self, person_type, obj):
-        print("You have met a {0}, a {1}!".format(obj.name, person_type))
+    def trader_screen(self, trader):
+        self.rich_print(f"You have met a {style_text(trader.name, 'name')}, a {style_text(trader.occupation, 'occupation')}!")
         time.sleep(1)
-        self.traders = obj
         os.system("cls")
-        self.rich_print(f"{style_text(obj.name, 'magenta')} - {style_text(person_type.title(), 'green')}", highlight=False)
-        for index, item in enumerate(self.traders.stuff):
+        self.rich_print(f"{style_text(trader.name, 'name')} - {style_text(trader.occupation, 'occupation')}", highlight=False)
+        for index, item in enumerate(trader.stuff):
             self.rich_print(f"{index+1}: {item.name} {style_text(item.cost, 'coin')}", highlight=False)
             self.rich_print(f"\t {item.description}")
         self.print_inventory()
@@ -307,19 +303,16 @@ class Dungeon:
                 pressed = keyboard.read_key()
                 if pressed.isdigit():
                     pressed = int(pressed)
-                    selected_item = self.traders.stuff[pressed-1]
+                    selected_item = trader.stuff[pressed-1]
                     if self.coins >= selected_item.cost:
                         if len(self.inventory) == self.max_inventory:
                             print("Your inventory is full.")
                         else:
-                            print("You have bought the {}".format(
-                                selected_item.name))
-                            self.inventory.append(
-                                selected_item)
+                            print("You have bought the {}".format(selected_item.name))
+                            self.inventory.append(selected_item)
                             self.print_inventory()
                     else:
-                        print("You do not have enough money to buy the {}.".format(
-                            selected_item.name))
+                        print("You do not have enough money to buy the {}.".format(selected_item.name))
                     time.sleep(0.3)
                 if pressed == "e":
                     break

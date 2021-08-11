@@ -1,27 +1,40 @@
 class StyleConfig:
+    # map features
     wall = "bold #666666"
     empty = "dim #444444"
+    unknown = "#0C0C0C"
     grid_num = "#444444"
+
+    target = "#0DFF00"
+
     potions = "#ff6bf8"
     weapons = "#6bc6ff"
-    controls = "#61B3FF"
-    action = "#61D5FF"
+
     player = "#70D2FF"
+    
     chemist = "#FFD900"
-    target = "#0DFF00"
-    unknown = "#0C0C0C"
-    game_header = "bold red"
+
+    # game vars
     move_count = "#FF63D6"
     health = "#00F521"
     xp_count = "#00C8FF"
     coin = "#FFDD00"
     inventory = "#00FFC8"
     time_count = "#B199FF"
+
+    # text colours
     fail = "#FF0000"
     success = "#00FF00"
     enemy = "bold #FF2424"
+    occupation = "bold green"
+    name = "bold magenta"
+
+    # ui elements
+    game_header = "bold red"
     hp_drop = "bold red"
     menu_header = "bold green"
+    controls = "#61B3FF"
+    action = "#61D5FF"
 
 class SymbolConfig:
     
@@ -44,6 +57,10 @@ class SymbolConfig:
 
     enemies = [
         orc
+    ]
+
+    traders = [
+        chemist
     ]
 
 class DungeonCountConfig:

@@ -2,17 +2,35 @@ from random import randint
 from .database import DungeonItemDatabase
 
 
-class people:
-    def __init__(self):
-        pass
+class People:
+    def __init__(self, occupation):
+        self.name = People.generate_name()
+        self.occupation = occupation
 
-    class chemist:
-        def __init__(self):
-            p = people()
-            self.type = "chemist"
-            self.name = people().generate_name()
-            self.stuff = []
-            self.potential_sales = [
+    @staticmethod
+    def generate_name():
+        try:
+            import names
+            if randint(1, 2) == 1:
+                gender = "male"
+            else:
+                gender = "female"
+            return str(names.get_full_name(gender))
+        except:
+            return "John Doe"
+
+class Trader(People):
+    def __init__(self, potential_sales, occupation="trader"):
+        super().__init__(occupation=occupation)
+        self.stuff = []
+        for sale in potential_sales:
+            if randint(1, 100) < sale.chance:
+                self.stuff.append(sale.item)
+
+class Chemist(Trader):
+    def __init__(self):
+        super().__init__(
+            potential_sales=[
                 TraderSales(
                     item=DungeonItemDatabase.search_item(name="Weak Healing Potion"),
                     chance=100
@@ -29,21 +47,9 @@ class people:
                     item=DungeonItemDatabase.search_item(name="Cloth Bag"),
                     chance=50
                 )
-            ]
-            for sell in self.potential_sales:
-                if randint(1, 100) < sell.chance:
-                    self.stuff.append(sell.item)
-
-    def generate_name(self):
-        try:
-            import names
-            if randint(1, 2) == 1:
-                gender = "male"
-            else:
-                gender = "female"
-            return str(names.get_full_name(gender))
-        except:
-            return "John Doe"
+            ],
+            occupation="Chemist"
+        )
 
 class TraderSales:
     def __init__(self, item, chance):
