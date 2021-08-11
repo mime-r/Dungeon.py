@@ -36,5 +36,5 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 - pick up items on the ground
 
 ## Credits:
-- @mime-r
-- @nj
+- [@mime-r](https://github.com/mime-r)
+- [@NJ889](https://github.com/NicholasJohansan)
