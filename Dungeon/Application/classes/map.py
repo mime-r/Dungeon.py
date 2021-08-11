@@ -137,7 +137,7 @@ class Map(object):
         new_matrix = str_matrix
         for row_index, row in enumerate(str_matrix):
             for element_index, element in enumerate(row):
-                if element == "O" and random.randint(1, 3) == 1:
+                if element == "O" and random.randint(1, 2) == 1:
                     new_matrix[row_index][element_index] = " "
 
         return str_matrix

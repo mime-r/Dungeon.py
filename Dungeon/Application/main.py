@@ -230,7 +230,14 @@ class Dungeon:
             self.attack(enemy_symbol=player_cell.symbol)
             self.print_map()
         if player_cell.symbol in config.symbols.traders:
-            self.trader_screen(trader=player_cell.inventory[0])
+            trader = player_cell.inventory[0]
+            self.rich_print(f"You have met a {style_text(trader.name, 'name')}, a {style_text(trader.occupation, 'occupation')}!")
+            time.sleep(1)
+            self.inventory_item_menu(
+                print_header=lambda: self.trader_screen_header(trader=trader),
+                menu_function=self.trader_menu_function,
+                trader=trader
+            )
             self.print_map()
         # inv list
         if len(player_cell.inventory) > 0 and isinstance(player_cell.inventory[0], DungeonItem):
@@ -287,47 +294,34 @@ class Dungeon:
         self.rich_console.input(f"{style_text('[Enter]', 'controls')} to {style_text('exit', 'action')}")
         sys.exit()
 
-    def trader_screen(self, trader):
-        self.rich_print(f"You have met a {style_text(trader.name, 'name')}, a {style_text(trader.occupation, 'occupation')}!")
-        time.sleep(1)
-        os.system("cls")
-        self.rich_print(f"{style_text(trader.name, 'name')} - {style_text(trader.occupation, 'occupation')}", highlight=False)
+    def trader_screen_header(self, trader):
+        os.system('cls')
+        self.rich_print(f"{style_text(trader.name, 'name')} - {style_text(trader.occupation, 'occupation')}\n", highlight=False)
         for index, item in enumerate(trader.stuff):
             self.rich_print(f"{index+1}: {item.name} {style_text(item.cost, 'coin')}", highlight=False)
             self.rich_print(f"\t {item.description}")
-        self.print_inventory()
-        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
+        print("\n")
 
-        while True:
-            try:
-                pressed = keyboard.read_key()
-                if pressed.isdigit():
-                    pressed = int(pressed)
-                    selected_item = trader.stuff[pressed-1]
-                    if self.coins >= selected_item.cost:
-                        if len(self.inventory) == self.max_inventory:
-                            print("Your inventory is full.")
-                        else:
-                            print("You have bought the {}".format(selected_item.name))
-                            self.inventory.append(selected_item)
-                            self.print_inventory()
-                    else:
-                        print("You do not have enough money to buy the {}.".format(selected_item.name))
-                    time.sleep(0.3)
-                if pressed == "e":
-                    break
-            except IndexError:
-                print("You have chosen an invalid choice.")
-                time.sleep(0.5)
+    def trader_menu_function(self, selected_item, pressed=None, print_header=None):
+        if self.coins >= selected_item.cost:
+            if len(self.inventory) == self.max_inventory:
+                print("Your inventory is full.\n")
+            else:
+                print("You have bought the {}\n".format(selected_item.name))
+                self.inventory.append(selected_item)
+                self.coins -= selected_item.cost
+        else:
+            print("You do not have enough money to buy the {}.\n".format(selected_item.name))
 
     def attack(self, enemy_symbol):  # He protecc he attacc he also like to snacc
         enemy = {
             config.symbols.orc: Orc
         }.get(enemy_symbol)()
         print_header = lambda: self.rich_print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
-        def print_health(enemy_hp_drop=None, player_hp_drop=None):
-            self.rich_print(f"{style_text(enemy.name, 'enemy')}: Health - {style_text(enemy.health, 'health')}{style_text(' ( -'+str(enemy_hp_drop)+' )', 'hp_drop') if enemy_hp_drop else ''}", highlight=False)
+        print_health = lambda enemy_hp_drop=None, player_hp_drop=None: (
+            self.rich_print(f"{style_text(enemy.name, 'enemy')}: Health - {style_text(enemy.health, 'health')}{style_text(' ( -'+str(enemy_hp_drop)+' )', 'hp_drop') if enemy_hp_drop else ''}", highlight=False),
             self.rich_print(f"{style_text('You', 'player')}: Health - {style_text(self.health, 'health')}{style_text(' ( -'+str(player_hp_drop)+' )', 'hp_drop') if player_hp_drop else ''}\n", highlight=False)
+        )
         print_footer = lambda: self.rich_print(f"Press {controls_style('a')} to {style_text('attack', 'action')}.", highlight=False)
 
         self.rich_print(f"You have met an {style_text(enemy.name, 'enemy')}!", highlight=False)
@@ -413,88 +407,92 @@ class Dungeon:
                 print("Exiting [Dungeon]...")
                 sys.exit()
             elif keyboard.is_pressed("u"):
-                self.equip_menu()
+                #self.equip_menu()
+                self.inventory_item_menu(
+                    print_header=lambda: self.menu_header(menu_name="Use/Equip"),
+                    menu_function=self.equip_menu_function
+                )
                 self.print_map()
             elif keyboard.is_pressed("d"):
-                self.drop_menu()
+                self.inventory_item_menu(
+                    print_header=lambda: self.menu_header(menu_name="Drop"),
+                    menu_function=self.drop_menu_function
+                )
                 self.print_map()
             elif keyboard.is_pressed("i"):
                 self.print_inventory_wrapper()
                 self.print_map()
 
-    def equip_menu(self):
-        os.system("cls")
-        self.rich_print("Use/Equip Menu", style="menu_header", highlight=False)
-        self.print_inventory()
-        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
-        while True:
-            try:
-                pressed = keyboard.read_key()
-                if pressed.isnumeric():
-                    pressed = int(pressed)
-                    selected_item = self.inventory[pressed-1]
-                    if isinstance(selected_item, DungeonInventory):
-                        print("You sling the {} over your shoulders.".format(
-                            selected_item.name))
-                        del self.inventory[pressed-1]
-                        self.max_inventory += selected_item.inventory
-                    elif isinstance(selected_item, DungeonPotion):
-                        if self.health == self.max_health:
-                            print(
-                                "You are already at maximum health. Try drinking a maximum-health increasing potion.")
-                        else:
-                            if (self.health + selected_item.hp_change) > self.max_health:
-                                self.health = self.max_health
-                            else:
-                                self.health += selected_item.hp_change
-                            print("You drink the {}. The strong elixir makes you feel rejuvenated.\n".format(
-                                selected_item.name))
-                            del self.inventory[pressed-1]
+    def menu_header(self, menu_name):
+        os.system('cls')
+        self.rich_print(f"{menu_name} Menu\n", style="menu_header", highlight=False)
 
-                    time.sleep(0.2)
-                    self.print_inventory()
-                if pressed == "e":
-                    break
-            except IndexError:
-                print("You have chosen an invalid choice.")
-                time.sleep(0.5)
-
-    def drop_menu(self):
-        os.system("cls")
-        self.rich_print("Drop Menu", style="menu_header", highlight=False)
-        self.print_inventory()
-        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
+    def inventory_item_menu(self, print_header, menu_function, trader=None):
+        print_footer = lambda: (
+            self.print_inventory(),
+            self.rich_print(f"\nPress {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
+        )
+        print_header()
+        print_footer()
         while True:
-            try:
-                pressed = keyboard.read_key()
-                if pressed.isnumeric():
-                    pressed = int(pressed)
-                    selected_item = self.inventory[pressed-1]
-                    self.rich_print(f"Do you want to drop the {selected_item.name}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
-                    while True:
-                        if keyboard.is_pressed("y"):
-                            del self.inventory[pressed-1]
-                            self.rich_print(f"You have dropped the {selected_item.name}!")
-                            break
-                        elif keyboard.is_pressed("n"):
-                            self.rich_print(f"You do not drop the {selected_item.name}.")
-                            break
+            pressed = keyboard.read_key()
+            if pressed.isnumeric():
+                pressed = int(pressed)
+                print_header()
+                inv = trader.stuff if trader else self.inventory
+                if not ((pressed < len(inv)+1) and (1 <= pressed)):
+                    print("You have chosen an invalid choice.\n")
                     time.sleep(0.2)
-                    self.print_inventory()
-                if pressed == "e":
-                    break
-            except IndexError:
-                print("You have chosen an invalid choice.")
-                time.sleep(0.5)
+                    print_footer()
+                    continue
+                selected_item = trader.stuff[pressed-1] if trader else self.inventory[pressed-1]
+                menu_function(selected_item=selected_item, pressed=pressed, print_header=print_header)
+                time.sleep(0.2)
+                print_footer()
+            if pressed == "e":
+                break
+
+    def equip_menu_function(self, selected_item, pressed=None, print_header=None):
+        if isinstance(selected_item, DungeonInventory):
+            print("You sling the {} over your shoulders.\n".format(
+                selected_item.name))
+            del self.inventory[pressed-1]
+            self.max_inventory += selected_item.inventory
+        elif isinstance(selected_item, DungeonPotion):
+            if self.health == self.max_health:
+                print(
+                    "You are already at maximum health. Try drinking a maximum-health increasing potion.\n")
+            else:
+                if (self.health + selected_item.hp_change) > self.max_health:
+                    self.health = self.max_health
+                else:
+                    self.health += selected_item.hp_change
+                print("You drink the {}. The strong elixir makes you feel rejuvenated.\n".format(
+                    selected_item.name))
+                del self.inventory[pressed-1]
+
+    def drop_menu_function(self, selected_item, pressed=None, print_header=None):
+        self.rich_print(f"Do you want to drop the {selected_item.name}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
+        while True:
+            if keyboard.is_pressed("y"):
+                os.system('cls')
+                print_header()
+                del self.inventory[pressed-1]
+                self.rich_print(f"You have dropped the {selected_item.name}!\n")
+                break
+            elif keyboard.is_pressed("n"):
+                os.system('cls')
+                print_header()
+                self.rich_print(f"You do not drop the {selected_item.name}.\n")
+                break
 
     def print_inventory(self):
-        self.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", highlight=False)
+        self.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})\n", style="inventory", highlight=False)
         if len(self.inventory) == 0:
-            print("You have nothing in your inventory!")
+            print("You have nothing in your inventory!\n")
         else:
             for index, item in enumerate(self.inventory):
-                print("{0}: {1}\n\t{2}".format(
-                    index+1, item.name, item.description))
+                self.rich_print("{0}: {1}\n\t{2}".format(index+1, item.name, item.description))
 
     def print_inventory_wrapper(self, *args):
         os.system("cls")
