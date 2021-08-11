@@ -24,8 +24,12 @@ from Application.loggers import LogType
 
 import random
 print("Loading...")
-random_yx = lambda: (random.randint(1, config.map.max_y), random.randint(1, config.map.max_x))
 chemist = people().chemist
+
+# convenient lambda functions
+random_yx = lambda: (random.randint(1, config.map.max_y), random.randint(1, config.map.max_x))
+style_text = lambda t, s: f"[{s}]{t}[/{s}]"
+controls_style = lambda t: style_text(chr(92)+f"[{t}]", 'controls')
 
 class Dungeon:
     def __init__(self, logger):
@@ -248,11 +252,11 @@ class Dungeon:
         self.leaderboardList = self.leaderboard.all()
 
         self.leaderboardList.sort(key=operator.itemgetter('time'))
-        self.rich_print("[magenta][Leaderboard][/magenta]\n", highlight=False)
+        self.rich_print(f"{style_text('[Leaderboard]', 'magenta')}\n", highlight=False)
         for i, element in enumerate(self.leaderboardList):
             self.prefix_text = ""
             if element["sessionid"] == self.session_id:  # show current game score
-                self.prefix_text = "[green]< This Game >[/green] "
+                self.prefix_text = style_text("< This Game > ", 'green')
             self.rich_print("{the_prefix}{index}: [{name}]\n\tTime: {time}\n\tMoves: {moves}\n\tDate and Time: {datetime}".format(
                 the_prefix=self.prefix_text,
                 index=str(i+1),
@@ -265,11 +269,11 @@ class Dungeon:
     def game_over(self, how):
         if how == "exit":
             os.system('cls')
-            self.rich_print(r"You have [success]successfully[/success] escaped the [game_header][DUNGEON][/game_header]", highlight=False)
+            self.rich_print(f"You have {style_text('successfully', 'success')} escaped the {style_text('[DUNGEON]', 'game_header')}", highlight=False)
             self.print_leaderboard()
         elif how == "dead":
-            self.rich_print(r"You have [fail]failed[/fail] to escape the [game_header][DUNGEON][/game_header], you'll do better next time.", highlight=False)
-        self.rich_console.input(r"[controls][Enter][/controls] to [action]exit[/action]")
+            self.rich_print(f"You have {style_text('failed', 'fail')} to escape the {style_text('[DUNGEON]', 'game_header')}, you'll do better next time.", highlight=False)
+        self.rich_console.input(f"{style_text('[Enter]', 'controls')} to {style_text('exit', 'action')}")
         sys.exit()
 
     def trader_screen(self, person_type, obj):
@@ -277,12 +281,12 @@ class Dungeon:
         time.sleep(1)
         self.traders = obj
         os.system("cls")
-        self.rich_print(f"[magenta]{obj.name}[/magenta] - [green]{person_type.title()}[/green]", highlight=False)
+        self.rich_print(f"{style_text(obj.name, 'magenta')} - {style_text(person_type.title(), 'green')}", highlight=False)
         for index, item in enumerate(self.traders.stuff):
-            self.rich_print(f"{index+1}: {item['name'].title()} [coin]{item['cost']}[/coin]", highlight=False)
+            self.rich_print(f"{index+1}: {item['name'].title()} {style_text(item['cost'], 'coin')}", highlight=False)
             self.rich_print(f"\t {item['description']}")
         self.print_inventory()
-        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
+        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
 
         while True:
             try:
@@ -314,11 +318,11 @@ class Dungeon:
         }.get(enemy_symbol)()
         print_header = lambda: self.rich_print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
         def print_health(enemy_hp_drop=None, player_hp_drop=None):
-            self.rich_print(f"[enemy]{enemy.name}[/enemy]: Health - [health]{enemy.health}[/health]{' [hp_drop]( -'+str(enemy_hp_drop)+' )[/hp_drop]' if enemy_hp_drop else ''}", highlight=False)
-            self.rich_print(f"[player]You[/player]: Health - [health]{self.health}[/health]{' [hp_drop]( -'+str(player_hp_drop)+' )[/hp_drop]' if player_hp_drop else ''}\n", highlight=False)
-        print_footer = lambda: self.rich_print(r"Press [controls]\[a][/controls] to [action]attack[/action].", highlight=False)
+            self.rich_print(f"{style_text(enemy.name, 'enemy')}: Health - {style_text(enemy.health, 'health')}{style_text(' ( -'+str(enemy_hp_drop)+' )', 'hp_drop') if enemy_hp_drop else ''}", highlight=False)
+            self.rich_print(f"{style_text('You', 'player')}: Health - {style_text(self.health, 'health')}{style_text(' ( -'+str(player_hp_drop)+' )', 'hp_drop') if player_hp_drop else ''}\n", highlight=False)
+        print_footer = lambda: self.rich_print(f"Press {controls_style('a')} to {style_text('attack', 'action')}.", highlight=False)
 
-        self.rich_print(f"You have met an [enemy]{enemy.name}[/enemy]!", highlight=False)
+        self.rich_print(f"You have met an {style_text(enemy.name, 'enemy')}!", highlight=False)
         time.sleep(1)
         os.system("cls")
         print_header();print_health();print_footer()
@@ -346,7 +350,7 @@ class Dungeon:
         )
 
         # print(self.matrix[self.player_loc[0]][self.player_loc[1]])
-        self.rich_print(f"The [enemy]{enemy.name}[/enemy] drops [coin]{enemy.coin_drop}[/coin] coins.", highlight=False)
+        self.rich_print(f"The {style_text(enemy.name, 'enemy')} drops {style_text(enemy.coin_drop, 'coin')} coins.", highlight=False)
         self.coins += enemy.coin_drop
         time.sleep(2)
 
@@ -414,7 +418,7 @@ class Dungeon:
         os.system("cls")
         self.rich_print("Use/Equip Menu", style="menu_header", highlight=False)
         self.print_inventory()
-        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
+        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
         while True:
             try:
                 pressed = keyboard.read_key()
@@ -451,14 +455,14 @@ class Dungeon:
         os.system("cls")
         self.rich_print("Drop Menu", style="menu_header", highlight=False)
         self.print_inventory()
-        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
+        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
         while True:
             try:
                 pressed = keyboard.read_key()
                 if pressed.isnumeric():
                     pressed = int(pressed)
                     self.to_use = self.inventory[pressed-1]
-                    self.rich_print(fr"Do you want to drop the {self.to_use['name'].title()}?\nPress [controls]\[y][/controls] for [action]Yes[/action] and [controls]\[n][/controls] for [action]No[/action].", highlight=False)
+                    self.rich_print(f"Do you want to drop the {self.to_use['name'].title()}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
                     while True:
                         if keyboard.is_pressed("y"):
                             del self.inventory[pressed-1]
@@ -487,7 +491,7 @@ class Dungeon:
     def print_inventory_wrapper(self, *args):
         os.system("cls")
         self.print_inventory()
-        self.rich_print(r"Press [controls]\[e][/controls] to [action]exit[/action].", highlight=False)
+        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
         # time.sleep(0.5)
         while True:
             if keyboard.is_pressed("e"):
@@ -557,16 +561,16 @@ class Dungeon:
             (config.symbols.weapons, "weapons")
         ]
         for symbol, style in styling:
-            map_str = map_str.replace(symbol, f"[{style}]{symbol}[/{style}]")
+            map_str = map_str.replace(symbol, style_text(symbol, style))
         for num in "0123456789":
-            map_str = map_str.replace(num, f"[grid_num]{num}[/grid_num]")
+            map_str = map_str.replace(num, style_text(num, 'grid_num'))
         self.rich_print(map_str, highlight=False)
-        self.rich_print(r"""
-Press [controls]\[arrow keys][/controls] to [action]move[/action].
-Press [controls]\[i][/controls] for [action]inventory[/action].
-Press [controls]\[esc][/controls] to [action]exit[/action].
-Press [controls]\[u][/controls] to [action]equip/use items[/action].
-Press [controls]\[d][/controls] to [action]drop items[/action].
+        self.rich_print(f"""
+Press {controls_style('arrow keys')} to {style_text('move', 'action')}.
+Press {controls_style('i')} for {style_text('inventory', 'action')}.
+Press {controls_style('esc')} to {style_text('exit', 'action')}.
+Press {controls_style('u')} to {style_text('equip/use items', 'action')}.
+Press {controls_style('d')} to {style_text('drop items', 'action')}.
 """, highlight=False)
 
     def deactivate_seen_tiles(self):
