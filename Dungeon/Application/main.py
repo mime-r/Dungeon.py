@@ -18,18 +18,14 @@ from .classes.weapons import *
 from .classes.people import *
 from .classes.enemies import Orc
 from .config import config
-from .classes.map import Map, DungeonCell
+from .utils import random_yx, style_text, controls_style
+from .classes.map import Map, DungeonCell, DungeonPlayer
 from .loggers import LogType
 from .classes.items import *
 from .classes.database import DungeonItemDatabase
 
 import random
 print("Loading...")
-
-# convenient lambda functions
-random_yx = lambda: (random.randint(1, config.map.max_y), random.randint(1, config.map.max_x))
-style_text = lambda t, s: f"[{s}]{t}[/{s}]"
-controls_style = lambda t: style_text(chr(92)+f"[{t}]", 'controls')
 
 class Dungeon:
     def __init__(self, logger):
@@ -52,39 +48,36 @@ class Dungeon:
         self.rich_print = self.rich_console.print
         self.log_info("rich console & styles set up")
 
-        # Empty tile
-        self.player_loc = []
-
         # Game vars init
         self.moves = 1
         self.firsttime = True
         self.start_time = time.time()
 
-        # Init Player Stat Vars
-        self.inventory = []
-        self.max_inventory = config.player.max_inventory
-        self.health = config.player.health
-        self.max_health = config.player.max_health
-        self.coins = config.player.coins
-        self.xp = config.player.xp
-
         # Leaderboard
         self.leaderboard = TinyDB("leaderboard.json")
         self.leaderboardQuery = Query()
 
-        # init weapons
+        # Init Player Stat Vars
         # name, base attack, startrandom, endrandom, chanceofhit, hittextsucessful, hittextweak, hittextmiss
-        self.equipped = DungeonItemDatabase.search_item(name="Fists")
+        self.player = DungeonPlayer(
+            health=config.player.health,
+            max_health=config.player.max_health,
+            max_inventory=config.player.max_inventory,
+            coins=config.player.coins,
+            xp=config.player.xp,
+            equipped=DungeonItemDatabase.search_item(name="Fists"),
+            game=self
+        )
 
         # Fill inventory with starter potions
         for i in range(2):
-            self.inventory.append(
+            self.player.inventory.append(
                 DungeonItemDatabase.search_item(
                     name="Weak Healing Potion"
                 )
             )
 
-        self.log_info("init dungeon variables")
+        self.log_info("init dungeon and player variables")
         
         # generate unique session id for highscore leaderboard
         while True:
@@ -110,9 +103,9 @@ class Dungeon:
             self.matrix.append([])
             for n, cell in enumerate(row):
                 if cell == "O":
-                    self.matrix[i].append(DungeonCell(symbol=config.symbols.wall))
+                    self.matrix[i].append(DungeonCell(symbol=config.symbols.wall, game=self))
                 else:
-                    self.matrix[i].append(DungeonCell(symbol=config.symbols.empty))
+                    self.matrix[i].append(DungeonCell(symbol=config.symbols.empty, game=self))
         self.log_info("generated base map string")
 
         #self.matrix = [[[config.symbols.empty, 0, []] for x in range(config.map.width)] for y in range(config.map.height)]
@@ -122,7 +115,7 @@ class Dungeon:
             while True:
                 x, y = random_yx()
                 if self.matrix[y][x].symbol != config.symbols.wall:
-                    self.matrix[y][x] = DungeonCell(symbol=config.symbols.orc)
+                    self.matrix[y][x] = DungeonCell(symbol=config.symbols.orc, game=self)
                     break
         self.log_info("filled map with orcs")
 
@@ -133,6 +126,7 @@ class Dungeon:
                 if self.matrix[y][x].symbol != config.symbols.wall:
                     self.matrix[y][x] = DungeonCell(
                         symbol=config.symbols.chemist,
+                        game=self,
                         inventory=[Chemist()]
                     )
                     break
@@ -167,11 +161,12 @@ class Dungeon:
             if self.matrix[y][x].symbol != config.symbols.wall:
                 self.matrix[y][x] = DungeonCell(
                     symbol=config.symbols.player,
+                    game=self,
                     explored=True,
                     inventory=self.matrix[y][x]
                 )
                 break
-        self.player_loc = (y, x)
+        self.player.location = (y, x)
 
         self.player_name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
         if not self.player_name:
@@ -187,10 +182,10 @@ class Dungeon:
                 """
                 to maintain at least a solid 13 distance between goal and player
                 """
-                # if abs(x-self.player_loc[0])+abs(y-self.player_loc[1]) > 13:
-                if abs(y-self.player_loc[0])+abs(x-self.player_loc[1]) > config.map.min_distance:
+                # if abs(x-self.player.location[0])+abs(y-self.player.location[1]) > 13:
+                if abs(y-self.player.location[0])+abs(x-self.player.location[1]) > config.map.min_distance:
                     #self.matrix[x][y] = [config.symbols.target, 0, self.matrix[x][y]]
-                    self.matrix[y][x] = DungeonCell(symbol=config.symbols.target)
+                    self.matrix[y][x] = DungeonCell(symbol=config.symbols.target, game=self)
                     break
         self.log_info("put target on map")
         self.base_map_str = self.gen_debug_map()       
@@ -222,7 +217,7 @@ class Dungeon:
         self.check()
 
     def check(self):
-        player_cell = self.matrix[self.player_loc[0]][self.player_loc[1]].inventory
+        player_cell = self.matrix[self.player.location[0]][self.player.location[1]].inventory
         # print(self.playerontile_type)
         if player_cell.symbol == config.symbols.target:
             self.game_over("exit")
@@ -240,13 +235,7 @@ class Dungeon:
             )
             self.print_map()
         # inv list
-        if len(player_cell.inventory) > 0 and isinstance(player_cell.inventory[0], DungeonItem):
-            self.print_cell_inv(
-                inventory=list(filter(
-                    lambda x: isinstance(x, DungeonItem),
-                    player_cell.inventory
-                ))
-            )
+        player_cell.print_inventory()
 
 
     def print_cell_inv(self, inventory):
@@ -303,13 +292,13 @@ class Dungeon:
         print("\n")
 
     def trader_menu_function(self, selected_item, pressed=None, print_header=None):
-        if self.coins >= selected_item.cost:
-            if len(self.inventory) == self.max_inventory:
+        if self.player.coins >= selected_item.cost:
+            if len(self.player.inventory) == self.player.max_inventory:
                 print("Your inventory is full.\n")
             else:
                 print("You have bought the {}\n".format(selected_item.name))
-                self.inventory.append(selected_item)
-                self.coins -= selected_item.cost
+                self.player.inventory.append(selected_item)
+                self.player.coins -= selected_item.cost
         else:
             print("You do not have enough money to buy the {}.\n".format(style_text(selected_item.name, 'item')))
 
@@ -320,7 +309,7 @@ class Dungeon:
         print_header = lambda: self.rich_print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
         print_health = lambda enemy_hp_drop=None, player_hp_drop=None: (
             self.rich_print(f"{style_text(enemy.name, 'enemy')}: Health - {style_text(enemy.health, 'health')}{style_text(' ( -'+str(enemy_hp_drop)+' )', 'hp_drop') if enemy_hp_drop else ''}", highlight=False),
-            self.rich_print(f"{style_text('You', 'player')}: Health - {style_text(self.health, 'health')}{style_text(' ( -'+str(player_hp_drop)+' )', 'hp_drop') if player_hp_drop else ''}\n", highlight=False)
+            self.rich_print(f"{style_text('You', 'player')}: Health - {style_text(self.player.health, 'health')}{style_text(' ( -'+str(player_hp_drop)+' )', 'hp_drop') if player_hp_drop else ''}\n", highlight=False)
         )
         print_footer = lambda: self.rich_print(f"Press {controls_style('a')} to {style_text('attack', 'action')}.", highlight=False)
 
@@ -338,22 +327,23 @@ class Dungeon:
                 if enemy.health <= 0:
                     break
                 time.sleep(0.15)
-                self.health, player_hp_drop = self.enemy_hit(enemy)
+                self.player.health, player_hp_drop = self.enemy_hit(enemy)
                 print_health(player_hp_drop=player_hp_drop)
                 print_footer()
                 time.sleep(0.15)
-                if self.health <= 0:
+                if self.player.health <= 0:
                     self.game_over("dead")
-        self.xp += enemy.xp_drop
+        self.player.xp += enemy.xp_drop
         self.rich_print(f"{enemy.texts.death}")
-        self.matrix[self.player_loc[0]][self.player_loc[1]].inventory = DungeonCell(
+        self.matrix[self.player.location[0]][self.player.location[1]].inventory = DungeonCell(
             symbol=config.symbols.empty,
+            game=self,
             explored=True
         )
 
-        # print(self.matrix[self.player_loc[0]][self.player_loc[1]])
+        # print(self.matrix[self.player.location[0]][self.player.location[1]])
         self.rich_print(f"The {style_text(enemy.name, 'enemy')} drops {style_text(enemy.coin_drop, 'coin')} coins.", highlight=False)
-        self.coins += enemy.coin_drop
+        self.player.coins += enemy.coin_drop
         time.sleep(2)
 
     def enemy_hit(self, enemy):
@@ -366,26 +356,26 @@ class Dungeon:
             else:
                 self.rich_print(enemy.texts.hit)
             #self.rich_print(f"\n[player]Your[/player] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
-            return (self.health - attack_damage), attack_damage
+            return (self.player.health - attack_damage), attack_damage
         else:
             self.rich_print(enemy.texts.missed_hit)
-            return self.health, 0
+            return self.player.health, 0
 
     def hit(self, enemy):
-        if not random.randint(1, 100) < self.equipped.accuracy:
-            attack_damage = self.equipped.base_attack + random.randint(
-                self.equipped.attack_range[0], self.equipped.attack_range[1])
-            if attack_damage == self.equipped.base_attack + self.equipped.attack_range[1]:
+        if not random.randint(1, 100) < self.player.equipped.accuracy:
+            attack_damage = self.player.equipped.base_attack + random.randint(
+                self.player.equipped.attack_range[0], self.player.equipped.attack_range[1])
+            if attack_damage == self.player.equipped.base_attack + self.player.equipped.attack_range[1]:
                 # Max Damage
                 self.rich_print(
-                    self.equipped.texts.critical_hit.format(style_text(self.equipped.name, 'weapons')), highlight=False)
+                    self.player.equipped.texts.critical_hit.format(style_text(self.player.equipped.name, 'weapons')), highlight=False)
             else:
                 self.rich_print(
-                    self.equipped.texts.hit.format(style_text(enemy.name, 'enemy'), style_text(self.equipped.name, 'weapons')), highlight=False)
+                    self.player.equipped.texts.hit.format(style_text(enemy.name, 'enemy'), style_text(self.player.equipped.name, 'weapons')), highlight=False)
             #self.rich_print(f"\n[enemy]{enemy.name}\'s[/enemy] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
             return (enemy.health - attack_damage), attack_damage
         else:
-            self.rich_print(self.equipped.texts.missed_hit.format(style_text(enemy.name, 'enemy')), highlight=False)
+            self.rich_print(self.player.equipped.texts.missed_hit.format(style_text(enemy.name, 'enemy')), highlight=False)
             return enemy.health, 0
 
     def gameloop(self):
@@ -429,7 +419,7 @@ class Dungeon:
 
     def inventory_item_menu(self, print_header, menu_function, trader=None):
         print_footer = lambda: (
-            self.print_inventory(),
+            self.player.print_inventory(),
             self.rich_print(f"\nPress {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
         )
         print_header()
@@ -439,13 +429,13 @@ class Dungeon:
             if pressed.isnumeric():
                 pressed = int(pressed)
                 print_header()
-                inv = trader.stuff if trader else self.inventory
+                inv = trader.stuff if trader else self.player.inventory
                 if not ((pressed < len(inv)+1) and (1 <= pressed)):
                     print("You have chosen an invalid choice.\n")
                     time.sleep(0.2)
                     print_footer()
                     continue
-                selected_item = trader.stuff[pressed-1] if trader else self.inventory[pressed-1]
+                selected_item = trader.stuff[pressed-1] if trader else self.player.inventory[pressed-1]
                 menu_function(selected_item=selected_item, pressed=pressed, print_header=print_header)
                 time.sleep(0.2)
                 print_footer()
@@ -456,19 +446,19 @@ class Dungeon:
         if isinstance(selected_item, DungeonInventory):
             self.rich_print("You sling the {} over your shoulders.\n".format(
                 style_text(selected_item.name, 'item')))
-            del self.inventory[pressed-1]
-            self.max_inventory += selected_item.inventory
+            del self.player.inventory[pressed-1]
+            self.player.max_inventory += selected_item.inventory
         elif isinstance(selected_item, DungeonPotion):
-            if self.health == self.max_health:
+            if self.player.health == self.player.max_health:
                 print(
                     "You are already at maximum health. Try drinking a maximum-health increasing potion.\n")
             else:
-                if (self.health + selected_item.hp_change) > self.max_health:
-                    self.health = self.max_health
+                if (self.player.health + selected_item.hp_change) > self.player.max_health:
+                    self.player.health = self.player.max_health
                 else:
-                    self.health += selected_item.hp_change
+                    self.player.health += selected_item.hp_change
                 self.rich_print("You drink the {}. The strong elixir makes you feel rejuvenated.\n".format(style_text(selected_item.name, 'item')))
-                del self.inventory[pressed-1]
+                del self.player.inventory[pressed-1]
 
     def drop_menu_function(self, selected_item, pressed=None, print_header=None):
         self.rich_print(f"Do you want to drop the {style_text(selected_item.name, 'item')}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
@@ -476,7 +466,7 @@ class Dungeon:
             if keyboard.is_pressed("y"):
                 os.system('cls')
                 print_header()
-                del self.inventory[pressed-1]
+                del self.player.inventory[pressed-1]
                 self.rich_print(f"You have dropped the {style_text(selected_item.name, 'item')}!\n")
                 break
             elif keyboard.is_pressed("n"):
@@ -485,25 +475,17 @@ class Dungeon:
                 self.rich_print(f"You do not drop the {style_text(selected_item.name, 'item')}.\n")
                 break
 
-    def print_inventory(self):
-        self.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})\n", style="inventory", highlight=False)
-        if len(self.inventory) == 0:
-            print("You have nothing in your inventory!\n")
-        else:
-            for index, item in enumerate(self.inventory):
-                self.rich_print("{0}: {1}\n\t{2}".format(index+1, style_text(item.name, 'item'), item.description))
-
     def print_inventory_wrapper(self, *args):
         os.system("cls")
-        self.print_inventory()
-        self.rich_print(f"Press {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
+        self.player.print_inventory()
+        self.rich_print(f"\nPress {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
         # time.sleep(0.5)
         while True:
             if keyboard.is_pressed("e"):
                 break
 
     def player_move(self, direction):
-        y, x = self.player_loc
+        y, x = self.player.location
         condition, new_y, new_x = {
             "e": ((x < (config.map.max_x)), y, x+1),
             "w": ((x > 0), y, x-1),
@@ -515,21 +497,22 @@ class Dungeon:
                 self.matrix[y][x] = self.matrix[y][x].inventory
                 self.matrix[new_y][new_x] = DungeonCell(
                     symbol=config.symbols.player,
+                    game=self,
                     explored=True,
                     inventory=self.matrix[new_y][new_x]
                 )
 
-                self.player_loc = (new_y, new_x)
+                self.player.location = (new_y, new_x)
         self.deactivate_seen_tiles()
 
     def print_map(self):
         os.system('cls')
         self.rich_print("[Dungeon]", style="game_header", end=" ", highlight=False)
         self.rich_print(f"Move: {self.moves}", style="move_count", end=" ", highlight=False)
-        self.rich_print(f"Health: ({self.health} / {self.max_health})", style="health", end=" ", highlight=False)
-        self.rich_print(f"XP: {self.xp}", style="xp_count", end=" ", highlight=False)
-        self.rich_print(f"Coins: {self.coins}", style="coin", end=" ", highlight=False)
-        self.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", end=" ", highlight=False)
+        self.rich_print(f"Health: ({self.player.health} / {self.player.max_health})", style="health", end=" ", highlight=False)
+        self.rich_print(f"XP: {self.player.xp}", style="xp_count", end=" ", highlight=False)
+        self.rich_print(f"Coins: {self.player.coins}", style="coin", end=" ", highlight=False)
+        self.rich_print(f"Inventory ({len(self.player.inventory)} / {self.player.max_inventory})", style="inventory", end=" ", highlight=False)
         self.rich_print(f"Time: {(time.time()-self.start_time):.2f}s", style="time_count", highlight=False)
         temp_map = []
         index = -1
@@ -577,7 +560,7 @@ Press {controls_style('d')} to {style_text('drop items', 'action')}.
 """, highlight=False)
 
     def deactivate_seen_tiles(self):
-        y, x = self.player_loc
+        y, x = self.player.location
         adjacent_cells = [
             (y-1, x-1), (y-1, x), (y-1, x+1),
             (y, x-1), (y, x), (y, x+1),
@@ -590,22 +573,22 @@ Press {controls_style('d')} to {style_text('drop items', 'action')}.
 
         """
         # Prevent Border Sneak-peaking
-        if not self.player_loc[1] == 0:
-            if not self.player_loc[0] == 0:
-                self.matrix[self.player_loc[0]-1][self.player_loc[1]-1][1] = 1 # North West
-            if not self.player_loc[1] == (config.map.height - 1):
-                self.matrix[self.player_loc[0]+1][self.player_loc[1]-1][1] = 1 # South West
-            self.matrix[self.player_loc[0]][self.player_loc[1]-1][1] = 1 # West
-        if not self.player_loc[1] == (config.map.width):
-            if not self.player_loc[0] == 0:
-                self.matrix[self.player_loc[0]-1][self.player_loc[1]+1][1] = 1 # North East
-            if not self.player_loc[1] == (config.map.height - 1): ###
-                self.matrix[self.player_loc[0]+1][self.player_loc[1]+1][1] = 1 # South East
-            self.matrix[self.player_loc[0]][self.player_loc[1]+1][1] = 1 # East
-        if not self.player_loc[0] == 0:
-            self.matrix[self.player_loc[0]-1][self.player_loc[1]][1] = 1 # North
-        if not self.player_loc[1] == (config.map.height - 1):
-            self.matrix[self.player_loc[0]+1][self.player_loc[1]][1] = 1 # South
+        if not self.player.location[1] == 0:
+            if not self.player.location[0] == 0:
+                self.matrix[self.player.location[0]-1][self.player.location[1]-1][1] = 1 # North West
+            if not self.player.location[1] == (config.map.height - 1):
+                self.matrix[self.player.location[0]+1][self.player.location[1]-1][1] = 1 # South West
+            self.matrix[self.player.location[0]][self.player.location[1]-1][1] = 1 # West
+        if not self.player.location[1] == (config.map.width):
+            if not self.player.location[0] == 0:
+                self.matrix[self.player.location[0]-1][self.player.location[1]+1][1] = 1 # North East
+            if not self.player.location[1] == (config.map.height - 1): ###
+                self.matrix[self.player.location[0]+1][self.player.location[1]+1][1] = 1 # South East
+            self.matrix[self.player.location[0]][self.player.location[1]+1][1] = 1 # East
+        if not self.player.location[0] == 0:
+            self.matrix[self.player.location[0]-1][self.player.location[1]][1] = 1 # North
+        if not self.player.location[1] == (config.map.height - 1):
+            self.matrix[self.player.location[0]+1][self.player.location[1]][1] = 1 # South
         """
 
 

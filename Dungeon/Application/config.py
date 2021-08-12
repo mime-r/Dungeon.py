@@ -1,7 +1,7 @@
 class StyleConfig:
     # map features
     wall = "bold #666666"
-    empty = "dim #444444"
+    empty = "#444444"
     unknown = "#0C0C0C"
     grid_num = "#444444"
 

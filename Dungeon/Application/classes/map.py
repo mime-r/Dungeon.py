@@ -3,15 +3,57 @@
 # Credits: https://github.com/boppreh/maze/blob/master/maze.py
 # I edited a lil bit
 import random
+from ..utils import style_text
+from .items import DungeonItem
 
 # Easy to read representation for each cardinal direction.
 N, S, W, E = ('n', 's', 'w', 'e')
 
+class DungeonPlayer:
+    def __init__(self, health, max_health, max_inventory, coins, xp, equipped, game):
+        self.health = health
+        self.max_health = max_health
+        self.xp = xp
+        self.coins = coins
+        self.inventory = []
+        self.max_inventory = max_inventory
+        self.equipped = equipped
+        self.location = (0, 0)
+        self.game = game
+
+    def print_inventory(self):
+        self.game.rich_print(f"Inventory ({len(self.inventory)} / {self.max_inventory})\n", style="inventory", highlight=False)
+        if len(self.inventory) == 0:
+            print("You have nothing in your inventory!\n")
+        else:
+            for index, item in enumerate(self.inventory):
+                self.game.rich_print("{0}: {1}\n\t{2}".format(index+1, style_text(item.name, 'item'), item.description))
+
 class DungeonCell:
-    def __init__(self, symbol, explored=False, inventory=None):
+    def __init__(self, symbol, game, explored=False, inventory=None):
         self.symbol = symbol
         self.explored = explored
         self.inventory = inventory if inventory else []
+        self.game = game
+
+    def print_inventory(self):
+        if len(self.inventory) > 0 and isinstance(self.inventory[0], DungeonItem):
+            inventory = list(filter(
+                lambda x: isinstance(x, DungeonItem),
+                self.inventory
+            ))
+            constructor = ""
+            if len(inventory) == 1:
+                constructor = style_text(inventory[0].name, 'item')
+            elif len(inventory) > 1:
+                constructor = '{} and {}'.format(
+                    ', '.join(map(
+                        lambda item: style_text(item.name, 'item'),
+                        inventory[:-1])
+                    ),
+                    style_text(inventory[-1].name, 'item')
+                )
+            self.game.rich_print("You see a {} here.".format(constructor))
 
 class Cell(object):
     """
