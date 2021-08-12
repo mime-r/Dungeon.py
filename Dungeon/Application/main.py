@@ -254,10 +254,10 @@ class Dungeon:
         # print(self.playerontile_inv)
         # time.sleep(1)
         if len(inventory) == 1:
-            constructor = inventory[0].name
+            constructor = style_text(inventory[0].name, 'item')
         elif len(inventory) > 1:
-            constructor = '{} and {}'.format(', '.join(map(lambda obj: obj.name, inventory[:-1])), str(inventory[-1].name))
-        print("You see a {} here.".format(constructor))
+            constructor = '{} and {}'.format(', '.join(map(lambda obj: style_text(obj.name, 'item'), inventory[:-1])), style_text(inventory[-1].name, 'item'))
+        self.rich_print("You see a {} here.".format(constructor))
 
     def print_leaderboard(self):
         self.leaderboard.insert({
@@ -298,7 +298,7 @@ class Dungeon:
         os.system('cls')
         self.rich_print(f"{style_text(trader.name, 'name')} - {style_text(trader.occupation, 'occupation')}\n", highlight=False)
         for index, item in enumerate(trader.stuff):
-            self.rich_print(f"{index+1}: {item.name} {style_text(item.cost, 'coin')}", highlight=False)
+            self.rich_print(f"{index+1}: {style_text(item.name, 'item')} {style_text(item.cost, 'coin')}", highlight=False)
             self.rich_print(f"\t {item.description}")
         print("\n")
 
@@ -311,7 +311,7 @@ class Dungeon:
                 self.inventory.append(selected_item)
                 self.coins -= selected_item.cost
         else:
-            print("You do not have enough money to buy the {}.\n".format(selected_item.name))
+            print("You do not have enough money to buy the {}.\n".format(style_text(selected_item.name, 'item')))
 
     def attack(self, enemy_symbol):  # He protecc he attacc he also like to snacc
         enemy = {
@@ -454,8 +454,8 @@ class Dungeon:
 
     def equip_menu_function(self, selected_item, pressed=None, print_header=None):
         if isinstance(selected_item, DungeonInventory):
-            print("You sling the {} over your shoulders.\n".format(
-                selected_item.name))
+            self.rich_print("You sling the {} over your shoulders.\n".format(
+                style_text(selected_item.name, 'item')))
             del self.inventory[pressed-1]
             self.max_inventory += selected_item.inventory
         elif isinstance(selected_item, DungeonPotion):
@@ -467,23 +467,22 @@ class Dungeon:
                     self.health = self.max_health
                 else:
                     self.health += selected_item.hp_change
-                print("You drink the {}. The strong elixir makes you feel rejuvenated.\n".format(
-                    selected_item.name))
+                self.rich_print("You drink the {}. The strong elixir makes you feel rejuvenated.\n".format(style_text(selected_item.name, 'item')))
                 del self.inventory[pressed-1]
 
     def drop_menu_function(self, selected_item, pressed=None, print_header=None):
-        self.rich_print(f"Do you want to drop the {selected_item.name}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
+        self.rich_print(f"Do you want to drop the {style_text(selected_item.name, 'item')}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
         while True:
             if keyboard.is_pressed("y"):
                 os.system('cls')
                 print_header()
                 del self.inventory[pressed-1]
-                self.rich_print(f"You have dropped the {selected_item.name}!\n")
+                self.rich_print(f"You have dropped the {style_text(selected_item.name, 'item')}!\n")
                 break
             elif keyboard.is_pressed("n"):
                 os.system('cls')
                 print_header()
-                self.rich_print(f"You do not drop the {selected_item.name}.\n")
+                self.rich_print(f"You do not drop the {style_text(selected_item.name, 'item')}.\n")
                 break
 
     def print_inventory(self):
@@ -492,7 +491,7 @@ class Dungeon:
             print("You have nothing in your inventory!\n")
         else:
             for index, item in enumerate(self.inventory):
-                self.rich_print("{0}: {1}\n\t{2}".format(index+1, item.name, item.description))
+                self.rich_print("{0}: {1}\n\t{2}".format(index+1, style_text(item.name, 'item'), item.description))
 
     def print_inventory_wrapper(self, *args):
         os.system("cls")

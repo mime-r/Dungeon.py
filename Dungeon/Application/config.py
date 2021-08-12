@@ -28,6 +28,7 @@ class StyleConfig:
     enemy = "bold #FF2424"
     occupation = "bold green"
     name = "bold magenta"
+    item = "#A4FF42"
 
     # ui elements
     game_header = "bold red"
