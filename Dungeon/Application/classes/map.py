@@ -19,6 +19,7 @@ class DungeonPlayer:
         self.max_inventory = max_inventory
         self.equipped = equipped
         self.location = (0, 0)
+        self.name = None
         self.game = game
 
     def print_inventory(self):

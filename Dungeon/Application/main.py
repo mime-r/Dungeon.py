@@ -35,6 +35,11 @@ class Dungeon:
         self.log_info = lambda info: self.logger.log(LogType.INFO, info)
         self.log_debug = lambda debug: self.logger.log(LogType.DEBUG, debug)
         self.log_fatal = lambda fatal: self.logger.log(LogType.FATAL, fatal)
+        self.time_log = lambda start, func, end: (
+            self.log_info(f"{start} at {time.time():.2f}"),
+            func(),
+            self.log_info(f"{end} at {time.time():.2f}")
+        )
         self.log_info("logging functions set up is done")
 
         #sets console size and clears console
@@ -50,8 +55,6 @@ class Dungeon:
 
         # Game vars init
         self.moves = 1
-        self.firsttime = True
-        self.start_time = time.time()
 
         # Leaderboard
         self.leaderboard = TinyDB("leaderboard.json")
@@ -168,10 +171,11 @@ class Dungeon:
                 break
         self.player.location = (y, x)
 
-        self.player_name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
-        if not self.player_name:
-            self.player_name = People.generate_name()
-            print("Your name is: {}".format(self.player_name))
+        self.player.name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
+        if not self.player.name:
+            self.player.name = People.generate_name()
+            print("Your name is: {}".format(self.player.name))
+            time.sleep(1.5)
         self.deactivate_seen_tiles()
         self.log_info("initiated player")
 
@@ -188,7 +192,7 @@ class Dungeon:
                     self.matrix[y][x] = DungeonCell(symbol=config.symbols.target, game=self)
                     break
         self.log_info("put target on map")
-        self.base_map_str = self.gen_debug_map()       
+        self.base_map_str = self.gen_debug_map()
 
     def gen_debug_map(self):
         base_map = []
@@ -250,7 +254,7 @@ class Dungeon:
 
     def print_leaderboard(self):
         self.leaderboard.insert({
-            "name": self.player_name,
+            "name": self.player.name,
             "time": round(time.time() - self.start_time, 3),
             "moves": self.moves,
             "datetime": str(datetime.datetime.now()),
@@ -379,38 +383,56 @@ class Dungeon:
             return enemy.health, 0
 
     def gameloop(self):
+        self.start_time = time.time()
+        self.log_info(f"started game at {time.time():.2f}")
         self.print_map()
         while True:
             if keyboard.is_pressed("right"):
                 self.player_move("e")
+                self.log_info("moved east")
                 self.event()
             elif keyboard.is_pressed("left"):
                 self.player_move("w")
+                self.log_info("moved west")
                 self.event()
             elif keyboard.is_pressed("up"):
                 self.player_move("n")
+                self.log_info("moved north")
                 self.event()
             elif keyboard.is_pressed("down"):
                 self.player_move("s")
+                self.log_info("moved south")
                 self.event()
             elif keyboard.is_pressed("esc"):
                 print("Exiting [Dungeon]...")
+                self.log_info(f"game exited at {time.time():.2f}")
                 sys.exit()
             elif keyboard.is_pressed("u"):
-                #self.equip_menu()
-                self.inventory_item_menu(
-                    print_header=lambda: self.menu_header(menu_name="Use/Equip"),
-                    menu_function=self.equip_menu_function
+                self.time_log(
+                    start="use/equip menu opened",
+                    func=lambda: self.inventory_item_menu(
+                        print_header=lambda: self.menu_header(menu_name="Use/Equip"),
+                        menu_function=self.equip_menu_function
+                    ),
+                    end="use/equip menu closed"
                 )
                 self.print_map()
             elif keyboard.is_pressed("d"):
-                self.inventory_item_menu(
-                    print_header=lambda: self.menu_header(menu_name="Drop"),
-                    menu_function=self.drop_menu_function
+                self.time_log(
+                    start="drop menu opened",
+                    func=lambda: self.inventory_item_menu(
+                        print_header=lambda: self.menu_header(menu_name="Drop"),
+                        menu_function=self.drop_menu_function
+                    ),
+                    end="drop menu closed"
                 )
                 self.print_map()
             elif keyboard.is_pressed("i"):
-                self.print_inventory_wrapper()
+                self.time_log(
+                    start="inventory opened",
+                    func=lambda: self.print_inventory_wrapper(),
+                    end="inventory closed"
+                )
                 self.print_map()
 
     def menu_header(self, menu_name):
@@ -602,7 +624,7 @@ def main(logger):
         d.gameloop()
     except KeyboardInterrupt:
         print("Exiting [Dungeon]...")
-        logger.log(LogType.INFO, "game exited")
+        logger.log(LogType.INFO, f"game exited by KeyboardInterrupt at {time.time():.2f}")
         sys.exit()
     except Exception as e:
         logger.log(LogType.FATAL, f"\n{''.join(traceback.format_tb(e.__traceback__))}\n\n{str(e)}")
