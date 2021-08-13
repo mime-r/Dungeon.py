@@ -1,6 +1,7 @@
 import os
 import sys
-import time
+from time import time
+from datetime import datetime
 
 cwd = os.getcwd()
 
@@ -13,11 +14,11 @@ class Logger:
     def __init__(self):
         if not os.path.exists(self.logs_path):
             os.makedirs(self.logs_path)
-        self.log_file = os.path.join(self.logs_path, f"{applicationName}{round(time.time())}.log")
+        self.log_file = os.path.join(self.logs_path, f"{applicationName}-{round(time())}.log")
 
     def log(self, log_type, this):
         with open(self.log_file, "a") as f:
-            f.write(f"{round(time.time())} [{log_type}] {this}\n")
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %T')} [{log_type}] {this}\n")
         if log_type == "FATAL":
             input(f"[FATAL ERROR]: {this}\n\n[Logs: {self.log_file}]\n{self.get_logs()}\n\n[enter to exit]")
             sys.exit(-1)
