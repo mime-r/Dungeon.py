@@ -67,6 +67,23 @@ class DungeonPlayer:
         self.game.map.update_adjacent_cells()
         self.game.event()
 
+    def attack_turn(self, enemy):
+        if not random.randint(1, 100) < self.equipped.accuracy:
+            attack_damage = self.equipped.base_attack + random.randint(
+                self.equipped.attack_range[0], self.equipped.attack_range[1])
+            if attack_damage == self.equipped.base_attack + self.equipped.attack_range[1]:
+                # Max Damage
+                self.game.print(
+                    self.equipped.texts.critical_hit.format(style_text(self.equipped.name, 'weapons')), highlight=False)
+            else:
+                self.game.print(
+                    self.equipped.texts.hit.format(style_text(enemy.name, 'enemy'), style_text(self.equipped.name, 'weapons')), highlight=False)
+            #self.print(f"\n[enemy]{enemy.name}\'s[/enemy] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
+            return (enemy.health - attack_damage), attack_damage
+        else:
+            self.game.print(self.equipped.texts.missed_hit.format(style_text(enemy.name, 'enemy')), highlight=False)
+            return enemy.health, 0
+
 class DungeonCell:
     def __init__(self, symbol, game, explored=False, inventory=None):
         self.symbol = symbol

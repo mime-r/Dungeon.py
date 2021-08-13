@@ -259,7 +259,7 @@ class Dungeon:
     def attack(self, enemy_symbol):  # He protecc he attacc he also like to snacc
         enemy = {
             config.symbols.orc: Orc
-        }.get(enemy_symbol)()
+        }.get(enemy_symbol)(game=self)
         print_header = lambda: self.print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
         print_health = lambda enemy_hp_drop=None, player_hp_drop=None: (
             self.print(f"{style_text(enemy.name, 'enemy')}: Health - {style_text(enemy.health, 'health')}{style_text(' ( -'+str(enemy_hp_drop)+' )', 'hp_drop') if enemy_hp_drop else ''}", highlight=False),
@@ -276,12 +276,12 @@ class Dungeon:
                 os.system('cls')
                 print_header()
                 time.sleep(0.15)
-                enemy.health, enemy_hp_drop = self.hit(enemy)
+                enemy.health, enemy_hp_drop = self.player.attack_turn(enemy)
                 print_health(enemy_hp_drop=enemy_hp_drop)
                 if enemy.health <= 0:
                     break
                 time.sleep(0.15)
-                self.player.health, player_hp_drop = self.enemy_hit(enemy)
+                self.player.health, player_hp_drop = enemy.attack_turn()
                 print_health(player_hp_drop=player_hp_drop)
                 print_footer()
                 time.sleep(0.15)
@@ -300,82 +300,51 @@ class Dungeon:
         self.player.coins += enemy.coin_drop
         time.sleep(2)
 
-    def enemy_hit(self, enemy):
-        if random.randint(1, 100) < enemy.accuracy:
-            attack_damage = enemy.attack_base + \
-                random.randint(enemy.attack_range[0], enemy.attack_range[1])
-            if attack_damage == enemy.attack_base + enemy.attack_range[1]:
-                # Max Damage
-                self.print(enemy.texts.critical_hit)
-            else:
-                self.print(enemy.texts.hit)
-            #self.print(f"\n[player]Your[/player] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
-            return (self.player.health - attack_damage), attack_damage
-        else:
-            self.print(enemy.texts.missed_hit)
-            return self.player.health, 0
-
-    def hit(self, enemy):
-        if not random.randint(1, 100) < self.player.equipped.accuracy:
-            attack_damage = self.player.equipped.base_attack + random.randint(
-                self.player.equipped.attack_range[0], self.player.equipped.attack_range[1])
-            if attack_damage == self.player.equipped.base_attack + self.player.equipped.attack_range[1]:
-                # Max Damage
-                self.print(
-                    self.player.equipped.texts.critical_hit.format(style_text(self.player.equipped.name, 'weapons')), highlight=False)
-            else:
-                self.print(
-                    self.player.equipped.texts.hit.format(style_text(enemy.name, 'enemy'), style_text(self.player.equipped.name, 'weapons')), highlight=False)
-            #self.print(f"\n[enemy]{enemy.name}\'s[/enemy] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
-            return (enemy.health - attack_damage), attack_damage
-        else:
-            self.print(self.player.equipped.texts.missed_hit.format(style_text(enemy.name, 'enemy')), highlight=False)
-            return enemy.health, 0
-
     def gameloop(self):
         self.start_time = time.time()
         self.log.info(f"started game at {time.time():.2f}")
         self.map.print()
         while True:
-            if keyboard.is_pressed("right"):
-                self.player.move("e")
-            elif keyboard.is_pressed("left"):
-                self.player.move("w")
-            elif keyboard.is_pressed("up"):
-                self.player.move("n")
-            elif keyboard.is_pressed("down"):
-                self.player.move("s")
-            elif keyboard.is_pressed("esc"):
-                print("Exiting [Dungeon]...")
-                self.log.info(f"game exited at {time.time():.2f}")
-                sys.exit()
-            elif keyboard.is_pressed("u"):
-                self.log.time_logged(
-                    start="use/equip menu opened",
-                    func=lambda: self.inventory_item_menu(
-                        print_header=lambda: self.menu_header(menu_name="Use/Equip"),
-                        menu_function=self.equip_menu_function
-                    ),
-                    end="use/equip menu closed"
-                )
-                self.map.print()
-            elif keyboard.is_pressed("d"):
-                self.log.time_logged(
-                    start="drop menu opened",
-                    func=lambda: self.inventory_item_menu(
-                        print_header=lambda: self.menu_header(menu_name="Drop"),
-                        menu_function=self.drop_menu_function
-                    ),
-                    end="drop menu closed"
-                )
-                self.map.print()
-            elif keyboard.is_pressed("i"):
-                self.log.time_logged(
-                    start="inventory opened",
-                    func=lambda: self.print_inventory_wrapper(),
-                    end="inventory closed"
-                )
-                self.map.print()
+            if keyboard.read_key():
+                if keyboard.is_pressed("right"):
+                    self.player.move("e")
+                elif keyboard.is_pressed("left"):
+                    self.player.move("w")
+                elif keyboard.is_pressed("up"):
+                    self.player.move("n")
+                elif keyboard.is_pressed("down"):
+                    self.player.move("s")
+                elif keyboard.is_pressed("esc"):
+                    print("Exiting [Dungeon]...")
+                    self.log.info(f"game exited at {time.time():.2f}")
+                    sys.exit()
+                elif keyboard.is_pressed("u"):
+                    self.log.time_logged(
+                        start="use/equip menu opened",
+                        func=lambda: self.inventory_item_menu(
+                            print_header=lambda: self.menu_header(menu_name="Use/Equip"),
+                            menu_function=self.equip_menu_function
+                        ),
+                        end="use/equip menu closed"
+                    )
+                    self.map.print()
+                elif keyboard.is_pressed("d"):
+                    self.log.time_logged(
+                        start="drop menu opened",
+                        func=lambda: self.inventory_item_menu(
+                            print_header=lambda: self.menu_header(menu_name="Drop"),
+                            menu_function=self.drop_menu_function
+                        ),
+                        end="drop menu closed"
+                    )
+                    self.map.print()
+                elif keyboard.is_pressed("i"):
+                    self.log.time_logged(
+                        start="inventory opened",
+                        func=lambda: self.print_inventory_wrapper(),
+                        end="inventory closed"
+                    )
+                    self.map.print()
 
     def menu_header(self, menu_name):
         os.system('cls')

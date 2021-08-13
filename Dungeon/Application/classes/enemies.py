@@ -1,7 +1,8 @@
 import random
 f = lambda s, e: s.replace("{}", f"[enemy]{e}[/enemy]")
+
 class DungeonEnemy:
-    def __init__(self, name, xp_drop, attack_base, attack_range, accuracy):
+    def __init__(self, name, xp_drop, attack_base, attack_range, accuracy, game):
         self.name = name
         self.xp_drop = xp_drop
         self.attack_base = attack_base
@@ -10,10 +11,26 @@ class DungeonEnemy:
         self.health = None
         self.coin_drop = None
         self.texts = None
+        self.game = game
+
+    def attack_turn(self):
+        if random.randint(1, 100) < self.accuracy:
+            attack_damage = self.attack_base + \
+                random.randint(self.attack_range[0], self.attack_range[1])
+            if attack_damage == self.attack_base + self.attack_range[1]:
+                # Max Damage
+                self.game.print(self.texts.critical_hit)
+            else:
+                self.game.print(self.texts.hit)
+            #self.print(f"\n[player]Your[/player] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
+            return (self.game.player.health - attack_damage), attack_damage
+        else:
+            self.game.print(self.texts.missed_hit)
+            return self.game.player.health, 0
 
 
 class Orc(DungeonEnemy):
-    def __init__(self):
+    def __init__(self, game):
         health = 3 + random.randint(1, 7)
         if health < 5:
             super().__init__(
@@ -21,7 +38,8 @@ class Orc(DungeonEnemy):
                 xp_drop=1,
                 attack_base=1,
                 attack_range=(0, 1),
-                accuracy=80
+                accuracy=80,
+                game=game
             )
         elif health < 9:
             super().__init__(
@@ -29,7 +47,8 @@ class Orc(DungeonEnemy):
                 xp_drop=2,
                 attack_base=1,
                 attack_range=(0, 1),
-                accuracy=60
+                accuracy=60,
+                game=game
             )
         else:
             super().__init__(
@@ -37,7 +56,8 @@ class Orc(DungeonEnemy):
                 xp_drop=3,
                 attack_base=1,
                 attack_range=(0, 2),
-                accuracy=50
+                accuracy=50,
+                game=game
             )
         # hitcritical, hitmedium, miss, uponded
         self.health = health
