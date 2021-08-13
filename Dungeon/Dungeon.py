@@ -2,7 +2,7 @@
 import os
 
 # App Imports
-from Application.checkmodules import check_modules
+from Application.modules import check_modules
 from Application.loggers import Logger
 
 

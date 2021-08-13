@@ -44,6 +44,29 @@ class DungeonPlayer:
             for index, item in enumerate(self.inventory):
                 self.game.print("{0}: {1}\n\t{2}".format(index+1, style_text(item.name, 'item'), item.description))
 
+    def move(self, direction):
+        y, x = self.location
+        condition, new_y, new_x = {
+            "e": ((x < (config.map.max_x)), y, x+1),
+            "w": ((x > 0), y, x-1),
+            "n": ((y > 0), y-1, x),
+            "s": ((y < (config.map.max_y)), y+1, x)
+        }.get(direction)
+        if condition:
+            if self.game.map.matrix[new_y][new_x].symbol != config.symbols.wall:
+                self.game.map.matrix[y][x] = self.game.map.matrix[y][x].inventory
+                self.game.map.matrix[new_y][new_x] = DungeonCell(
+                    symbol=config.symbols.player,
+                    game=self,
+                    explored=True,
+                    inventory=self.game.map.matrix[new_y][new_x]
+                )
+
+                self.location = (new_y, new_x)
+        self.game.log.info(f"moved {direction}")
+        self.game.map.update_adjacent_cells()
+        self.game.event()
+
 class DungeonCell:
     def __init__(self, symbol, game, explored=False, inventory=None):
         self.symbol = symbol
@@ -155,6 +178,39 @@ Press {controls_style('esc')} to {style_text('exit', 'action')}.
 Press {controls_style('u')} to {style_text('equip/use items', 'action')}.
 Press {controls_style('d')} to {style_text('drop items', 'action')}.
 """, highlight=False)
+
+    def update_adjacent_cells(self):
+        y, x = self.game.player.location
+        adjacent_cells = [
+            (y-1, x-1), (y-1, x), (y-1, x+1),
+            (y, x-1), (y, x), (y, x+1),
+            (y+1, x-1), (y+1, x), (y+1, x+1)
+        ]
+        for y, x in adjacent_cells:
+            if (y < 0 or y > config.map.max_y) or (x < 0 or x > config.map.max_x):
+                continue
+            self.matrix[y][x].explored = True
+
+
+        """
+        # Prevent Border Sneak-peaking
+        if not self.player.x == 0:
+            if not self.player.y == 0:
+                self.map.matrix[self.player.y-1][self.player.x-1][1] = 1 # North West
+            if not self.player.x == (config.map.height - 1):
+                self.map.matrix[self.player.y+1][self.player.x-1][1] = 1 # South West
+            self.map.matrix[self.player.y][self.player.x-1][1] = 1 # West
+        if not self.player.x == (config.map.width):
+            if not self.player.y == 0:
+                self.map.matrix[self.player.y-1][self.player.x+1][1] = 1 # North East
+            if not self.player.x == (config.map.height - 1): ###
+                self.map.matrix[self.player.y+1][self.player.x+1][1] = 1 # South East
+            self.map.matrix[self.player.y][self.player.x+1][1] = 1 # East
+        if not self.player.y == 0:
+            self.map.matrix[self.player.y-1][self.player.x][1] = 1 # North
+        if not self.player.x == (config.map.height - 1):
+            self.map.matrix[self.player.y+1][self.player.x][1] = 1 # South
+        """
 
 class Cell(object):
     """

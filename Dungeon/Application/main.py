@@ -30,27 +30,19 @@ class Dungeon:
     def __init__(self, logger):
 
         # instantiate logger
-        self.logger = logger
-        self.log_info = lambda info: self.logger.log(LogType.INFO, info)
-        self.log_debug = lambda debug: self.logger.log(LogType.DEBUG, debug)
-        self.log_fatal = lambda fatal: self.logger.log(LogType.FATAL, fatal)
-        self.time_log = lambda start, func, end: (
-            self.log_info(f"{start} at {time.time():.2f}"),
-            func(),
-            self.log_info(f"{end} at {time.time():.2f}")
-        )
-        self.log_info("logging functions set up is done")
+        self.log = logger
+        self.log.info("logging functions set up is done")
 
         #sets console size and clears console
         os.system("mode 100, 38 && cls")
-        self.log_info("resized console & cleared")
+        self.log.info("resized console & cleared")
 
         # Set up rich styles
         self.rich_console = Console(
             theme=Theme(config.styles)
         )
         self.print = self.rich_console.print
-        self.log_info("rich console & styles set up")
+        self.log.info("rich console & styles set up")
 
         # Game vars init
         self.moves = 1
@@ -79,18 +71,18 @@ class Dungeon:
                 )
             )
 
-        self.log_info("init dungeon and player variables")
+        self.log.info("init dungeon and player variables")
         
         # generate unique session id for highscore leaderboard
         while True:
             self.session_id = random.getrandbits(10000)
             if len(self.leaderboard.search(self.leaderboardQuery.session_id == self.session_id)) == 0:  # check for repeating
                 break
-        self.log_info("generated session id")
+        self.log.info("generated session id")
 
         self.generate_map()
-        self.log_info("generated map")
-        self.log_debug(f"Raw Map String:\n{self.map.get_debug_map()}")
+        self.log.info("generated map")
+        self.log.debug(f"Raw Map String:\n{self.map.get_debug_map()}")
 
     def generate_map(self):
         '''
@@ -98,7 +90,7 @@ class Dungeon:
         '''
 
         self.map = DungeonMap(game=self)
-        self.log_info("initialised map")
+        self.log.info("initialised map")
 
         #self.map.matrix = [[[config.symbols.empty, 0, []] for x in range(config.map.width)] for y in range(config.map.height)]
 
@@ -109,7 +101,7 @@ class Dungeon:
                 if self.map.matrix[y][x].symbol != config.symbols.wall:
                     self.map.matrix[y][x] = DungeonCell(symbol=config.symbols.orc, game=self)
                     break
-        self.log_info("filled map with orcs")
+        self.log.info("filled map with orcs")
 
         # Fill map (chemists)
         for count in range(config.count.chemist):
@@ -122,7 +114,7 @@ class Dungeon:
                         inventory=[Chemist()]
                     )
                     break
-        self.log_info("filled map with chemists")
+        self.log.info("filled map with chemists")
 
         # Scatter potions
         for count in range(config.count.floor_potions):
@@ -145,7 +137,7 @@ class Dungeon:
                         )
                     self.map.matrix[y][x].inventory.append(chosen_potion)
                     break
-        self.log_info("filled map with potions")
+        self.log.info("filled map with potions")
 
         # init player
         while True:
@@ -165,8 +157,8 @@ class Dungeon:
             self.player.name = People.generate_name()
             print("Your name is: {}".format(self.player.name))
             time.sleep(1.5)
-        self.deactivate_seen_tiles()
-        self.log_info("initiated player")
+        self.map.update_adjacent_cells()
+        self.log.info("initiated player")
 
         # init target
         while True:
@@ -180,7 +172,7 @@ class Dungeon:
                     #self.map.matrix[x][y] = [config.symbols.target, 0, self.map.matrix[x][y]]
                     self.map.matrix[y][x] = DungeonCell(symbol=config.symbols.target, game=self)
                     break
-        self.log_info("put target on map")
+        self.log.info("put target on map")
 
     def event(self):
         time.sleep(0.1)  # Time Lag
@@ -342,31 +334,23 @@ class Dungeon:
 
     def gameloop(self):
         self.start_time = time.time()
-        self.log_info(f"started game at {time.time():.2f}")
+        self.log.info(f"started game at {time.time():.2f}")
         self.map.print()
         while True:
             if keyboard.is_pressed("right"):
-                self.player_move("e")
-                self.log_info("moved east")
-                self.event()
+                self.player.move("e")
             elif keyboard.is_pressed("left"):
-                self.player_move("w")
-                self.log_info("moved west")
-                self.event()
+                self.player.move("w")
             elif keyboard.is_pressed("up"):
-                self.player_move("n")
-                self.log_info("moved north")
-                self.event()
+                self.player.move("n")
             elif keyboard.is_pressed("down"):
-                self.player_move("s")
-                self.log_info("moved south")
-                self.event()
+                self.player.move("s")
             elif keyboard.is_pressed("esc"):
                 print("Exiting [Dungeon]...")
-                self.log_info(f"game exited at {time.time():.2f}")
+                self.log.info(f"game exited at {time.time():.2f}")
                 sys.exit()
             elif keyboard.is_pressed("u"):
-                self.time_log(
+                self.log.time_logged(
                     start="use/equip menu opened",
                     func=lambda: self.inventory_item_menu(
                         print_header=lambda: self.menu_header(menu_name="Use/Equip"),
@@ -376,7 +360,7 @@ class Dungeon:
                 )
                 self.map.print()
             elif keyboard.is_pressed("d"):
-                self.time_log(
+                self.log.time_logged(
                     start="drop menu opened",
                     func=lambda: self.inventory_item_menu(
                         print_header=lambda: self.menu_header(menu_name="Drop"),
@@ -386,7 +370,7 @@ class Dungeon:
                 )
                 self.map.print()
             elif keyboard.is_pressed("i"):
-                self.time_log(
+                self.log.time_logged(
                     start="inventory opened",
                     func=lambda: self.print_inventory_wrapper(),
                     end="inventory closed"
@@ -464,71 +448,17 @@ class Dungeon:
             if keyboard.is_pressed("e"):
                 break
 
-    def player_move(self, direction):
-        y, x = self.player.location
-        condition, new_y, new_x = {
-            "e": ((x < (config.map.max_x)), y, x+1),
-            "w": ((x > 0), y, x-1),
-            "n": ((y > 0), y-1, x),
-            "s": ((y < (config.map.max_y)), y+1, x)
-        }.get(direction)
-        if condition:
-            if self.map.matrix[new_y][new_x].symbol != config.symbols.wall:
-                self.map.matrix[y][x] = self.map.matrix[y][x].inventory
-                self.map.matrix[new_y][new_x] = DungeonCell(
-                    symbol=config.symbols.player,
-                    game=self,
-                    explored=True,
-                    inventory=self.map.matrix[new_y][new_x]
-                )
-
-                self.player.location = (new_y, new_x)
-        self.deactivate_seen_tiles()
-
-    def deactivate_seen_tiles(self):
-        y, x = self.player.location
-        adjacent_cells = [
-            (y-1, x-1), (y-1, x), (y-1, x+1),
-            (y, x-1), (y, x), (y, x+1),
-            (y+1, x-1), (y+1, x), (y+1, x+1)
-        ]
-        for y, x in adjacent_cells:
-            if (y < 0 or y > config.map.max_y) or (x < 0 or x > config.map.max_x):
-                continue
-            self.map.matrix[y][x].explored = True
-
-        """
-        # Prevent Border Sneak-peaking
-        if not self.player.x == 0:
-            if not self.player.y == 0:
-                self.map.matrix[self.player.y-1][self.player.x-1][1] = 1 # North West
-            if not self.player.x == (config.map.height - 1):
-                self.map.matrix[self.player.y+1][self.player.x-1][1] = 1 # South West
-            self.map.matrix[self.player.y][self.player.x-1][1] = 1 # West
-        if not self.player.x == (config.map.width):
-            if not self.player.y == 0:
-                self.map.matrix[self.player.y-1][self.player.x+1][1] = 1 # North East
-            if not self.player.x == (config.map.height - 1): ###
-                self.map.matrix[self.player.y+1][self.player.x+1][1] = 1 # South East
-            self.map.matrix[self.player.y][self.player.x+1][1] = 1 # East
-        if not self.player.y == 0:
-            self.map.matrix[self.player.y-1][self.player.x][1] = 1 # North
-        if not self.player.x == (config.map.height - 1):
-            self.map.matrix[self.player.y+1][self.player.x][1] = 1 # South
-        """
-
-
 # if __name__ == "__main__":
 def main(logger):
     try:
         d = Dungeon(
             logger=logger
         )
-        d.log_info("dungeon set up is done, starting game")
+        d.log.info("dungeon set up is done, starting game")
         d.gameloop()
     except KeyboardInterrupt:
         print("Exiting [Dungeon]...")
-        logger.log(LogType.INFO, f"game exited by KeyboardInterrupt at {time.time():.2f}")
+        logger.info(f"game exited by KeyboardInterrupt at {time.time():.2f}")
         sys.exit()
     except Exception as e:
-        logger.log(LogType.FATAL, f"\n{''.join(traceback.format_tb(e.__traceback__))}\n\n{str(e)}")
+        logger.fatal(f"\n{''.join(traceback.format_tb(e.__traceback__))}\n\n{str(e)}")
