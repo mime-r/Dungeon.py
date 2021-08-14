@@ -19,7 +19,7 @@ from .classes.menus import DungeonMenu
 from .classes.enemies import Orc
 from .config import config
 from .utils import random_yx, style_text, controls_style
-from .classes.map import GeneratedMap, DungeonMap, DungeonCell, DungeonPlayer
+from .classes.map import GeneratedMap, DungeonMap, DungeonPlayer
 from .loggers import LogType
 from .classes.items import *
 from .classes.database import DungeonItemDatabase
@@ -101,7 +101,7 @@ class Dungeon:
             while True:
                 x, y = random_yx()
                 if self.map.matrix[y][x].symbol != config.symbols.wall:
-                    self.map.matrix[y][x] = DungeonCell(symbol=config.symbols.orc, game=self)
+                    self.map.matrix[y][x] = self.map.cell(symbol=config.symbols.orc)
                     break
         self.log.info("filled map with orcs")
 
@@ -110,9 +110,8 @@ class Dungeon:
             while True:
                 x, y = random_yx()
                 if self.map.matrix[y][x].symbol != config.symbols.wall:
-                    self.map.matrix[y][x] = DungeonCell(
+                    self.map.matrix[y][x] = self.map.cell(
                         symbol=config.symbols.chemist,
-                        game=self,
                         inventory=[Chemist()]
                     )
                     break
@@ -145,9 +144,8 @@ class Dungeon:
         while True:
             y, x = random_yx()
             if self.map.matrix[y][x].symbol != config.symbols.wall:
-                self.map.matrix[y][x] = DungeonCell(
+                self.map.matrix[y][x] = self.map.cell(
                     symbol=config.symbols.player,
-                    game=self,
                     explored=True,
                     inventory=self.map.matrix[y][x]
                 )
@@ -172,7 +170,7 @@ class Dungeon:
                 # if abs(x-self.player.y)+abs(y-self.player.x) > 13:
                 if abs(y-self.player.y)+abs(x-self.player.x) > config.map.min_distance:
                     #self.map.matrix[x][y] = [config.symbols.target, 0, self.map.matrix[x][y]]
-                    self.map.matrix[y][x] = DungeonCell(symbol=config.symbols.target, game=self)
+                    self.map.matrix[y][x] = self.map.cell(symbol=config.symbols.target)
                     break
         self.log.info("put target on map")
 
@@ -275,9 +273,8 @@ class Dungeon:
         self.player.xp += enemy.xp_drop
         self.print(f"{enemy.texts.death}")
         prev_inventory = self.map.matrix[self.player.y][self.player.x].inventory.inventory
-        self.map.matrix[self.player.y][self.player.x].inventory = DungeonCell(
+        self.map.matrix[self.player.y][self.player.x].inventory = self.map.cell(
             symbol=config.symbols.empty,
-            game=self,
             explored=True,
             inventory=prev_inventory
         )

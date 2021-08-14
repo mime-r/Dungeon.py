@@ -65,9 +65,8 @@ class DungeonPlayer:
         if condition:
             if self.game.map.matrix[new_y][new_x].symbol != config.symbols.wall:
                 self.game.map.matrix[y][x] = self.game.map.matrix[y][x].inventory
-                self.game.map.matrix[new_y][new_x] = DungeonCell(
+                self.game.map.matrix[new_y][new_x] = self.game.map.cell(
                     symbol=config.symbols.player,
-                    game=self,
                     explored=True,
                     inventory=self.game.map.matrix[new_y][new_x]
                 )
@@ -95,10 +94,10 @@ class DungeonPlayer:
             return enemy.health, 0
 
 class DungeonCell:
-    def __init__(self, symbol, game, explored=False, inventory=None):
+    def __init__(self, game, symbol, explored, inventory):
         self.symbol = symbol
         self.explored = explored
-        self.inventory = inventory if inventory else []
+        self.inventory = inventory
         self.game = game
 
     def print_inventory(self):
@@ -129,9 +128,17 @@ class DungeonMap:
             self.matrix.append([])
             for n, cell in enumerate(row):
                 if cell == "O":
-                    self.matrix[i].append(DungeonCell(symbol=config.symbols.wall, game=self.game))
+                    self.matrix[i].append(self.cell(symbol=config.symbols.wall))
                 else:
-                    self.matrix[i].append(DungeonCell(symbol=config.symbols.empty, game=self.game))
+                    self.matrix[i].append(self.cell(symbol=config.symbols.empty))
+
+    def cell(self, symbol, explored=False, inventory=None):
+        return DungeonCell(
+            game=self.game,
+            symbol=symbol,
+            explored=explored,
+            inventory=inventory if inventory else []
+        )
 
     def get_debug_map(self):
         base_map = []
