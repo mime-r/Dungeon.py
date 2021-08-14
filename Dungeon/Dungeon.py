@@ -1,5 +1,5 @@
 # Standard Imports
-import os
+import os, sys
 
 # App Imports
 from Application.modules import check_modules
@@ -20,6 +20,7 @@ dependencies = {
 
 if __name__ == "__main__":
 	logger = Logger()
+	logger.debug(f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
 	check_modules(
 		modules=dependencies,
 		name="dungeon",

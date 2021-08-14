@@ -5,6 +5,7 @@
 import random
 import os
 import time
+import keyboard
 from ..utils import style_text, controls_style
 from ..config import config
 from .items import DungeonItem, DungeonWeapon, DungeonPotion
@@ -43,6 +44,15 @@ class DungeonPlayer:
         else:
             for index, item in enumerate(self.inventory):
                 self.game.print("{0}: {1}\n\t{2}".format(index+1, style_text(item.name, 'item'), item.description))
+
+    def inventory_wrapper(self):
+        os.system("cls")
+        self.print_inventory()
+        self.game.print(f"\nPress {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
+        # time.sleep(0.5)
+        while True:
+            if keyboard.is_pressed("e"):
+                break
 
     def move(self, direction):
         y, x = self.location
