@@ -5,6 +5,7 @@ import sys
 import time
 import operator
 import traceback
+import random
 
 # Lib Imports
 import keyboard
@@ -13,18 +14,18 @@ from rich.console import Console
 from rich.theme import Theme
 
 # App Imports
-from .classes.weapons import *
-from .classes.people import *
-from .classes.menus import DungeonMenu
-from .classes.enemies import Orc
 from .config import config
 from .utils import random_yx, style_text, controls_style
-from .classes.map import GeneratedMap, DungeonMap, DungeonPlayer
 from .loggers import LogType
+from .classes.map import GeneratedMap, DungeonMap, DungeonPlayer
+from .classes.menus import DungeonMenu
 from .classes.items import *
 from .classes.database import DungeonItemDatabase
+from .classes.misc import DungeonTimeData
+from .classes.weapons import *
+from .classes.people import *
+from .classes.enemies import Orc
 
-import random
 print("Loading...")
 
 class Dungeon:
@@ -199,7 +200,7 @@ class Dungeon:
     def print_leaderboard(self):
         self.leaderboard.insert({
             "name": self.player.name,
-            "time": round(time.time() - self.start_time, 3),
+            "time": round(self.time.elapsed, 3),
             "moves": self.moves,
             "datetime": str(datetime.datetime.now()),
             "sessionid": self.session_id
@@ -277,11 +278,12 @@ class Dungeon:
         time.sleep(2)
 
     def gameloop(self):
-        self.start_time = time.time()
+        self.time = DungeonTimeData(game=self)
         self.log.info(f"started game at {time.time():.2f}")
         self.map.print()
         while True:
             if keyboard.read_key():
+                self.time.add()
                 if keyboard.is_pressed("right"):
                     self.player.move("e")
                 elif keyboard.is_pressed("left"):
@@ -348,6 +350,8 @@ class Dungeon:
                             end=f"stopped trading"
                         )
                         self.map.print()
+                elif keyboard.is_pressed("p"):
+                    self.time.pause_menu()
 
 # if __name__ == "__main__":
 def main(logger):

@@ -171,6 +171,10 @@ class DungeonMap:
         return str(DataFrame(base_map)).replace(config.symbols.unknown, ' ')
 
     def print(self):
+        self.ui()
+        self.controls()
+
+    def ui(self):
         os.system('cls')
         self.game.print("[Dungeon]", style="game_header", end=" ", highlight=False)
         self.game.print(f"Move: {self.game.moves}", style="move_count", end=" ", highlight=False)
@@ -178,7 +182,7 @@ class DungeonMap:
         self.game.print(f"XP: {self.game.player.xp}", style="xp_count", end=" ", highlight=False)
         self.game.print(f"Coins: {self.game.player.coins}", style="coin", end=" ", highlight=False)
         self.game.print(f"Inventory ({len(self.game.player.inventory)} / {self.game.player.max_inventory})", style="inventory", end=" ", highlight=False)
-        self.game.print(f"Time: {(time.time()-self.game.start_time):.2f}s", style="time_count", highlight=False)
+        self.game.print(f"Time: {(self.game.time.elapsed):.2f}s", style="time_count", highlight=False)
         temp_map = []
         index = -1
         for row in self.matrix:
@@ -216,12 +220,15 @@ class DungeonMap:
         for num in "0123456789":
             map_str = map_str.replace(num, style_text(num, 'grid_num'))
         self.game.print(map_str, highlight=False)
+        
+    def controls(self):
         self.game.print(f"""
 Press {controls_style('arrow keys')} to {style_text('move', 'action')}.
 Press {controls_style('i')} to {style_text('interact', 'action')} with {style_text('people', 'occupation')} or {style_text('pick up', 'action')} {style_text('items', 'item')}.
-Press {controls_style('esc')} to {style_text('exit', 'action')}.
 Press {controls_style('u')} to {style_text('equip/use items', 'action')}.
 Press {controls_style('d')} to {style_text('drop items', 'action')}.
+Press {controls_style('p')} to {style_text('pause', 'action')}.
+Press {controls_style('esc')} to {style_text('exit', 'action')}.
 """, highlight=False)
 
     def update_adjacent_cells(self):
