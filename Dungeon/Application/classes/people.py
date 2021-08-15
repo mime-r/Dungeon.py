@@ -2,9 +2,9 @@ from random import randint
 from .database import DungeonItemDatabase
 
 
-class People:
+class DungeonPeople:
     def __init__(self, occupation):
-        self.name = People.generate_name()
+        self.name = DungeonPeople.generate_name()
         self.occupation = occupation
 
     @staticmethod
@@ -19,7 +19,7 @@ class People:
         except:
             return "John Doe"
 
-class Trader(People):
+class DungeonTrader(DungeonPeople):
     def __init__(self, potential_sales, occupation="trader"):
         super().__init__(occupation=occupation)
         self.stuff = []
@@ -27,7 +27,7 @@ class Trader(People):
             if randint(1, 100) < sale.chance:
                 self.stuff.append(sale.item)
 
-class Chemist(Trader):
+class Chemist(DungeonTrader):
     def __init__(self):
         super().__init__(
             potential_sales=[

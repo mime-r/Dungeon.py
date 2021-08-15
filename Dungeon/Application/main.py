@@ -35,7 +35,8 @@ class Dungeon:
         self.log.info("logging functions set up is done")
 
         #sets console size and clears console
-        os.system("mode 100, 38 && cls")
+        os.system("cls")
+        keyboard.press("f11")
         self.log.info("resized console & cleared")
 
         # Set up rich styles
@@ -154,7 +155,7 @@ class Dungeon:
 
         self.player.name = input("Hello adventurer, what is your name? (Enter for random name)\n> ")
         if not self.player.name:
-            self.player.name = People.generate_name()
+            self.player.name = DungeonPeople.generate_name()
             print("Your name is: {}".format(self.player.name))
             time.sleep(1.5)
         self.map.update_adjacent_cells()
@@ -179,10 +180,10 @@ class Dungeon:
         self.moves += 1
         # print("\n"*100) # comment thi to make it smoother, unless your pc does not support cls
         self.map.print()
-        self.check()
+        self.cell_check()
 
-    def check(self):
-        player_cell = self.map.matrix[self.player.y][self.player.x].inventory
+    def cell_check(self):
+        player_cell = self.player.cell
         # print(self.playerontile_type)
         if player_cell.symbol == config.symbols.target:
             self.game_over("exit")
@@ -190,17 +191,8 @@ class Dungeon:
             self.attack(enemy_symbol=player_cell.symbol)
             self.map.print()
         if player_cell.symbol in config.symbols.traders:
-            trader = player_cell.inventory[0]
-            self.print(f"You have met a {style_text(trader.name, 'name')}, a {style_text(trader.occupation, 'occupation')}!")
-            time.sleep(1)
-            self.menu.inventory(
-                menu_context=self.menu.context(
-                    function=self.menu.function.trader,
-                    header=lambda: self.menu.header.trader(trader=trader),
-                    trader=trader
-                )
-            )
-            self.map.print()
+            trader = player_cell.object
+            self.print(f"You see {style_text(trader.name, 'name')}, a {style_text(trader.occupation, 'occupation')}!")
         # inv list
         player_cell.print_inventory()
 
@@ -272,7 +264,7 @@ class Dungeon:
                     self.game_over("dead")
         self.player.xp += enemy.xp_drop
         self.print(f"{enemy.texts.death}")
-        prev_inventory = self.map.matrix[self.player.y][self.player.x].inventory.inventory
+        prev_inventory = self.player.cell.inventory
         self.map.matrix[self.player.y][self.player.x].inventory = self.map.cell(
             symbol=config.symbols.empty,
             explored=True,
@@ -327,12 +319,35 @@ class Dungeon:
                     )
                     self.map.print()
                 elif keyboard.is_pressed("i"):
-                    self.log.time_logged(
-                        start="inventory opened",
-                        func=lambda: self.player.inventory_wrapper(),
-                        end="inventory closed"
-                    )
-                    self.map.print()
+                    if len(self.player.cell.inventory) == 0:
+                        self.map.print()
+                        self.print(f"There is nothing to {style_text('interact', 'action')} with or {style_text('pick up', 'action')}.")
+                        continue
+                    _object = self.player.cell.object
+                    if isinstance(_object, DungeonItem):
+                        self.map.print()
+                        if len(self.player.inventory) == self.player.max_inventory:
+                            self.print(f"Your {style_text('inventory', 'inventory')} is full!")
+                            self.player.cell.print_inventory()
+                            continue
+                        item = _object
+                        self.print(f"You {style_text('picked up', 'action')} a {style_text(item.name, 'item')}.")
+                        self.player.cell.item_pickup()
+                        self.player.cell.print_inventory()
+                    elif isinstance(_object, DungeonTrader):
+                        trader = _object
+                        self.log.time_logged(
+                            start=f"trading with {trader.occupation}",
+                            func=lambda: self.menu.inventory(
+                                menu_context=self.menu.context(
+                                    function=self.menu.function.trader,
+                                    header=lambda: self.menu.header.trader(trader=trader),
+                                    trader=trader
+                                )
+                            ),
+                            end=f"stopped trading"
+                        )
+                        self.map.print()
 
 # if __name__ == "__main__":
 def main(logger):

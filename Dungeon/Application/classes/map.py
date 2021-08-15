@@ -35,6 +35,10 @@ class DungeonPlayer:
     def y(self):
         return self.location[0]
 
+    @property
+    def cell(self):
+        return self.game.map.matrix[self.y][self.x].inventory
+
     def print_inventory(self):
         self.game.print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", highlight=False)
         self.game.print(f"Health: ({self.health} / {self.max_health})", style="health", highlight=False)
@@ -100,15 +104,22 @@ class DungeonCell:
         self.inventory = inventory
         self.game = game
 
+    @property
+    def object(self):
+        return self.inventory[0]
+
+    def item_pickup(self):
+        self.game.player.inventory.append(self.inventory.pop(0))
+
     def print_inventory(self):
-        if len(self.inventory) > 0 and isinstance(self.inventory[0], DungeonItem):
+        if len(self.inventory) > 0 and isinstance(self.object, DungeonItem):
             inventory = list(filter(
                 lambda x: isinstance(x, DungeonItem),
                 self.inventory
             ))
             constructor = ""
             if len(inventory) == 1:
-                constructor = style_text(inventory[0].name, 'item')
+                constructor = style_text(self.object.name, 'item')
             elif len(inventory) > 1:
                 constructor = '{} and {}'.format(
                     ', '.join(map(
@@ -207,7 +218,7 @@ class DungeonMap:
         self.game.print(map_str, highlight=False)
         self.game.print(f"""
 Press {controls_style('arrow keys')} to {style_text('move', 'action')}.
-Press {controls_style('i')} for {style_text('inventory', 'action')}.
+Press {controls_style('i')} to {style_text('interact', 'action')} with {style_text('people', 'occupation')} or {style_text('pick up', 'action')} {style_text('items', 'item')}.
 Press {controls_style('esc')} to {style_text('exit', 'action')}.
 Press {controls_style('u')} to {style_text('equip/use items', 'action')}.
 Press {controls_style('d')} to {style_text('drop items', 'action')}.
