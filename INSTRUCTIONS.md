@@ -14,7 +14,6 @@ This file contains the instructions for the following:
 1. Install from https://github.com/mime-r/Dungeon.py/archive/main.zip
 2. Unzip "Dungeon.py-main.zip"
 3. Move "Dungeon.py-main" folder to desired place
-
 Note: Ensure that all files in the folder are kept in the SAME place.
 
 ### Python
@@ -37,19 +36,13 @@ When at the Installer
 
 ## Running the Game
 
-Open the game folder
-
-Navigate to the "Run" folder,
-
+Open the game folder  
+Navigate to the "Run" folder,  
 run any of the following accordingly:
 
-command_prompt.bat   > to run in command prompt
-
-python.bat           > to run with python
-
+command_prompt.bat   > to run in command prompt  
+python.bat           > to run with python  
 windows_terminal.bat > to run in windows terminal (recommended)
 
-
-To use windows_terminal.bat, you need to install Windows Terminal from Microsoft Store
-
+To use windows_terminal.bat, you need to install Windows Terminal from Microsoft Store  
 Install from https://www.microsoft.com/en-us/p/windows-terminal/9n0dx20hk701
