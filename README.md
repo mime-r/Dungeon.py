@@ -15,6 +15,9 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 
 <br />
 
+## Instructions
+Instructions to download can be found [here](INSTRUCTIONS.md)
+
 ## Changelog:
 
 30/7/21 v1.1.6
