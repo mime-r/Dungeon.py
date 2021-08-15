@@ -1,0 +1,1 @@
+wt nt -p "PowerShell" -d "../Dungeon" cmd /k "echo loading && dungeon.py && exit"
