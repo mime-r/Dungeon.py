@@ -30,8 +30,15 @@ class Logger:
         with open(self.log_file, "a") as f:
             f.write(f"{current_time()} [{log_type}] {this}\n")
         if log_type == "FATAL":
-            input(f"[FATAL ERROR]: {this}\n\n[Logs: {self.log_file}]\n{self.get_logs()}\n\n[enter to exit]")
-            sys.exit(-1)
+            print(f"[FATAL ERROR]: {this}\n\n[Logs: {self.log_file}]\n{self.get_logs()}\n\n[enter to exit]")
+            try:
+                import keyboard
+                while True:
+                    if keyboard.read_key() and keyboard.is_pressed("enter"):
+                        break
+            except:
+                input()
+            sys.exit(0)
 
     def get_logs(self):
         with open(self.log_file, "r") as f:

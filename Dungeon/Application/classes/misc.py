@@ -26,7 +26,7 @@ class DungeonTimeData:
 Game is paused.
 Press {controls_style('p')} to {style_text('unpause', 'action')}
 """)
-		time.sleep(1)
+		time.sleep(.2)
 		while True:
 			if keyboard.is_pressed("p"):
 				self.reset()

@@ -43,7 +43,7 @@ class DungeonMenu:
 				))
 				time.sleep(0.2)
 				footer()
-			if pressed == "e":
+			if pressed == "esc":
 				break
 
 class DungeonMenuFunctions:
@@ -101,7 +101,7 @@ class DungeonMenuContext:
 		self.header = header
 		self.footer = footer if footer else lambda: (
 			self.game.player.print_inventory(),
-			self.game.print(f"\nPress {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
+			self.game.print(f"\nPress {controls_style('esc')} to {style_text('exit', 'action')}.", highlight=False)
 		)
 		self.function = function
 		self.trader = trader

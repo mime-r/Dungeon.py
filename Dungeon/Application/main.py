@@ -225,11 +225,16 @@ class Dungeon:
     def game_over(self, how):
         if how == "exit":
             os.system('cls')
+            self.log.info(f"escaped dungeon at {time.time():.2f}")
             self.print(f"You have {style_text('successfully', 'success')} escaped the {style_text('[DUNGEON]', 'game_header')}", highlight=False)
             self.print_leaderboard()
         elif how == "dead":
+            self.log.info(f"died at {time.time():.2f}")
             self.print(f"You have {style_text('failed', 'fail')} to escape the {style_text('[DUNGEON]', 'game_header')}, you'll do better next time.", highlight=False)
-        self.rich_console.input(f"{style_text('[Enter]', 'controls')} to {style_text('exit', 'action')}")
+        self.print(f"{style_text('[Enter]', 'controls')} to {style_text('exit', 'action')}")
+        while True:
+            if keyboard.read_key() and keyboard.is_pressed("enter"):
+                break
         sys.exit()
 
     def attack(self, enemy_symbol):  # He protecc he attacc he also like to snacc
