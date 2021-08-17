@@ -15,7 +15,7 @@ from rich.theme import Theme
 
 # App Imports
 from .config import config
-from .utils import random_yx, style_text, controls_style
+from .utils import random_yx, style_text, controls_style, clear_screen
 from .loggers import LogType
 from .classes.map import GeneratedMap, DungeonMap, DungeonPlayer
 from .classes.menus import DungeonMenu
@@ -36,7 +36,7 @@ class Dungeon:
         self.log.info("logging functions set up is done")
 
         #sets console size and clears console
-        os.system("cls")
+        clear_screen()
         keyboard.press("f11")
         self.log.info("resized console & cleared")
 
@@ -224,7 +224,7 @@ class Dungeon:
 
     def game_over(self, how):
         if how == "exit":
-            os.system('cls')
+            clear_screen()
             self.log.info(f"escaped dungeon at {time.time():.2f}")
             self.print(f"You have {style_text('successfully', 'success')} escaped the {style_text('[DUNGEON]', 'game_header')}", highlight=False)
             self.print_leaderboard()
@@ -250,11 +250,11 @@ class Dungeon:
 
         self.print(f"You have met an {style_text(enemy.name, 'enemy')}!", highlight=False)
         time.sleep(1)
-        os.system("cls")
+        clear_screen()
         print_header();print_health();print_footer()
         while enemy.health > 0:
             if keyboard.is_pressed("a"):
-                os.system('cls')
+                clear_screen()
                 print_header()
                 time.sleep(0.15)
                 enemy.health, enemy_hp_drop = self.player.attack_turn(enemy)

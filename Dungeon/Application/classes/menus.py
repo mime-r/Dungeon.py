@@ -1,7 +1,7 @@
 import os
 import time
 import keyboard
-from ..utils import style_text, controls_style
+from ..utils import style_text, controls_style, clear_screen
 from .items import DungeonInventory, DungeonPotion
 
 class DungeonMenu:
@@ -118,11 +118,11 @@ class DungeonHeaders:
 		self.game = game
 
 	def menu(self, menu_name):
-		os.system('cls')
+		clear_screen()
 		self.game.print(f"{menu_name} Menu\n", style="menu_header", highlight=False)
 
 	def trader(self, trader):
-		os.system('cls')
+		clear_screen()
 		self.game.print(f"{style_text(trader.name, 'name')} - {style_text(trader.occupation, 'occupation')}\n", highlight=False)
 		for index, item in enumerate(trader.stuff):
 			self.game.print(f"{index+1}: {style_text(item.name, 'item')} {style_text(item.cost, 'coin')}", highlight=False)

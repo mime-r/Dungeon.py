@@ -6,7 +6,7 @@ import random
 import os
 import time
 import keyboard
-from ..utils import style_text, controls_style
+from ..utils import style_text, controls_style, clear_screen
 from ..config import config
 from .items import DungeonItem, DungeonWeapon, DungeonPotion
 from pandas import DataFrame
@@ -50,7 +50,7 @@ class DungeonPlayer:
                 self.game.print("{0}: {1}\n\t{2}".format(index+1, style_text(item.name, 'item'), item.description))
 
     def inventory_wrapper(self):
-        os.system("cls")
+        clear_screen()
         self.print_inventory()
         self.game.print(f"\nPress {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
         # time.sleep(0.5)
@@ -175,7 +175,7 @@ class DungeonMap:
         self.controls()
 
     def ui(self):
-        os.system('cls')
+        clear_screen()
         self.game.print("[Dungeon]", style="game_header", end=" ", highlight=False)
         self.game.print(f"Move: {self.game.moves}", style="move_count", end=" ", highlight=False)
         self.game.print(f"Health: ({self.game.player.health} / {self.game.player.max_health})", style="health", end=" ", highlight=False)
