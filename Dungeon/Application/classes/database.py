@@ -1,4 +1,33 @@
 from .items import *
+from .decoder import DungeonJSONDecoder
+
+class DungeonDatabase:
+    def __init__(self, game):
+        self.game = game
+        self.decoder = DungeonJSONDecoder(
+            game=self.game
+        )
+
+        self.item_db = DungeonItemDatabase
+        self.enemy_db = DungeonEnemyDatabase(
+            global_db=self,
+            game=self.game
+        )
+
+class DungeonEnemyDatabase:
+    def __init__(self, global_db, game):
+        self.global_db = global_db
+        self.enemies = self.global_db.decoder.fetch_enemies()
+
+    def search_enemy(self, name):
+        results = list(filter(
+            lambda enemy_loader: enemy_loader.enemy_data.name == name,
+            self.enemies
+        ))
+        if len(results) == 0:
+            return None
+        return results[0]
+
 
 class DungeonItemDatabase:
     potions = [

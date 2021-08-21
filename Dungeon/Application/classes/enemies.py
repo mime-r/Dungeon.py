@@ -1,16 +1,17 @@
 import random
+import collections
 f = lambda s, e: s.replace("{}", f"[enemy]{e}[/enemy]")
 
 class DungeonEnemy:
-    def __init__(self, name, xp_drop, attack_base, attack_range, accuracy, game):
+    def __init__(self, name, health, coin_drop, texts, xp_drop, attack_base, attack_range, accuracy, game):
         self.name = name
         self.xp_drop = xp_drop
         self.attack_base = attack_base
         self.attack_range = attack_range
         self.accuracy = accuracy
-        self.health = None
-        self.coin_drop = None
-        self.texts = None
+        self.health = health
+        self.coin_drop = coin_drop
+        self.texts = texts
         self.game = game
 
     def attack_turn(self):
@@ -28,47 +29,62 @@ class DungeonEnemy:
             self.game.print(self.texts.missed_hit)
             return self.game.player.health, 0
 
+class DungeonEnemyLoader:
+    def __init__(self, game, enemy_data):
+        self.game = game
+        self.enemy_data = enemy_data
 
-class Orc(DungeonEnemy):
-    def __init__(self, game):
-        health = 3 + random.randint(1, 7)
-        if health < 5:
-            super().__init__(
-                name="Weak Orc",
-                xp_drop=1,
-                attack_base=1,
-                attack_range=(0, 1),
-                accuracy=80,
-                game=game
+    def load(self):
+        enemy_data = self.enemy_data
+        min_hp, max_hp = enemy_data.health_range
+        min_coin, max_coin = enemy_data.coin_drop_range
+        health = random.randint(min_hp, max_hp)
+        coin_drop = random.randint(min_coin, max_coin)
+
+        if hasattr(enemy_data, 'sub_enemies'):
+            for sub_enemy in enemy_data.sub_enemies:
+                min_hp, max_hp = sub_enemy['health_range']
+                if health not in range(min_hp, max_hp+1):
+                    continue
+
+                enemy_data = collections.namedtuple(
+                    "EnemyData",
+                    [
+                        'name',
+                        'xp_drop',
+                        'attack_base',
+                        'attack_range',
+                        'accuracy',
+                        'texts'
+                    ]
+                )(
+                    name=sub_enemy['name'],
+                    xp_drop=sub_enemy['xp_drop'],
+                    attack_base=sub_enemy['attack_base'],
+                    attack_range=sub_enemy['attack_range'],
+                    accuracy=sub_enemy['accuracy'],
+                    texts=enemy_data.texts
+                )
+                break
+
+        enemy_data = enemy_data._replace(
+            texts=EnemyTexts(
+                *enemy_data.texts.values(),
+                enemy_data.name
             )
-        elif health < 9:
-            super().__init__(
-                name="Orc",
-                xp_drop=2,
-                attack_base=1,
-                attack_range=(0, 1),
-                accuracy=60,
-                game=game
-            )
-        else:
-            super().__init__(
-                name="Chief Orc",
-                xp_drop=3,
-                attack_base=1,
-                attack_range=(0, 2),
-                accuracy=50,
-                game=game
-            )
-        # hitcritical, hitmedium, miss, uponded
-        self.health = health
-        self.texts = EnemyTexts(
-            critical_hit="The {} lashes out at you, hitting you squarely in the stomach. You double up in pain.",
-            hit="The {} aims, at you, delivering a fierce punch.",
-            missed_hit="The {} misses you by inches.",
-            death="The {} falls to the ground with a grunt. The corpse disappears upon touching the ground.",
-            enemy_name=self.name
         )
-        self.coin_drop = random.randint(0, 2)
+
+        return DungeonEnemy(
+            name=enemy_data.name,
+            xp_drop=enemy_data.xp_drop,
+            coin_drop=coin_drop,
+            health=health,
+            attack_base=enemy_data.attack_base,
+            attack_range=enemy_data.attack_range,
+            accuracy=enemy_data.accuracy,
+            texts=enemy_data.texts,
+            game=self.game
+        )
 
 class EnemyTexts:
     def __init__(self, critical_hit, hit, missed_hit, death, enemy_name):

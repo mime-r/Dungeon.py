@@ -383,9 +383,18 @@ class GeneratedMap(object):
             if E not in cell and x + 1 < self.width:
                 str_matrix[y][x + 1] = ' '
 
+        wall_corners = [
+            (0, 0),
+            (0, config.map.max_x),
+            (0, config.map.max_x),
+            (config.map.max_y, config.map.max_x)
+        ]
         new_matrix = str_matrix
         for row_index, row in enumerate(str_matrix):
             for element_index, element in enumerate(row):
+                if (row_index, element_index) in wall_corners:
+                    continue
+
                 if element == "O" and random.randint(1, 2) == 1:
                     new_matrix[row_index][element_index] = " "
 

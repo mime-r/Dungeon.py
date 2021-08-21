@@ -1,0 +1,39 @@
+[
+	{
+		"name": "Orc",
+		"health_range": [2, 10],
+		"coin_drop_range": [0, 2],
+		"sub_enemies": [
+			{
+				"name": "Weak Orc",
+				"health_range": [2, 4],
+				"attack_base": 1,
+				"attack_range": [0, 1],
+				"accuracy": 80,
+				"xp_drop": 1
+			},
+			{
+				"name": "Orc",
+				"health_range": [5, 8],
+				"attack_base": 1,
+				"attack_range": [0, 1],
+				"accuracy": 60,
+				"xp_drop": 2
+			},
+			{
+				"name": "Chief Orc",
+				"health_range": [9, 10],
+				"attack_base": 1,
+				"attack_range": [0, 2],
+				"accuracy": 50,
+				"xp_drop": 3
+			}
+		],
+		"texts": {
+			"critical_hit": "The {} lashes out at you, hitting you squarely in the stomach. You double up in pain.",
+			"hit": "The {} aims, at you, delivering a fierce punch.",
+			"missed_hit": "The {} misses you by inches.",
+			"death": "The {} falls to the ground with a grunt. The corpse disappears upon touching the ground."
+		}
+	}
+]

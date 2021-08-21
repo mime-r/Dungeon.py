@@ -20,11 +20,10 @@ from .loggers import LogType
 from .classes.map import GeneratedMap, DungeonMap, DungeonPlayer
 from .classes.menus import DungeonMenu
 from .classes.items import *
-from .classes.database import DungeonItemDatabase
+from .classes.database import DungeonDatabase
 from .classes.misc import DungeonTimeData
 from .classes.weapons import *
 from .classes.people import *
-from .classes.enemies import Orc
 
 print("Loading...")
 
@@ -50,6 +49,7 @@ class Dungeon:
 
         # Game vars init
         self.moves = 1
+        self.db = DungeonDatabase(game=self)
 
         # Leaderboard
         self.leaderboard = TinyDB("leaderboard.json")
@@ -63,14 +63,14 @@ class Dungeon:
             max_inventory=config.player.max_inventory,
             coins=config.player.coins,
             xp=config.player.xp,
-            equipped=DungeonItemDatabase.search_item(name="Fists"),
+            equipped=self.db.item_db.search_item(name="Fists"),
             game=self
         )
 
         # Fill inventory with starter potions
         for i in range(2):
             self.player.inventory.append(
-                DungeonItemDatabase.search_item(
+                self.db.item_db.search_item(
                     name="Weak Healing Potion"
                 )
             )
@@ -127,15 +127,15 @@ class Dungeon:
                     cell = self.map.matrix[y][x]
                     rc_num = random.randint(0, 6)
                     if rc_num < 3:
-                        chosen_potion = DungeonItemDatabase.search_item(
+                        chosen_potion = self.db.item_db.search_item(
                             name="Weak Healing Potion"
                         )
                     elif rc_num < 6:
-                        chosen_potion = DungeonItemDatabase.search_item(
+                        chosen_potion = self.db.item_db.search_item(
                             name="Medium Healing Potion"
                         )
                     else:
-                        chosen_potion = DungeonItemDatabase.search_item(
+                        chosen_potion = self.db.item_db.search_item(
                             name="Strong Healing Potion"
                         )
                     self.map.matrix[y][x].inventory.append(chosen_potion)
@@ -238,9 +238,10 @@ class Dungeon:
         sys.exit()
 
     def attack(self, enemy_symbol):  # He protecc he attacc he also like to snacc
-        enemy = {
-            config.symbols.orc: Orc
-        }.get(enemy_symbol)(game=self)
+        enemy_name = {
+            config.symbols.orc: "Orc"
+        }.get(enemy_symbol)
+        enemy = self.db.enemy_db.search_enemy(name=enemy_name).load()
         print_header = lambda: self.print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
         print_health = lambda enemy_hp_drop=None, player_hp_drop=None: (
             self.print(f"{style_text(enemy.name, 'enemy')}: Health - {style_text(enemy.health, 'health')}{style_text(' ( -'+str(enemy_hp_drop)+' )', 'hp_drop') if enemy_hp_drop else ''}", highlight=False),
