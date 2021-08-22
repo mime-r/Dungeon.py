@@ -30,9 +30,9 @@ class DungeonEnemy:
             return self.game.player.health, 0
 
 class DungeonEnemyLoader:
-    def __init__(self, game, enemy_data):
+    def __init__(self, game, data):
         self.game = game
-        self.enemy_data = enemy_data
+        self.enemy_data = data
 
     def load(self):
         enemy_data = self.enemy_data

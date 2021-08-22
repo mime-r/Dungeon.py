@@ -1,0 +1,24 @@
+[
+	{
+		"occupation": "Chemist",
+		"type": "TRADER",
+		"potential_sales": [
+			{
+				"item": "Weak Healing Potion",
+				"chance": 100
+			},
+			{
+				"item": "Medium Healing Potion",
+				"chance": 100
+			},
+			{
+				"item": "Strong Healing Potion",
+				"chance": 50
+			},
+			{
+				"item": "Cloth Bag",
+				"chance": 50
+			}
+		]
+	}
+]

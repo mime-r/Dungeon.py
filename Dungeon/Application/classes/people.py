@@ -1,5 +1,4 @@
 from random import randint
-from .database import DungeonItemDatabase
 
 
 class DungeonPeople:
@@ -27,29 +26,28 @@ class DungeonTrader(DungeonPeople):
             if randint(1, 100) < sale.chance:
                 self.stuff.append(sale.item)
 
-class Chemist(DungeonTrader):
-    def __init__(self):
-        super().__init__(
-            potential_sales=[
-                TraderSales(
-                    item=DungeonItemDatabase.search_item(name="Weak Healing Potion"),
-                    chance=100
+class DungeonPeopleLoader:
+    def __init__(self, game, data):
+        self.game = game
+        self.people_data = data
+        self.people_type = {
+            "TRADER": DungeonTrader
+        }.get(self.people_data.type)
+
+    def load(self):
+        people_data = self.people_data
+        if self.people_type == DungeonTrader:
+            potential_sales = map(
+                lambda sale_dict: TraderSales(
+                    item=self.game.db.item_db.search_item(name=sale_dict["item"]),
+                    chance=sale_dict["chance"],
                 ),
-                TraderSales(
-                    item=DungeonItemDatabase.search_item(name="Medium Healing Potion"),
-                    chance=100
-                ),
-                TraderSales(
-                    item=DungeonItemDatabase.search_item(name="Strong Healing Potion"),
-                    chance=50
-                ),
-                TraderSales(
-                    item=DungeonItemDatabase.search_item(name="Cloth Bag"),
-                    chance=50
-                )
-            ],
-            occupation="Chemist"
-        )
+                people_data.potential_sales
+            )
+            return DungeonTrader(
+                potential_sales=potential_sales,
+                occupation=people_data.occupation
+            )
 
 class TraderSales:
     def __init__(self, item, chance):
