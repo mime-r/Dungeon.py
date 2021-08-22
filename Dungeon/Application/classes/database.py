@@ -7,7 +7,7 @@ class DungeonDatabase:
         self.game = game
         self.decoder = DungeonJSONDecoder(game=self.game)
 
-        self.item_db = DungeonItemDatabase
+        self.item_db = DungeonItemDatabase(global_db=self)
         self.enemy_db = DungeonEnemyDatabase(global_db=self)
         self.people_db = DungeonPeopleDatabase(global_db=self)
 
@@ -44,73 +44,19 @@ class DungeonPeopleDatabase:
 
 
 class DungeonItemDatabase:
-    potions = [
-        DungeonPotion(
-            name="Weak Healing Potion",
-            description="This berry-flavoured weak healing potion increases your health by 7",
-            cost=2,
-            hp_change=7
-        ),
-        DungeonPotion(
-            name="Medium Healing Potion",
-            description="This concentrated berry-flavoured medium healing potion increases your health by 15",
-            cost=6,
-            hp_change=15
-        ),
-        DungeonPotion(
-            name="Strong Healing Potion",
-            description="This super-concentrated berry-flavoured strong healing potion increases your health by 25",
-            cost=12,
-            hp_change=25
-        )
-    ]
-    weapons = [
-        DungeonWeapon(
-            name="Fists",
-            description="Your trusty pair of fists",
-            cost=0,
-            type=WeaponType.MELEE,
-            base_attack=2,
-            attack_range=(0, 1),
-            accuracy=50,
-            texts=DungeonWeaponTexts(
-                critical_hit="You deliver a smashing blow with your {}.",
-                hit="You hit the {0} with your {1}.",
-                missed_hit="You flail your arms, failing to even touch the {}."
-            )
-        ),
-        DungeonWeapon(
-            name="Dagger",
-            description="A sharp lightweight dagger",
-            cost=4,
-            type=WeaponType.MELEE,
-            base_attack=1,
-            attack_range=(0, 4),
-            accuracy=50,
-            texts=DungeonWeaponTexts(
-                critical_hit="You stab viciously with your {}.",
-                hit="You hit the {0} with your {1}.",
-                missed_hit="You flail your dagger, failing to even touch the {}."
-            )
-        )
-    ]
-    inventory = [
-        DungeonInventory(
-            name="Cloth Bag",
-            description="This useful cloth bag increases your inventory storage by 4",
-            cost=5,
-            inventory=4
-        )
-    ]
-    items = potions + inventory + weapons
+    def __init__(self, global_db):
+        self.global_db = global_db
+        self.potions = self.global_db.decoder.fetch_potions()
+        self.weapons = self.global_db.decoder.fetch_weapons()
+        self.inventory = self.global_db.decoder.fetch_inventory()
+        self.items = self.potions + self.weapons + self.inventory
 
-    @classmethod
-    def search_item(cls, name, type=DungeonItem):
+    def search_item(self, name, type=DungeonItem):
         search_list = {
-            DungeonItem: cls.items,
-            DungeonInventory: cls.inventory,
-            DungeonPotion: cls.potions,
-            DungeonWeapon: cls.weapons
+            DungeonItem: self.items,
+            DungeonInventory: self.inventory,
+            DungeonPotion: self.potions,
+            DungeonWeapon: self.weapons
         }.get(type)
         results = list(filter(
             lambda item: item.name == name,

@@ -1,0 +1,8 @@
+[
+    {
+        "name": "Cloth Bag",
+        "description": "This useful cloth bag increases your inventory storage by 4",
+        "cost": 5,
+        "inventory": 4
+    }
+]

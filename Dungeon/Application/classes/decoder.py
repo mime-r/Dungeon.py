@@ -1,6 +1,8 @@
 import json
 import collections
 
+from .items import *
+from .weapons import *
 from .enemies import DungeonEnemyLoader
 from .people import DungeonPeopleLoader
 
@@ -34,3 +36,25 @@ class DungeonJSONDecoder:
 			data_file="data/people.json",
 			loader_class=DungeonPeopleLoader
 		)
+
+	def fetch_potions(self):
+		data_list = self.load("data/potions.json")
+		decoded = []
+		for data in data_list:
+			decoded.append(DungeonPotion(*data.values()))
+		return decoded
+
+	def fetch_weapons(self):
+		data_list = self.load("data/weapons.json")
+		decoded = []
+		for data in data_list:
+			data["texts"] = DungeonWeaponTexts(*data["texts"].values())
+			decoded.append(DungeonWeapon(*data.values()))
+		return decoded
+
+	def fetch_inventory(self):
+		data_list = self.load("data/inventory.json")
+		decoded = []
+		for data in data_list:
+			decoded.append(DungeonInventory(*data.values()))
+		return decoded

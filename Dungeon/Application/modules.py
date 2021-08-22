@@ -20,7 +20,7 @@ def check_modules(modules, name, logger):
             while True:
                 prompt_msg = f"{name} requires \"{module}\" to run." if module in modules["required"] else f"{module} is optional."
                 kb = input(f"The module \"{module}\" not found, {prompt_msg}\nDo you want to install it? (y/n): ")
-                os.system("cls")
+                os.system("cls" if platform.system() == 'Windows' else 'clear')
 
                 if kb.lower() in ["y", "n"]:
                     if kb.lower() == "n":
@@ -33,7 +33,7 @@ def check_modules(modules, name, logger):
                         logger.info(f"attempting to install {module}")
                         try:
                             os.system(f"{'python3' if platform.system() == 'Linux' else 'python'} -m pip install {module}")
-                            os.system("cls")
+                            os.system("cls" if platform.system() == 'Windows' else 'clear')
                             globals()[module] = import_module(module)
                             logger.info(f"Successfully install and imported {module}")
                         except:

@@ -1,0 +1,30 @@
+[
+    {
+        "name": "Fists",
+        "description": "Your trusty pair of fists",
+        "cost": 0,
+        "type": "MELEE",
+        "base_attack": 2,
+        "attack_range": [0, 1],
+        "accuracy": 50,
+        "texts": {
+            "critical_hit": "You deliver a smashing blow with your {}.",
+            "hit": "You hit the {0} with your {1}.",
+            "missed_hit": "You flail your arms, failing to even touch the {}."
+        }
+    },
+    {
+        "name": "Dagger",
+        "description": "A sharp lightweight dagger",
+        "cost": 4,
+        "type": "MELEE",
+        "base_attack": 1,
+        "attack_range": [0, 4],
+        "accuracy": 50,
+        "texts": {
+            "critical_hit": "You stab viciously with your {}.",
+            "hit": "You hit the {0} with your {1}.",
+            "missed_hit": "You flail your dagger, failing to even touch the {}."
+        }
+    }
+]

@@ -1,0 +1,20 @@
+[
+    {
+        "name": "Weak Healing Potion",
+        "description": "This berry-flavoured weak healing potion increases your health by 7",
+        "cost": 2,
+        "hp_change": 7
+    },
+    {
+        "name": "Medium Healing Potion",
+        "description": "This concentrated berry-flavoured medium healing potion increases your health by 15",
+        "cost": 6,
+        "hp_change": 15
+    },
+    {
+        "name": "Strong Healing Potion",
+        "description": "This super-concentrated berry-flavoured strong healing potion increases your health by 25",
+        "cost": 12,
+        "hp_change": 25
+    }
+]
