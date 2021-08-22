@@ -9,7 +9,7 @@ applicationName = "dungeon"
 
 
 class Logger:
-    logs_path = os.path.expandvars(fr'{cwd}\logs')
+    logs_path = os.path.expandvars(fr'{cwd}/logs')
 
     def __init__(self):
         if not os.path.exists(self.logs_path):
