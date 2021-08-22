@@ -19,6 +19,10 @@ Welcome to the Dungeon, the underground maze full of battle and exploration.
 Instructions to download can be found [here](INSTRUCTIONS.md)
 
 ## Changelog:
+22/8/21 v1.2
+- added compatabilty to linux(WSL currently not supported)
+- MAJOR refactoring of code(credits to NJ)
+- Changed to rich libary for UI
 
 30/7/21 v1.1.6
 - fixed bugs regarding the change of the order of files in v1.1.5
@@ -41,3 +45,4 @@ Instructions to download can be found [here](INSTRUCTIONS.md)
 ## Credits:
 - [@mime-r](https://github.com/mime-r)
 - [@NJ889](https://github.com/NicholasJohansan)
+- [@duckupus](https://github.com/duckupus)
