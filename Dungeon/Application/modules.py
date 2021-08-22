@@ -2,12 +2,13 @@
 from importlib import import_module
 from subprocess import getoutput
 import os
+import platform
 
 from Application.loggers import LogType
 
 def check_modules(modules, name, logger):
     """String[] modules"""
-    logger.debug(f"starting import checks with {getoutput('python --version')}")
+    logger.debug(f"starting import checks with {getoutput('python3 --version') if platform.system() == 'Linux' else getoutput('python --version')}")
     logger.info("Importing libraries...")
     all_modules = modules["required"] + modules["optional"]
     for module in all_modules:
@@ -31,7 +32,7 @@ def check_modules(modules, name, logger):
                     else:
                         logger.info(f"attempting to install {module}")
                         try:
-                            os.system(f"python -m pip install {module}")
+                            os.system(f"{'python3' if platform.system() == 'Linux' else 'python'} -m pip install {module}")
                             os.system("cls")
                             globals()[module] = import_module(module)
                             logger.info(f"Successfully install and imported {module}")
