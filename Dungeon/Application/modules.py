@@ -1,11 +1,13 @@
 # https://github.com/The-Duck-Syndicate/encry-duck/blob/master/encry-duck.py
 from importlib import import_module
+from subprocess import getoutput
 import os
 
 from Application.loggers import LogType
 
 def check_modules(modules, name, logger):
     """String[] modules"""
+    logger.debug(f"starting import checks with {getoutput('python --version')}")
     logger.info("Importing libraries...")
     all_modules = modules["required"] + modules["optional"]
     for module in all_modules:
