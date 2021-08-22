@@ -1,21 +1,18 @@
 from .items import *
+from .people import *
 from .decoder import DungeonJSONDecoder
 
 class DungeonDatabase:
     def __init__(self, game):
         self.game = game
-        self.decoder = DungeonJSONDecoder(
-            game=self.game
-        )
+        self.decoder = DungeonJSONDecoder(game=self.game)
 
         self.item_db = DungeonItemDatabase
-        self.enemy_db = DungeonEnemyDatabase(
-            global_db=self,
-            game=self.game
-        )
+        self.enemy_db = DungeonEnemyDatabase(global_db=self)
+        self.people_db = DungeonPeopleDatabase(global_db=self)
 
 class DungeonEnemyDatabase:
-    def __init__(self, global_db, game):
+    def __init__(self, global_db):
         self.global_db = global_db
         self.enemies = self.global_db.decoder.fetch_enemies()
 
@@ -27,6 +24,23 @@ class DungeonEnemyDatabase:
         if len(results) == 0:
             return None
         return results[0]
+
+class DungeonPeopleDatabase:
+    def __init__(self, global_db):
+        self.global_db = global_db
+        self.people = self.global_db.decoder.fetch_people()
+
+    def search_people(self, occupation, type=DungeonPeople):
+        results = list(filter(
+            lambda people_loader: (True if type == DungeonPeople else people_loader.people_type == type) and people_loader.people_data.occupation == occupation,
+            self.people
+        ))
+        if len(results) == 0:
+            return None
+        return results[0]
+
+    def search_trader(self, occupation):
+        return self.search_people(occupation, type=DungeonTrader)
 
 
 class DungeonItemDatabase:

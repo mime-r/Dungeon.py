@@ -114,7 +114,7 @@ class Dungeon:
                 if self.map.matrix[y][x].symbol != config.symbols.wall:
                     self.map.matrix[y][x] = self.map.cell(
                         symbol=config.symbols.chemist,
-                        inventory=[Chemist()]
+                        inventory=[self.db.people_db.search_trader(occupation="Chemist").load()]
                     )
                     break
         self.log.info("filled map with chemists")
