@@ -29,14 +29,14 @@ class DungeonTrader(DungeonPeople):
 class DungeonPeopleLoader:
     def __init__(self, game, data):
         self.game = game
-        self.people_data = data
-        self.people_type = {
+        self.data = data
+        self.type = {
             "TRADER": DungeonTrader
-        }.get(self.people_data.type)
+        }.get(self.data.type)
 
     def load(self):
-        people_data = self.people_data
-        if self.people_type == DungeonTrader:
+        people_data = self.data
+        if self.type == DungeonTrader:
             potential_sales = map(
                 lambda sale_dict: TraderSales(
                     item=self.game.db.item_db.search_item(name=sale_dict["item"]),

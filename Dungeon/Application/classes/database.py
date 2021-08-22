@@ -16,9 +16,9 @@ class DungeonEnemyDatabase:
         self.global_db = global_db
         self.enemies = self.global_db.decoder.fetch_enemies()
 
-    def search_enemy(self, name):
+    def search_enemy(self, name=None, symbol=None):
         results = list(filter(
-            lambda enemy_loader: enemy_loader.enemy_data.name == name,
+            lambda enemy_loader: enemy_loader.data.name == name if name else enemy_loader.data.symbol == symbol,
             self.enemies
         ))
         if len(results) == 0:
@@ -32,7 +32,7 @@ class DungeonPeopleDatabase:
 
     def search_people(self, occupation, type=DungeonPeople):
         results = list(filter(
-            lambda people_loader: (True if type == DungeonPeople else people_loader.people_type == type) and people_loader.people_data.occupation == occupation,
+            lambda people_loader: (True if type == DungeonPeople else people_loader.type == type) and people_loader.data.occupation == occupation,
             self.people
         ))
         if len(results) == 0:

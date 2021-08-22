@@ -32,10 +32,10 @@ class DungeonEnemy:
 class DungeonEnemyLoader:
     def __init__(self, game, data):
         self.game = game
-        self.enemy_data = data
+        self.data = data
 
     def load(self):
-        enemy_data = self.enemy_data
+        enemy_data = self.data
         min_hp, max_hp = enemy_data.health_range
         min_coin, max_coin = enemy_data.coin_drop_range
         health = random.randint(min_hp, max_hp)

@@ -1,6 +1,7 @@
 [
 	{
 		"name": "Orc",
+		"symbol": "o",
 		"health_range": [2, 10],
 		"coin_drop_range": [0, 2],
 		"sub_enemies": [

@@ -1,6 +1,7 @@
 [
 	{
 		"occupation": "Chemist",
+		"symbol": "C",
 		"type": "TRADER",
 		"potential_sales": [
 			{

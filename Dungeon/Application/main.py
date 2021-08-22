@@ -99,22 +99,24 @@ class Dungeon:
         #self.map.matrix = [[[config.symbols.empty, 0, []] for x in range(config.map.width)] for y in range(config.map.height)]
 
         # Fill map (Bad Orcs)
+        orc_loader = self.db.enemy_db.search_enemy(name="Orc")
         for count in range(config.count.orc):
             while True:
                 x, y = random_yx()
                 if self.map.matrix[y][x].symbol != config.symbols.wall:
-                    self.map.matrix[y][x] = self.map.cell(symbol=config.symbols.orc)
+                    self.map.matrix[y][x] = self.map.cell(symbol=orc_loader.data.symbol)
                     break
         self.log.info("filled map with orcs")
 
         # Fill map (chemists)
+        chemist_loader = self.db.people_db.search_trader(occupation="Chemist")
         for count in range(config.count.chemist):
             while True:
                 x, y = random_yx()
                 if self.map.matrix[y][x].symbol != config.symbols.wall:
                     self.map.matrix[y][x] = self.map.cell(
-                        symbol=config.symbols.chemist,
-                        inventory=[self.db.people_db.search_trader(occupation="Chemist").load()]
+                        symbol=chemist_loader.data.symbol,
+                        inventory=[chemist_loader.load()]
                     )
                     break
         self.log.info("filled map with chemists")
@@ -238,10 +240,7 @@ class Dungeon:
         sys.exit()
 
     def attack(self, enemy_symbol):  # He protecc he attacc he also like to snacc
-        enemy_name = {
-            config.symbols.orc: "Orc"
-        }.get(enemy_symbol)
-        enemy = self.db.enemy_db.search_enemy(name=enemy_name).load()
+        enemy = self.db.enemy_db.search_enemy(symbol=enemy_symbol).load()
         print_header = lambda: self.print(f"Enemy: {enemy.name}\n", style="enemy", highlight=False)
         print_health = lambda enemy_hp_drop=None, player_hp_drop=None: (
             self.print(f"{style_text(enemy.name, 'enemy')}: Health - {style_text(enemy.health, 'health')}{style_text(' ( -'+str(enemy_hp_drop)+' )', 'hp_drop') if enemy_hp_drop else ''}", highlight=False),
