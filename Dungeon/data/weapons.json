@@ -4,8 +4,8 @@
         "description": "Your trusty pair of fists",
         "cost": 0,
         "type": "MELEE",
-        "base_attack": 2,
-        "attack_range": [0, 1],
+        "base_attack": 1,
+        "attack_range": [0, 2],
         "accuracy": 50,
         "texts": {
             "critical_hit": "You deliver a smashing blow with your {}.",
@@ -18,7 +18,7 @@
         "description": "A sharp lightweight dagger",
         "cost": 4,
         "type": "MELEE",
-        "base_attack": 1,
+        "base_attack": 2,
         "attack_range": [0, 4],
         "accuracy": 50,
         "texts": {
