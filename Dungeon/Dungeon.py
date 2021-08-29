@@ -27,7 +27,5 @@ if __name__ == "__main__":
 		logger=logger
 	)
 
-	import Application.main as dungeon
-	dungeon.main(
-		logger=logger
-	)
+	from Application.wrapper import GameWrapper
+	GameWrapper(logger=logger)

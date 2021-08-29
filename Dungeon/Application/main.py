@@ -28,7 +28,7 @@ from .classes.people import *
 print("Loading...")
 
 class Dungeon:
-    def __init__(self, logger):
+    def __init__(self, logger, rich_console):
 
         # instantiate logger
         self.log = logger
@@ -40,9 +40,7 @@ class Dungeon:
         self.log.info("resized console & cleared")
 
         # Set up rich styles
-        self.rich_console = Console(
-            theme=Theme(config.styles)
-        )
+        self.rich_console = rich_console
         self.print = self.rich_console.print
         self.log.info("rich console & styles set up")
         self.menu = DungeonMenu(game=self)
@@ -358,17 +356,18 @@ class Dungeon:
                 elif keyboard.is_pressed("p"):
                     self.time.pause_menu()
 
-# if __name__ == "__main__":
-def main(logger):
-    try:
-        d = Dungeon(
-            logger=logger
-        )
-        d.log.info("dungeon set up is done, starting game")
-        d.gameloop()
-    except KeyboardInterrupt:
-        print("Exiting [Dungeon]...")
-        logger.info(f"game exited by KeyboardInterrupt at {time.time():.2f}")
-        sys.exit()
-    except Exception as e:
-        logger.fatal(f"\n{''.join(traceback.format_tb(e.__traceback__))}\n\n{str(e)}")
+    @staticmethod
+    def __start__(logger, rich_console):
+        try:
+            d = Dungeon(
+                logger=logger,
+                rich_console=rich_console
+            )
+            d.log.info("dungeon set up is done, starting game")
+            d.gameloop()
+        except KeyboardInterrupt:
+            print("Exiting [Dungeon]...")
+            logger.info(f"game exited by KeyboardInterrupt at {time.time():.2f}")
+            sys.exit()
+        except Exception as e:
+            logger.fatal(f"\n{''.join(traceback.format_tb(e.__traceback__))}\n\n{str(e)}")
