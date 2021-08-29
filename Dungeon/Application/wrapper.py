@@ -37,6 +37,7 @@ Press {controls_style('esc')} to {style_text('exit', 'action')}.
 			if keyboard.read_key():
 				if keyboard.is_pressed("enter"):
 					input()
+					time.sleep(.2)
 					Dungeon.__start__(
 						logger=self.logger,
 						rich_console=self.rich_console
