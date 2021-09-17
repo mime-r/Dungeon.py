@@ -43,6 +43,7 @@ run any of the following accordingly:
 command_prompt.bat   > to run in command prompt  
 python.bat           > to run with python  
 windows_terminal.bat > to run in windows terminal (recommended)
+linux_terminal.sh > to run in linux terminal
 
 To use windows_terminal.bat, you need to install Windows Terminal from Microsoft Store  
 Install from https://www.microsoft.com/en-us/p/windows-terminal/9n0dx20hk701
