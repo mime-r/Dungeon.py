@@ -22,6 +22,7 @@ Instructions to download can be found [here](INSTRUCTIONS.md)
 22/8/21 v1.2
 - added compatabilty to linux(WSL currently not supported)
 - MAJOR refactoring of code(credits to NJ)
+- pick up items from the ground
 - Changed to rich libary for UI
 
 30/7/21 v1.1.6
@@ -38,9 +39,6 @@ Instructions to download can be found [here](INSTRUCTIONS.md)
 28/7/21 v1.0
 - minor bugfix
   - fixed the bug where player could not finish the game due to an annoying array error.
-
-## Todo (aka submit pull requests thank you):
-- pick up items on the ground
 
 ## Credits:
 - [@mime-r](https://github.com/mime-r)
