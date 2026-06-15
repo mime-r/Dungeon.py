@@ -74,6 +74,8 @@ class LevelLayout:
         self.stairs_up: tuple[int, int] | None = None
         self.stairs_down: tuple[int, int] | None = None
         self.vault_cells: list[tuple[int, int]] = []
+        self.temple_cells: list[tuple[int, int]] = []
+        self.altar: tuple[int, int] | None = None
         self.floor_cells: list[tuple[int, int]] = []
 
 
@@ -86,9 +88,6 @@ def generate_level(is_last: bool = False, depth: int = 1) -> LevelLayout:
     """
     w = random.randint(config.map.min_width, config.map.max_width)
     h = random.randint(config.map.min_height, config.map.max_height)
-    scale = min(1.0, 0.6 + depth * 0.05)   # deeper = bigger within range
-    w = max(config.map.min_width, int(w * scale))
-    h = max(config.map.min_height, int(h * scale))
 
     weights = {"rooms": 40, "cave": 30, "bsp": 30}
     choice = random.choices(list(weights.keys()), weights=list(weights.values()), k=1)[0]
@@ -110,10 +109,11 @@ def _generate_rooms(w: int, h: int, is_last: bool) -> LevelLayout:
     interior_floor: set[tuple[int, int]] = set()
     rooms: list[Room] = []
     attempts = 0
-    target = random.randint(9, 14)
-    while len(rooms) < target and attempts < 300:
+    area = w * h
+    target = max(10, min(30, area // 220))   # scale room count with the larger maps
+    while len(rooms) < target and attempts < 800:
         attempts += 1
-        rw, rh = random.randint(4, 9), random.randint(3, 6)
+        rw, rh = random.randint(4, 12), random.randint(4, 9)
         rx, ry = random.randint(1, w - rw - 2), random.randint(1, h - rh - 2)
         shape = "oval" if random.random() < 0.25 else "rect"
         room = Room(rx, ry, rw, rh, shape=shape)
@@ -327,12 +327,39 @@ def _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h) 
     vault_candidates = [r for r in rooms if r not in used]
     if vault_candidates:
         vault = random.choice(vault_candidates)
+        used.add(vault)
         layout.vault_cells = vault.interior()
         if not is_last:
             for (vy, vx) in _mouths_of(grid, vault, w, h):
                 grid[vy][vx] = T.SECRET_DOOR
 
+    # A pillared temple may appear, guarded but rewarding, with a healing altar at its heart.
+    if random.random() < 0.30:
+        candidates = [r for r in rooms if r not in used and r.w >= 6 and r.h >= 5]
+        if candidates:
+            _carve_temple(layout, grid, random.choice(candidates))
+
     _build_floor_cells(layout, grid, w, h)
+
+
+def _carve_temple(layout, grid, room) -> None:
+    """Turn a room into a pillared temple: a grid of pillars with a central altar."""
+    floor_cells = []
+    for y in range(room.y, room.y + room.h):
+        for x in range(room.x, room.x + room.w):
+            on_edge = (y == room.y or y == room.y + room.h - 1
+                       or x == room.x or x == room.x + room.w - 1)
+            if not on_edge and (y - room.y) % 2 == 0 and (x - room.x) % 2 == 0:
+                grid[y][x] = T.WALL          # a pillar
+            else:
+                grid[y][x] = T.FLOOR
+                floor_cells.append((y, x))
+    altar = (room.cy, room.cx)
+    if grid[altar[0]][altar[1]] != T.FLOOR:  # never bury the altar in a pillar
+        altar = (room.cy, room.cx + 1)
+    grid[altar[0]][altar[1]] = T.FLOOR
+    layout.altar = altar
+    layout.temple_cells = [c for c in floor_cells if c != altar]
 
 
 def _place_cave_vault(layout, grid, interior_floor, is_last, w, h) -> None:
@@ -360,11 +387,13 @@ def _place_cave_vault(layout, grid, interior_floor, is_last, w, h) -> None:
 
 
 def _build_floor_cells(layout, grid, w, h) -> None:
-    vault_set = set(layout.vault_cells)
+    reserved = set(layout.vault_cells) | set(layout.temple_cells)
+    if layout.altar:
+        reserved.add(layout.altar)
     occupied = {layout.stairs_up, layout.stairs_down}
     for y in range(h):
         for x in range(w):
-            if grid[y][x] == T.FLOOR and (y, x) not in vault_set and (y, x) not in occupied:
+            if grid[y][x] == T.FLOOR and (y, x) not in reserved and (y, x) not in occupied:
                 layout.floor_cells.append((y, x))
 
 

@@ -28,14 +28,29 @@ class DungeonUI:
     # --- frame ----------------------------------------------------------
     def render(self) -> None:
         self.console.clear()
-        self.console.print(self._header(), highlight=False)
+        size = self.console.size
+        H, W = size.height, size.width
+
+        # Size the whole frame to fit the current window so nothing scrolls the header
+        # off the top. The map keeps its configured size (view_width x view_height)
+        # whenever it fits; the message log absorbs the leftover space and only the log
+        # shrinks on short windows. Layout: header(1) + map/sidebar row + log + controls(1),
+        # plus borders and a one-line safety margin.
+        chrome = 1 + 2 + 2 + 1 + 1            # header, map borders, log borders, controls, margin
+        view_h = max(4, min(config.map.view_height, H - chrome - 2))
+        log_view = max(1, min(self.LOG_VIEW, H - chrome - view_h))
+        view_w = max(12, min(config.map.view_width, W - 40))
+        panel_h = view_h + 2                  # map and sidebar share this height
+
         grid = Table.grid(padding=(0, 1))
         grid.add_column()
         grid.add_column()
-        grid.add_row(self._map_panel(), self._sidebar_panel())
+        grid.add_row(self._map_panel(view_w, view_h), self._sidebar_panel(panel_h))
+
+        self.console.print(self._header(), highlight=False, no_wrap=True, crop=True)
         self.console.print(grid)
-        self.console.print(self._log_panel())
-        self.console.print(self._controls(), highlight=False)
+        self.console.print(self._log_panel(log_view))
+        self.console.print(self._controls(), highlight=False, no_wrap=True, crop=True)
 
     def _header(self) -> Text:
         g = self.game
@@ -48,17 +63,17 @@ class DungeonUI:
             f"[time_count]{elapsed:.1f}s[/time_count]{god}"
         )
 
-    def _map_panel(self) -> Panel:
+    def _map_panel(self, view_w: int, view_h: int) -> Panel:
         text = Text(no_wrap=True, overflow="crop")
-        rows = self.game.map.render_grid()
+        rows = self.game.map.render_grid(view_w, view_h)
         for i, row in enumerate(rows):
             for ch, style in row:
                 text.append(ch, style=style)
             if i != len(rows) - 1:
                 text.append("\n")
-        return Panel(text, border_style="grey37", padding=(0, 1))
+        return Panel(text, border_style="grey37", padding=(0, 1), height=view_h + 2)
 
-    def _sidebar_panel(self) -> Panel:
+    def _sidebar_panel(self, height: int | None = None) -> Panel:
         p = self.game.player
         ratio = p.health / p.max_health if p.max_health else 0
         bar_w = 16
@@ -77,20 +92,22 @@ class DungeonUI:
             + ("  [warn]FULL[/warn]" if full else "")
             + ("  [orb]+Orb[/orb]" if p.has_orb else "")
         )
+        background = f" [flavor]{p.background}[/flavor]" if getattr(p, "background", None) else ""
         lines = [
-            f"[name]{p.name or 'Adventurer'}[/name]",
+            f"[name]{p.name or 'Adventurer'}[/name]{background}",
+            f"[level]Level {p.level}[/level]  [xp_count]XP {p.xp}/{p.xp_next}[/xp_count]",
             "",
             f"[health]HP[/health] {p.health}/{p.max_health}",
             bar,
-            f"[xp_count]XP[/xp_count]    {p.xp}",
             f"[coin]Gold[/coin]  {p.coins}",
             f"[depth]Depth[/depth] {self.game.depth}",
-            "",
-            f"[weapons]Weapon[/weapons]: {p.equipped.name}",
-            pack_line,
-            "",
-            objective,
         ]
+        if p.status.any():
+            lines.append("  ".join(f"[{style}]{label}[/{style}]" for label, style in p.status.summary()))
+        weapon_tag = f"[weapons]Weapon[/weapons]: {self.game.display_name(p.equipped)}"
+        if getattr(p.equipped, "ranged", False):
+            weapon_tag += f" [flavor](ranged {p.equipped.range})[/flavor]"
+        lines += ["", weapon_tag, pack_line, "", objective]
 
         enemies = self.game.map.visible_enemies()
         if enemies:
@@ -106,20 +123,23 @@ class DungeonUI:
             for n in npcs[:4]:
                 lines.append(f"  [{n.style}]{n.symbol}[/{n.style}] {n.name} [flavor]({n.occupation})[/flavor]")
 
-        return Panel(Text.from_markup("\n".join(lines)), title="[menu_header]Hero[/menu_header]",
-                     border_style="grey37", width=34)
+        return Panel(Text.from_markup("\n".join(lines), overflow="crop"),
+                     title="[menu_header]Hero[/menu_header]",
+                     border_style="grey37", width=34, height=height)
 
-    def _log_panel(self) -> Panel:
-        recent = list(self.messages)[-self.LOG_VIEW:]
+    def _log_panel(self, log_view: int | None = None) -> Panel:
+        log_view = log_view or self.LOG_VIEW
+        recent = list(self.messages)[-log_view:]
         body = "\n".join(recent) if recent else "[flavor]The dungeon is silent...[/flavor]"
-        text = Text.from_markup(body)
+        text = Text.from_markup(body, overflow="crop")
         return Panel(text, title="[menu_header]Messages[/menu_header]",
-                     border_style="grey37", height=self.LOG_VIEW + 2)
+                     border_style="grey37", height=log_view + 2)
 
     def _controls(self) -> Text:
         return Text.from_markup(
             "[controls]move[/controls] arrows/hjkl/yubn   "
-            "[controls]g[/controls] pick up   [controls]i[/controls] pack (use/equip/drop)   "
+            "[controls]f[/controls] aim/fire ranged   [controls]g[/controls] pick up   "
+            "[controls]i[/controls] pack   [controls]o[/controls] explore   "
             "[controls]>[/controls]/[controls]<[/controls] stairs   "
             "[controls]s[/controls] search   [controls].[/controls] wait   "
             "[controls]p[/controls] pause   [controls]?[/controls] help   [controls]esc[/controls] quit"

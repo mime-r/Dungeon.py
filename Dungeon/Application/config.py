@@ -58,6 +58,21 @@ class StyleConfig:
     action: str = "#61D5FF"
     flavor: str = "italic #b9a98c"
     warn: str = "bold #FFD166"
+    level: str = "bold #FFC74D"
+
+    # --- status effects ---
+    poison: str = "#7CFF6B"
+    regen: str = "#6BFFB0"
+    might: str = "#FF9D5C"
+    haste: str = "#6BE0FF"
+    slow: str = "#9aa0b0"
+    confusion: str = "#C77DFF"
+
+    # --- traps / targeting / features ---
+    trap: str = "bold #FF5C5C"
+    altar: str = "bold #E6D8A0"
+    target: str = "bold #FFE066"
+    target_path: str = "#8a7d3a"
 
 
 class TerrainConfig:
@@ -93,6 +108,8 @@ class SymbolConfig:
     weapons: str = ")"
     bag: str = "("
     orb: str = "0"
+    trap: str = "^"          # a revealed trap
+    altar: str = "_"         # a temple altar
 
     # npcs
     chemist: str = "C"
@@ -131,6 +148,8 @@ class SymbolConfig:
         weapons: "weapons",
         bag: "bag",
         orb: "orb",
+        trap: "trap",
+        altar: "altar",
         chemist: "chemist",
         blacksmith: "blacksmith",
         healer: "healer",
@@ -139,13 +158,21 @@ class SymbolConfig:
 
 
 class MapConfig:
-    """Per-floor map dimension ranges. Actual dimensions vary per level."""
+    """Per-floor map dimension ranges. Levels average ~70x70 and never exceed 80x80.
+    Only a window of the map is shown at a time (see view_width/view_height); the player
+    discovers the floor's true extent by exploring."""
 
-    min_width: int = 50
-    max_width: int = 75
-    min_height: int = 22
-    max_height: int = 32
-    min_distance: int = 18  # min Chebyshev distance between up/down stairs
+    min_width: int = 60
+    max_width: int = 80
+    min_height: int = 60
+    max_height: int = 80
+    min_distance: int = 28  # min Chebyshev distance between up/down stairs
+
+    # On-screen viewport (the map scrolls to follow the player, DCSS-style). Kept below
+    # the minimum map size so the view always scrolls on BOTH axes. Odd values centre
+    # the player exactly.
+    view_width: int = 33
+    view_height: int = 25
 
 
 class DepthConfig:
@@ -165,6 +192,20 @@ class SpawnConfig:
     floor_scrolls: int = 2
     gold_piles: int = 5
     floor_weapons: int = 2
+    traps_base: int = 2             # +depth // 2
+
+
+class ProgressionConfig:
+    """Character growth: XP curve and per-level stat gains."""
+
+    hp_per_level: int = 5
+    accuracy_per_level: int = 1     # +1% to-hit per level
+    damage_every: int = 2           # +1 damage every N levels
+
+    @staticmethod
+    def xp_for(level: int) -> int:
+        """XP needed to advance from *level* to the next."""
+        return 8 * level + 2
 
 
 class PlayerConfig:
@@ -187,6 +228,7 @@ class Config:
     map = MapConfig
     depth = DepthConfig
     spawn = SpawnConfig
+    progression = ProgressionConfig
     player = PlayerConfig
 
 

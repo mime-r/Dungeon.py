@@ -1,0 +1,30 @@
+[
+    {
+        "name": "Fighter",
+        "description": "Tough and well-armed. Starts with a sword, sturdy health, and healing.",
+        "hp_bonus": 8,
+        "start_weapon": "Short Sword",
+        "start_items": ["Medium Healing Potion", "Medium Healing Potion"]
+    },
+    {
+        "name": "Hunter",
+        "description": "Strikes from afar. Begins with a Short Bow and a healing potion.",
+        "hp_bonus": 2,
+        "start_weapon": "Short Bow",
+        "start_items": ["Weak Healing Potion", "Weak Healing Potion"]
+    },
+    {
+        "name": "Acolyte",
+        "description": "Frail but resourceful, carrying scrolls and curing draughts.",
+        "hp_bonus": 0,
+        "start_weapon": "Quarterstaff",
+        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Potion of Curing"]
+    },
+    {
+        "name": "Wanderer",
+        "description": "A jack-of-all-trades with a mixed pack and balanced health.",
+        "hp_bonus": 4,
+        "start_weapon": "Dagger",
+        "start_items": ["Weak Healing Potion", "Weak Healing Potion", "Scroll of Teleportation"]
+    }
+]

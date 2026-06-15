@@ -19,7 +19,7 @@
         "cost": 6,
         "type": "MELEE",
         "base_attack": 2,
-        "attack_range": [0, 4],
+        "attack_range": [0, 5],
         "accuracy": 55,
         "texts": {
             "critical_hit": "You drive your {1} into the {0} up to the hilt!",
@@ -123,6 +123,51 @@
             "critical_hit": "You cleave the {0} from shoulder to hip with your {1}!",
             "hit": "You hack at the {0} with your {1}.",
             "missed_hit": "The weight of your {1} drags you off balance, missing the {0}."
+        }
+    },
+    {
+        "name": "Sling",
+        "description": "A simple leather sling that flings stones at range.",
+        "cost": 12,
+        "type": "RANGED",
+        "base_attack": 2,
+        "attack_range": [0, 4],
+        "accuracy": 55,
+        "range": 5,
+        "texts": {
+            "critical_hit": "Your stone cracks the {0} square in the skull!",
+            "hit": "You sling a stone at the {0}.",
+            "missed_hit": "Your stone whizzes past the {0}."
+        }
+    },
+    {
+        "name": "Short Bow",
+        "description": "A hunter's bow. Reliable damage from a safe distance.",
+        "cost": 22,
+        "type": "RANGED",
+        "base_attack": 3,
+        "attack_range": [0, 6],
+        "accuracy": 60,
+        "range": 6,
+        "texts": {
+            "critical_hit": "Your arrow buries itself to the fletching in the {0}!",
+            "hit": "You loose an arrow at the {0}.",
+            "missed_hit": "Your arrow sails wide of the {0}."
+        }
+    },
+    {
+        "name": "Crossbow",
+        "description": "A heavy crossbow. Slow to aim, but it hits like a hammer.",
+        "cost": 34,
+        "type": "RANGED",
+        "base_attack": 5,
+        "attack_range": [1, 8],
+        "accuracy": 60,
+        "range": 7,
+        "texts": {
+            "critical_hit": "Your bolt punches clean through the {0}!",
+            "hit": "You fire a bolt into the {0}.",
+            "missed_hit": "Your bolt thunks into the wall past the {0}."
         }
     },
     {

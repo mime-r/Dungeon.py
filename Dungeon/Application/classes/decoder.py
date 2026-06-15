@@ -33,13 +33,13 @@ class DungeonJSONDecoder:
         return self._fetch_loaders(DATA_DIR / "people.json", DungeonPeopleLoader)
 
     def fetch_potions(self) -> list[DungeonPotion]:
-        return [DungeonPotion(*data.values()) for data in self._load(DATA_DIR / "potions.json")]
+        return [DungeonPotion(**data) for data in self._load(DATA_DIR / "potions.json")]
 
     def fetch_weapons(self) -> list[DungeonWeapon]:
         decoded = []
         for data in self._load(DATA_DIR / "weapons.json"):
             data["texts"] = DungeonWeaponTexts(*data["texts"].values())
-            decoded.append(DungeonWeapon(*data.values()))
+            decoded.append(DungeonWeapon(**data))  # keyword construction tolerates optional fields
         return decoded
 
     def fetch_inventory(self) -> list[DungeonInventory]:
@@ -47,3 +47,6 @@ class DungeonJSONDecoder:
 
     def fetch_scrolls(self) -> list[DungeonScroll]:
         return [DungeonScroll(*data.values()) for data in self._load(DATA_DIR / "scrolls.json")]
+
+    def fetch_backgrounds(self) -> list[dict]:
+        return self._load(DATA_DIR / "backgrounds.json")

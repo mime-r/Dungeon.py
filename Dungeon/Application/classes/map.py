@@ -10,6 +10,7 @@ import random
 
 from ..utils import style_text
 from ..config import config
+from .status import StatusSet
 
 T = config.terrain
 
@@ -29,6 +30,9 @@ class DungeonCell:
         self.items: list = []
         self.gold: int = 0
         self.explored: bool = False
+        self.trap: str | None = None       # trap kind, or None
+        self.trap_hidden: bool = True       # hidden until triggered or searched
+        self.feature: str | None = None    # a static feature such as "altar"
 
     @property
     def object(self):
@@ -55,8 +59,44 @@ class DungeonPlayer:
         self.equipped = equipped
         self.location: tuple[int, int] = (0, 0)
         self.name: str | None = None
+        self.background: str | None = None
         self.has_orb: bool = False
         self.game = game
+        # progression
+        self.level = 1
+        self.xp = 0
+        self.xp_next = config.progression.xp_for(1)
+        # status + turn economy
+        self.status = StatusSet()
+        self.energy = 0
+        self.speed = 10
+
+    def effective_speed(self) -> int:
+        s = self.speed
+        if self.status.has("haste"):
+            s += 5
+        if self.status.has("slow"):
+            s -= 5
+        return max(1, s)
+
+    def combat_bonus(self) -> tuple[int, int]:
+        """Return (damage_bonus, accuracy_bonus) from level and Might."""
+        prog = config.progression
+        dmg = self.level // prog.damage_every + self.status.potency("might")
+        acc = self.level * prog.accuracy_per_level
+        return dmg, acc
+
+    def gain_xp(self, amount: int) -> None:
+        self.xp += amount
+        while self.xp >= self.xp_next:
+            self.xp -= self.xp_next
+            self.level += 1
+            self.xp_next = config.progression.xp_for(self.level)
+            gain = config.progression.hp_per_level
+            self.max_health += gain
+            self.health += gain
+            self.game.message(
+                f"[level]Welcome to level {self.level}![/level] [health](+{gain} max HP)[/health]")
 
     @property
     def x(self) -> int:
@@ -100,6 +140,10 @@ class DungeonPlayer:
 
     def _on_enter(self, cell: DungeonCell) -> None:
         game = self.game
+        if cell.trap and cell.trap_hidden:
+            game.trigger_trap(cell)
+        if cell.feature == "altar":
+            game.bless_at_altar(cell)
         if cell.gold > 0:
             game.player.coins += cell.gold
             game.message(f"You pick up {style_text(str(cell.gold) + ' gold', 'gold')}.")
@@ -120,9 +164,11 @@ class DungeonPlayer:
             enemy.health = 0
             self.game.on_enemy_death(enemy)
             return
-        if random.randint(1, 100) <= weapon.accuracy:
-            damage = weapon.base_attack + random.randint(weapon.attack_range[0], weapon.attack_range[1])
-            crit = damage == weapon.base_attack + weapon.attack_range[1]
+        dmg_bonus, acc_bonus = self.combat_bonus()
+        if random.randint(1, 100) <= weapon.accuracy + acc_bonus:
+            raw = random.randint(weapon.attack_range[0], weapon.attack_range[1])
+            damage = max(1, weapon.base_attack + raw + dmg_bonus)
+            crit = raw == weapon.attack_range[1]
             template = weapon.texts.critical_hit if crit else weapon.texts.hit
             self.game.message(template.format(enemy_name, weapon_name), drop=damage)
             enemy.health -= damage
@@ -160,10 +206,15 @@ class DungeonMap:
         self.stairs_up = layout.stairs_up
         self.stairs_down = layout.stairs_down
         self.vault_cells = layout.vault_cells
+        self.temple_cells = layout.temple_cells
+        self.altar = layout.altar
         self.floor_cells = layout.floor_cells
         self.enemies: list = []
         self.npcs: list = []
         self.visible: set[tuple[int, int]] = set()
+        if self.altar:
+            ay, ax = self.altar
+            self.matrix[ay][ax].feature = "altar"
 
     # --- geometry -------------------------------------------------------
     def in_bounds(self, y: int, x: int) -> bool:
@@ -200,12 +251,13 @@ class DungeonMap:
         items = cell.items
         if not items:
             return
+        name = self.game.display_name
         if len(items) == 1:
-            label = style_text(items[0].name, "item")
+            label = style_text(name(items[0]), "item")
         else:
             label = "{} and {}".format(
-                ", ".join(style_text(i.name, "item") for i in items[:-1]),
-                style_text(items[-1].name, "item"),
+                ", ".join(style_text(name(i), "item") for i in items[:-1]),
+                style_text(name(items[-1]), "item"),
             )
         self.game.message(f"You see {label} here.")
 
@@ -228,6 +280,9 @@ class DungeonMap:
                 return False
         return True
 
+    def line_points(self, y0, x0, y1, x1) -> list[tuple[int, int]]:
+        return _bresenham(y0, x0, y1, x1)
+
     def reveal_all(self) -> None:
         for row in self.matrix:
             for cell in row:
@@ -245,31 +300,61 @@ class DungeonMap:
         found = False
         for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)):
             ny, nx = y + dy, x + dx
-            if self.in_bounds(ny, nx) and self.matrix[ny][nx].terrain == T.SECRET_DOOR:
-                self.matrix[ny][nx].terrain = T.DOOR_CLOSED
+            if not self.in_bounds(ny, nx):
+                continue
+            cell = self.matrix[ny][nx]
+            if cell.terrain == T.SECRET_DOOR:
+                cell.terrain = T.DOOR_CLOSED
+                found = True
+            if cell.trap and cell.trap_hidden:
+                cell.trap_hidden = False
                 found = True
         return found
 
-    def auto_detect_secret(self) -> bool:
+    def auto_detect_secret(self) -> str | None:
+        """Chance to notice an adjacent secret door or trap; returns 'door'/'trap'/None."""
         py, px = self.game.player.location
         for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             ny, nx = py + dy, px + dx
-            if self.in_bounds(ny, nx) and self.matrix[ny][nx].terrain == T.SECRET_DOOR:
-                if random.randint(1, 4) == 1:
-                    self.matrix[ny][nx].terrain = T.DOOR_CLOSED
-                    return True
-        return False
+            if not self.in_bounds(ny, nx):
+                continue
+            cell = self.matrix[ny][nx]
+            if cell.terrain == T.SECRET_DOOR and random.randint(1, 4) == 1:
+                cell.terrain = T.DOOR_CLOSED
+                return "door"
+            if cell.trap and cell.trap_hidden and random.randint(1, 3) == 1:
+                cell.trap_hidden = False
+                return "trap"
+        return None
 
     # --- rendering ------------------------------------------------------
-    def render_grid(self) -> list[list[tuple[str, str]]]:
-        """Return rows of (glyph, literal-rich-style) tuples for the UI map panel."""
+    def viewport(self, view_w: int, view_h: int) -> tuple[int, int, int, int]:
+        """Window onto the map, centred on the player and clamped to bounds.
+        Returns (top, left, height, width)."""
+        vw = max(1, min(view_w, self.width))
+        vh = max(1, min(view_h, self.height))
+        py, px = self.game.player.location
+        top = max(0, min(py - vh // 2, self.height - vh))
+        left = max(0, min(px - vw // 2, self.width - vw))
+        return top, left, vh, vw
+
+    def render_grid(self, view_w: int | None = None, view_h: int | None = None
+                    ) -> list[list[tuple[str, str]]]:
+        """Return rows of (glyph, literal-rich-style) tuples for a scrolling window of
+        the map, centred on the player."""
         styles = config.styles
         god = getattr(self.game, "godmode", False)
         player_loc = self.game.player.location
+        cursor = getattr(self.game, "target_cursor", None)
+        path = getattr(self.game, "target_path", None) or ()
+        path_set = set(path)
+        top, left, vh, vw = self.viewport(
+            view_w or config.map.view_width, view_h or config.map.view_height)
         rows = []
-        for y, row in enumerate(self.matrix):
+        for y in range(top, top + vh):
             out = []
-            for x, cell in enumerate(row):
+            for x in range(left, left + vw):
+                cell = self.matrix[y][x]
                 visible = (y, x) in self.visible or god
                 if not cell.explored and not visible:
                     out.append((config.symbols.unknown, styles["unknown"]))
@@ -278,6 +363,11 @@ class DungeonMap:
                 style = styles.get(name, name)
                 if not visible:
                     style = "dim " + style
+                if cursor is not None:
+                    if (y, x) == cursor:
+                        style = styles["target"]
+                    elif (y, x) in path_set:
+                        style = styles["target_path"]
                 out.append((glyph, style))
             rows.append(out)
         return rows
@@ -293,8 +383,38 @@ class DungeonMap:
         if cell.items:
             top = cell.items[-1]
             return top.symbol, config.symbols.tile_style.get(top.symbol, "item")
+        if cell.trap and not cell.trap_hidden:
+            return config.symbols.trap, "trap"
+        if cell.feature == "altar":
+            return config.symbols.altar, "altar"
         glyph = config.symbols.terrain_glyph.get(cell.terrain, config.symbols.empty)
         return glyph, config.symbols.tile_style.get(glyph, "floor")
+
+    # --- pathfinding ----------------------------------------------------
+    def bfs_path(self, start, is_goal, passable):
+        """Breadth-first search; returns the step path (excluding start) to the nearest
+        goal cell, or None. ``is_goal(cell)`` and ``passable(y, x)`` are callables."""
+        from collections import deque
+        prev = {start: None}
+        q = deque([start])
+        while q:
+            cur = q.popleft()
+            if cur != start and is_goal(cur):
+                path = []
+                node = cur
+                while node != start:
+                    path.append(node)
+                    node = prev[node]
+                path.reverse()
+                return path
+            cy, cx = cur
+            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1),
+                            (-1, -1), (-1, 1), (1, -1), (1, 1)):
+                ny, nx = cy + dy, cx + dx
+                if self.in_bounds(ny, nx) and (ny, nx) not in prev and passable(ny, nx):
+                    prev[(ny, nx)] = cur
+                    q.append((ny, nx))
+        return None
 
 
 def _bresenham(y0, x0, y1, x1):

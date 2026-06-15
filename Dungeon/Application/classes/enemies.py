@@ -1,6 +1,7 @@
 import random
 
 from ..config import config
+from .status import StatusSet
 
 _DEFAULT_TEXTS = {
     "critical_hit": "The {} lands a brutal blow!",
@@ -49,6 +50,10 @@ class DungeonEnemy:
         accuracy: int,
         texts: EnemyTexts,
         game,
+        ranged: bool = False,
+        attack_distance: int = 1,
+        on_hit: dict | None = None,
+        speed: int = 10,
     ) -> None:
         self.name = name
         self.symbol = symbol
@@ -65,6 +70,12 @@ class DungeonEnemy:
         self.game = game
         self.location: tuple[int, int] = (0, 0)
         self.awake = False
+        self.ranged = ranged
+        self.attack_distance = attack_distance
+        self.on_hit = on_hit or {}
+        self.status = StatusSet()
+        self.energy = 0
+        self.speed = speed
 
     @property
     def y(self) -> int:
@@ -74,20 +85,43 @@ class DungeonEnemy:
     def x(self) -> int:
         return self.location[1]
 
-    def attack_player(self) -> None:
-        """Resolve one attack against the player, applying damage and messaging."""
+    def effective_speed(self) -> int:
+        s = self.speed
+        if self.status.has("haste"):
+            s += 5
+        if self.status.has("slow"):
+            s -= 5
+        return max(1, s)
+
+    def attack_player(self, ranged: bool = False) -> None:
+        """Resolve one attack against the player, applying damage, status, and messaging."""
         if self.game.godmode:
             return
         if random.randint(1, 100) < self.accuracy:
-            damage = self.attack_base + random.randint(self.attack_range[0], self.attack_range[1])
-            crit = damage == self.attack_base + self.attack_range[1]
+            damage = (self.attack_base
+                      + random.randint(self.attack_range[0], self.attack_range[1])
+                      + self.status.potency("might"))
+            crit = damage >= self.attack_base + self.attack_range[1]
             self.game.message(self.texts.critical_hit if crit else self.texts.hit, drop=damage)
             self.game.player.health -= damage
+            self._apply_on_hit()
         else:
             self.game.message(self.texts.missed_hit)
 
+    def _apply_on_hit(self) -> None:
+        if not self.on_hit:
+            return
+        if random.randint(1, 100) > self.on_hit.get("chance", 100):
+            return
+        effect = self.on_hit["effect"]
+        self.game.player.status.add(
+            effect, self.on_hit.get("duration", 4), self.on_hit.get("potency", 1))
+        verb = {"poison": "are poisoned", "slow": "feel sluggish",
+                "confusion": "reel in confusion"}.get(effect, f"are afflicted with {effect}")
+        self.game.message(f"[{effect}]You {verb}![/{effect}]")
+
     def act(self) -> None:
-        """Take one turn: wake near the player, then chase and bump-attack."""
+        """Take one turn: wake near the player, then chase, fire, or bump-attack."""
         player = self.game.player
         dist = max(abs(self.y - player.y), abs(self.x - player.x))
         if not self.awake:
@@ -95,13 +129,19 @@ class DungeonEnemy:
                 self.awake = True
             else:
                 return
+        if self.status.has("confusion"):
+            self._step_confused()
+            return
         if dist == 1:
             self.attack_player()
             return
+        if self.ranged and dist <= self.attack_distance \
+                and self.game.map._line_of_sight(self.y, self.x, player.y, player.x):
+            self.attack_player(ranged=True)
+            return
         self._step_toward(player.y, player.x)
 
-    def _step_toward(self, ty: int, tx: int) -> None:
-        moves = []
+    def _walkable_neighbors(self):
         for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1),
                         (-1, -1), (-1, 1), (1, -1), (1, 1)):
             ny, nx = self.y + dy, self.x + dx
@@ -110,13 +150,20 @@ class DungeonEnemy:
             cell = self.game.map.matrix[ny][nx]
             if cell.terrain not in config.terrain.walkable or cell.occupant is not None:
                 continue
-            moves.append((max(abs(ny - ty), abs(nx - tx)), ny, nx))
+            yield ny, nx
+
+    def _step_toward(self, ty: int, tx: int) -> None:
+        moves = [(max(abs(ny - ty), abs(nx - tx)), ny, nx) for ny, nx in self._walkable_neighbors()]
         if not moves:
             return
-        moves.sort(key=lambda m: m[0])
-        best = moves[0][0]
+        best = min(m[0] for m in moves)
         _, ny, nx = random.choice([m for m in moves if m[0] == best])
         self.game.map.move_occupant(self, ny, nx)
+
+    def _step_confused(self) -> None:
+        options = list(self._walkable_neighbors())
+        if options:
+            self.game.map.move_occupant(self, *random.choice(options))
 
 
 class DungeonEnemyLoader:
@@ -147,4 +194,8 @@ class DungeonEnemyLoader:
             accuracy=d.accuracy,
             texts=texts,
             game=self.game,
+            ranged=getattr(d, "ranged", False),
+            attack_distance=getattr(d, "attack_distance", getattr(d, "range", 1)),
+            on_hit=getattr(d, "on_hit", None),
+            speed=getattr(d, "speed", 10),
         )

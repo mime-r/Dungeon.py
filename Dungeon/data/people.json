@@ -32,6 +32,7 @@
             { "item": "Medium Healing Potion", "chance": 80 },
             { "item": "Scroll of Magic Mapping", "chance": 70 },
             { "item": "Scroll of Teleportation", "chance": 60 },
+            { "item": "Scroll of Identification", "chance": 70 },
             { "item": "Cloth Bag", "chance": 60 },
             { "item": "Leather Pack", "chance": 30 },
             { "item": "Quarterstaff", "chance": 40 }

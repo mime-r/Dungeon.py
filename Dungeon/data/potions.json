@@ -1,20 +1,50 @@
 [
     {
         "name": "Weak Healing Potion",
-        "description": "This berry-flavoured weak healing potion increases your health by 7",
+        "description": "A berry-flavoured tonic that restores 7 health.",
         "cost": 2,
         "hp_change": 7
     },
     {
         "name": "Medium Healing Potion",
-        "description": "This concentrated berry-flavoured medium healing potion increases your health by 15",
+        "description": "A concentrated draught that restores 15 health.",
         "cost": 6,
         "hp_change": 15
     },
     {
         "name": "Strong Healing Potion",
-        "description": "This super-concentrated berry-flavoured strong healing potion increases your health by 25",
+        "description": "A potent elixir that restores 25 health.",
         "cost": 12,
         "hp_change": 25
+    },
+    {
+        "name": "Potion of Might",
+        "description": "Floods your muscles with strength, adding to your attacks for a while.",
+        "cost": 14,
+        "effect": "might",
+        "duration": 20,
+        "potency": 3
+    },
+    {
+        "name": "Potion of Speed",
+        "description": "Quickens your every move, letting you act faster than your foes.",
+        "cost": 16,
+        "effect": "haste",
+        "duration": 18
+    },
+    {
+        "name": "Potion of Regeneration",
+        "description": "Knits your wounds closed over the coming turns.",
+        "cost": 12,
+        "effect": "regen",
+        "duration": 12,
+        "potency": 2
+    },
+    {
+        "name": "Potion of Curing",
+        "description": "Purges poison and other ailments from your body.",
+        "cost": 8,
+        "hp_change": 5,
+        "effect": "curing"
     }
 ]

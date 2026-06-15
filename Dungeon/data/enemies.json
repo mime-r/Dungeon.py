@@ -28,6 +28,7 @@
         "attack_base": 1,
         "attack_range": [0, 1],
         "accuracy": 80,
+        "speed": 14,
         "texts": {
             "hit": "The {} flutters in and nips you.",
             "missed_hit": "The {} careens past your head.",
@@ -112,9 +113,48 @@
         "attack_base": 2,
         "attack_range": [0, 3],
         "accuracy": 55,
+        "speed": 6,
         "texts": {
             "hit": "The {} claws at you, reeking of rot.",
             "death": "The {} collapses into foul sludge."
+        }
+    },
+    {
+        "name": "Giant Spider",
+        "symbol": "x",
+        "tier": "mid",
+        "depth": [2, 5],
+        "spawn_weight": 7,
+        "health_range": [7, 12],
+        "coin_drop_range": [0, 3],
+        "xp_drop": 4,
+        "attack_base": 2,
+        "attack_range": [0, 2],
+        "accuracy": 65,
+        "on_hit": { "effect": "poison", "chance": 60, "duration": 5, "potency": 1 },
+        "texts": {
+            "hit": "The {} sinks its dripping fangs into you.",
+            "death": "The {} curls up, legs twitching."
+        }
+    },
+    {
+        "name": "Kobold Slinger",
+        "symbol": "y",
+        "tier": "mid",
+        "depth": [2, 5],
+        "spawn_weight": 6,
+        "health_range": [5, 9],
+        "coin_drop_range": [1, 3],
+        "xp_drop": 3,
+        "attack_base": 2,
+        "attack_range": [0, 3],
+        "accuracy": 60,
+        "ranged": true,
+        "range": 5,
+        "texts": {
+            "hit": "The {} slings a stone that cracks against you.",
+            "missed_hit": "The {}'s stone clatters off the wall.",
+            "death": "The {} drops its sling and slumps over."
         }
     },
     {
@@ -147,6 +187,7 @@
         "attack_base": 4,
         "attack_range": [0, 3],
         "accuracy": 70,
+        "on_hit": { "effect": "slow", "chance": 40, "duration": 6 },
         "texts": {
             "hit": "The {} drains the warmth from your bones.",
             "missed_hit": "The {} passes through the air where you stood.",

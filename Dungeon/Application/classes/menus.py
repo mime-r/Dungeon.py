@@ -43,6 +43,15 @@ class DungeonMenu:
     def _fists(self):
         return self.game.db.item_db.search_item(name="Fists")
 
+    def _name(self, item) -> str:
+        return self.game.display_name(item)
+
+    def _detail(self, item) -> str:
+        rec = self.game.ident.get(getattr(item, "name", None))
+        if rec and not rec["identified"]:
+            return "[flavor]unidentified[/flavor]"
+        return item_detail(item)
+
     # --- pack (use / equip / unequip / drop) ---------------------------
     def pack(self) -> None:
         game, player = self.game, self.game.player
@@ -55,7 +64,7 @@ class DungeonMenu:
                 + ("   [warn]FULL[/warn]" if full else "")
             )
             game.print(header, highlight=False)
-            game.print(f"Equipped: {style_text(player.equipped.name, 'weapons')}  "
+            game.print(f"Equipped: {style_text(self._name(player.equipped), 'weapons')}  "
                        f"[flavor]({item_detail(player.equipped)})[/flavor]\n", highlight=False)
             if not inv:
                 game.print("Your pack is empty.", highlight=False)
@@ -69,16 +78,17 @@ class DungeonMenu:
             table.add_column("", style="success")
             for i, it in enumerate(inv, 1):
                 equipped = "equipped" if it is player.equipped else ""
-                table.add_row(str(i), it.name, item_detail(it), equipped)
+                table.add_row(str(i), self._name(it), self._detail(it), equipped)
             game.print(table)
             game.print(f"\n{style_text('number', 'controls')} to select an item, "
                        f"{style_text('esc', 'controls')} to exit.", highlight=False)
             idx = self._read_index(len(inv))
             if idx is None:
                 return
-            self._item_actions(idx)
+            if self._item_actions(idx):
+                return  # quaffing/reading closes the pack so the effect is visible at once
 
-    def _item_actions(self, idx: int) -> None:
+    def _item_actions(self, idx: int) -> bool:
         game, player = self.game, self.game.player
         item = player.inventory[idx]
         if isinstance(item, DungeonWeapon):
@@ -91,19 +101,25 @@ class DungeonMenu:
             verb = "wear"
         else:
             verb = "use"
+        rec = game.ident.get(getattr(item, "name", None))
+        unidentified = bool(rec and not rec["identified"])
+        desc = "An unidentified item — use it to discover what it does." if unidentified else item.description
         clear_screen()
-        game.print(f"{style_text(item.name, 'item')}  [flavor]{item_detail(item)}[/flavor]\n"
-                   f"{item.description}\n", highlight=False)
+        game.print(f"{style_text(self._name(item), 'item')}  [flavor]{self._detail(item)}[/flavor]\n"
+                   f"{desc}\n", highlight=False)
         game.print(f"{style_text('e', 'controls')} {verb}   "
                    f"{style_text('d', 'controls')} drop   "
                    f"{style_text('esc', 'controls')} back", highlight=False)
         key = keys.read_key()
         if key == "e":
-            self._primary(item, idx, verb)
-        elif key == "d":
+            return self._primary(item, idx, verb)
+        if key == "d":
             self._drop(item, idx)
+        return False
 
-    def _primary(self, item, idx: int, verb: str) -> None:
+    def _primary(self, item, idx: int, verb: str) -> bool:
+        """Apply the item's primary action. Returns True if the pack should close
+        (i.e. a consumable was used, so the player can see the effect at once)."""
         game, player = self.game, self.game.player
         if isinstance(item, DungeonWeapon):
             if item is player.equipped:
@@ -112,21 +128,22 @@ class DungeonMenu:
             else:
                 player.equipped = item
                 game.message(f"You wield the {style_text(item.name, 'weapons')}.")
-        elif isinstance(item, DungeonInventory):
+            return False
+        if isinstance(item, DungeonInventory):
             player.max_inventory += item.inventory
             player.inventory.pop(idx)
             game.message(f"You sling the {style_text(item.name, 'item')} over your shoulders. "
                          f"[inventory](+{item.inventory} slots)[/inventory]")
-        elif isinstance(item, DungeonPotion):
-            if player.health >= player.max_health:
-                game.message("You are already at full health.")
-                return
-            player.health = min(player.max_health, player.health + item.hp_change)
+            return False
+        if isinstance(item, DungeonPotion):
             player.inventory.pop(idx)
-            game.message(f"You quaff the {style_text(item.name, 'item')}. You feel rejuvenated.")
-        elif isinstance(item, DungeonScroll):
-            player.inventory.pop(idx)
-            game.use_scroll(item)
+            game.apply_potion(item)
+            return True
+        if isinstance(item, DungeonScroll):
+            if game.use_scroll(item):
+                player.inventory.remove(item)
+            return True
+        return False
 
     def _drop(self, item, idx: int) -> None:
         game, player = self.game, self.game.player
@@ -134,9 +151,33 @@ class DungeonMenu:
             player.equipped = self._fists()
             game.message(f"You unequip and drop the {style_text(item.name, 'weapons')}.")
         else:
-            game.message(f"You drop the {style_text(item.name, 'item')}.")
+            game.message(f"You drop the {style_text(self._name(item), 'item')}.")
         player.inventory.pop(idx)
         player.cell.items.append(item)
+
+    # --- identify (choose an unidentified pack item) -------------------
+    def choose_unidentified(self, exclude=None):
+        """Let the player pick one unidentified pack item to identify. Returns it or None."""
+        game, player = self.game, self.game.player
+        items = [
+            it for it in player.inventory
+            if it is not exclude
+            and (rec := game.ident.get(getattr(it, "name", None))) and not rec["identified"]
+        ]
+        if not items:
+            return None
+        clear_screen()
+        game.print("[menu_header]Identify which item?[/menu_header]\n", highlight=False)
+        table = Table(expand=False, border_style="grey37")
+        table.add_column("#", style="controls", justify="right")
+        table.add_column("Item", style="item")
+        for i, it in enumerate(items, 1):
+            table.add_row(str(i), self._name(it))
+        game.print(table)
+        game.print(f"\n{style_text('number', 'controls')} identify   "
+                   f"{style_text('esc', 'controls')} cancel", highlight=False)
+        idx = self._read_index(len(items))
+        return None if idx is None else items[idx]
 
     # --- pick up from the tile you stand on ----------------------------
     def pickup_menu(self, cell) -> int:
@@ -154,7 +195,7 @@ class DungeonMenu:
             table.add_column("Item", style="item")
             table.add_column("Details", style="flavor")
             for i, it in enumerate(cell.items, 1):
-                table.add_row(str(i), it.name, item_detail(it))
+                table.add_row(str(i), self._name(it), self._detail(it))
             game.print(table)
             game.print(f"\n{style_text('number', 'controls')} take one   "
                        f"{style_text('a', 'controls')} take all   "
@@ -192,7 +233,7 @@ class DungeonMenu:
                 table.add_column("Cost", style="coin", justify="right")
                 table.add_column("Details", style="flavor")
                 for i, it in enumerate(stock, 1):
-                    table.add_row(str(i), it.name, str(it.cost), item_detail(it))
+                    table.add_row(str(i), self._name(it), str(it.cost), self._detail(it))
                 self.game.print(table)
             else:
                 self.game.print("\nThe stall is bare.", highlight=False)
@@ -221,7 +262,7 @@ class DungeonMenu:
         player.coins -= item.cost
         player.inventory.append(item)
         trader.stuff.pop(idx)
-        game.message(f"You buy the {style_text(item.name, 'item')} for [coin]{item.cost}[/coin] gold.")
+        game.message(f"You buy the {style_text(self._name(item), 'item')} for [coin]{item.cost}[/coin] gold.")
 
     # --- healer ---------------------------------------------------------
     def healer(self, healer) -> str | None:

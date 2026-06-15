@@ -10,5 +10,11 @@
         "description": "Reading this whisks you to a random spot on the floor. A lifesaver in a pinch.",
         "cost": 10,
         "effect": "teleport"
+    },
+    {
+        "name": "Scroll of Identification",
+        "description": "Reading this reveals the true nature of one unidentified item in your pack.",
+        "cost": 9,
+        "effect": "identify"
     }
 ]

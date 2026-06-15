@@ -35,6 +35,7 @@ class DungeonWeapon(DungeonItem):
         attack_range: int,
         accuracy: int,
         texts: DungeonWeaponTexts,
+        range: int = 1,
     ) -> None:
         super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.EQUIP])
         self.type = type
@@ -42,6 +43,8 @@ class DungeonWeapon(DungeonItem):
         self.attack_range = attack_range
         self.accuracy = accuracy
         self.texts = texts
+        self.range = range
+        self.ranged = (type == WeaponType.RANGED) or range > 1
 
 
 class DungeonInventory(DungeonItem):
@@ -55,13 +58,17 @@ class DungeonInventory(DungeonItem):
 
 
 class DungeonPotion(DungeonItem):
-    """A consumable potion that changes player HP."""
+    """A consumable potion: heals HP and/or applies a status effect."""
 
     symbol = "!"
 
-    def __init__(self, name: str, description: str, cost: int, hp_change: int) -> None:
+    def __init__(self, name: str, description: str, cost: int, hp_change: int = 0,
+                 effect: str | None = None, duration: int = 0, potency: int = 0) -> None:
         super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.USE])
         self.hp_change = hp_change
+        self.effect = effect
+        self.duration = duration
+        self.potency = potency
 
 
 class DungeonScroll(DungeonItem):

@@ -14,7 +14,7 @@ from .config import config
 from .utils import style_text, clear_screen
 from .classes.map import DungeonMap, DungeonPlayer
 from .classes.menus import DungeonMenu
-from .classes.items import DungeonOrb
+from .classes.items import DungeonOrb, DungeonPotion, DungeonScroll
 from .classes.database import DungeonDatabase
 from .classes.misc import DungeonTimeData
 from .classes.people import DungeonTrader, DungeonHealer
@@ -24,8 +24,26 @@ print("Loading...")
 
 T = config.terrain
 
+TURN = 10  # energy one full-speed action costs / grants per game-tick
+
+# compass direction -> (dy, dx), for cursor movement and pathfinding
+DIR_DELTA = {
+    "n": (-1, 0), "s": (1, 0), "w": (0, -1), "e": (0, 1),
+    "ne": (-1, 1), "nw": (-1, -1), "se": (1, 1), "sw": (1, -1),
+}
+
 # Weapons seeded into vault treasure, by how deep you are.
 _VAULT_WEAPONS = ["Short Sword", "Mace", "Spear", "Long Sword", "War Axe"]
+
+# Randomised appearances for unidentified consumables (shuffled per game).
+_POTION_ADJ = [
+    "fizzy", "murky", "glowing", "viscous", "azure", "crimson", "smoky", "bubbling",
+    "cloudy", "oily", "sparkling", "luminous", "syrupy", "effervescent",
+]
+_SCROLL_LABELS = [
+    "XYZZY", "FOOBIE", "KLATAA", "ZELGO", "NR9", "PRZ", "VELOX", "GNARL",
+    "HRUM", "TZADIK", "OByeDA", "WAffLE",
+]
 
 
 class Dungeon:
@@ -42,6 +60,8 @@ class Dungeon:
         self.moves = 0
         self.depth = 1
         self.levels: dict[int, DungeonMap] = {}
+        self.target_cursor = None   # ranged-targeting overlay state
+        self.target_path = None
         # Developer god mode: enable from the start with DUNGEON_GODMODE=1, or toggle in-game with `~`.
         self.godmode = os.environ.get("DUNGEON_GODMODE") == "1"
 
@@ -49,6 +69,7 @@ class Dungeon:
         self.ui = DungeonUI(game=self)
 
         self.db = DungeonDatabase(game=self)
+        self._init_identification()
         self.leaderboard = TinyDB("leaderboard.json")
         self.leaderboardQuery = Query()
 
@@ -61,8 +82,7 @@ class Dungeon:
             equipped=self.db.item_db.search_item(name="Fists"),
             game=self,
         )
-        for _ in range(2):
-            self.player.inventory.append(self.db.item_db.search_item(name="Weak Healing Potion"))
+        self._choose_background()
 
         while True:
             self.session_id = random.getrandbits(64)
@@ -80,12 +100,74 @@ class Dungeon:
         self.message(f"[flavor]You descend into the dungeon. Somewhere far below lies the Orb of Zot.[/flavor]")
         self.log.info("dungeon initialised")
 
+    # --- character creation --------------------------------------------
+    def _choose_background(self) -> None:
+        from rich.table import Table
+        backgrounds = self.db.backgrounds
+        clear_screen()
+        table = Table(title="Choose your Class", title_style="menu_header", border_style="grey37")
+        table.add_column("#", style="controls", justify="right")
+        table.add_column("Class", style="name")
+        table.add_column("HP", style="health", justify="right")
+        table.add_column("Starting kit", style="flavor")
+        for i, bg in enumerate(backgrounds, 1):
+            kit = ", ".join([bg["start_weapon"]] + bg.get("start_items", []))
+            table.add_row(str(i), bg["name"], f"+{bg['hp_bonus']}", kit)
+        self.print(table)
+        self.print(
+            f"\nPress {style_text('1', 'controls')}-{style_text(str(len(backgrounds)), 'controls')} "
+            f"to choose (any other key = Wanderer).", highlight=False)
+        key = keys.read_key()
+        idx = int(key) - 1 if key.isdigit() and 1 <= int(key) <= len(backgrounds) else len(backgrounds) - 1
+        self._apply_background(backgrounds[idx])
+
+    def _apply_background(self, bg: dict) -> None:
+        p = self.player
+        p.background = bg["name"]
+        p.max_health += bg.get("hp_bonus", 0)
+        p.health = p.max_health
+        weapon = self.db.item_db.search_item(name=bg["start_weapon"])
+        if weapon:
+            p.inventory.append(weapon)
+            p.equipped = weapon
+            self.identify(weapon, announce=False)
+        for name in bg.get("start_items", []):
+            item = self.db.item_db.search_item(name=name)
+            if item:
+                p.inventory.append(item)
+                self.identify(item, announce=False)  # starting kit is known
+
     # --- messaging ------------------------------------------------------
     def message(self, text: str, drop: int | None = None) -> None:
         self.ui.message(text, drop=drop)
 
     def render(self) -> None:
         self.ui.render()
+
+    # --- item identification -------------------------------------------
+    def _init_identification(self) -> None:
+        """Assign each potion/scroll type a random appearance for this game."""
+        self.ident: dict[str, dict] = {}
+        potions = list(self.db.item_db.potions)
+        for pot, adj in zip(potions, random.sample(_POTION_ADJ, len(potions))):
+            self.ident[pot.name] = {"appearance": f"{adj} potion", "identified": False}
+        scrolls = list(self.db.item_db.scrolls)
+        for sc, label in zip(scrolls, random.sample(_SCROLL_LABELS, len(scrolls))):
+            self.ident[sc.name] = {"appearance": f"scroll labelled '{label}'", "identified": False}
+
+    def display_name(self, item) -> str:
+        rec = self.ident.get(getattr(item, "name", None))
+        if rec and not rec["identified"]:
+            return rec["appearance"]
+        return getattr(item, "name", "?")
+
+    def identify(self, item, announce: bool = True) -> None:
+        """Mark an item's whole type identified (optionally announcing its true name)."""
+        rec = self.ident.get(getattr(item, "name", None))
+        if rec and not rec["identified"]:
+            rec["identified"] = True
+            if announce:
+                self.message(f"[success]You identify it as {style_text(item.name, 'item')}![/success]")
 
     # --- level generation & travel -------------------------------------
     def _new_level(self, depth: int) -> DungeonMap:
@@ -157,8 +239,17 @@ class Dungeon:
             if cell:
                 cell.gold += random.randint(2, 6 + depth * 2)
 
-        # Vault treasure (or the Orb chamber on the last floor).
+        # Hidden traps (depth-scaled), away from the entry stairs.
+        for _ in range(config.spawn.traps_base + depth // 2):
+            y, x = random.choice(level.floor_cells)
+            cell = level.matrix[y][x]
+            if cell.trap is None and not cell.items and cell.gold == 0 \
+                    and abs(y - suy) + abs(x - sux) > 4:
+                cell.trap = random.choice(["dart", "poison", "teleport", "alarm"])
+
+        # Vault treasure (or the Orb chamber on the last floor), then any temple.
         self._fill_vault(level, depth, is_last)
+        self._fill_temple(level, depth)
 
     def _scatter(self, level, item) -> None:
         cell = self._floor_cell(level)
@@ -206,6 +297,33 @@ class Dungeon:
                 py, px = cells.pop()
                 level.matrix[py][px].items.append(self.db.item_db.search_item(name="Strong Healing Potion"))
 
+    def _fill_temple(self, level, depth: int) -> None:
+        if not level.temple_cells:
+            return
+        cells = list(level.temple_cells)
+        random.shuffle(cells)
+        for _ in range(min(3, len(cells))):  # guardians, a notch tougher than the floor
+            loader = self.db.enemy_db.random_for_depth(min(config.depth.floors, depth + 1))
+            if not loader or not cells:
+                continue
+            sy, sx = cells.pop()
+            if level.matrix[sy][sx].occupant is None:
+                enemy = loader.load()
+                level.place_occupant(enemy, sy, sx)
+                level.enemies.append(enemy)
+        if cells:  # a strong weapon as the prize
+            wy, wx = cells.pop()
+            weapon_name = _VAULT_WEAPONS[min(depth, len(_VAULT_WEAPONS) - 1)]
+            level.matrix[wy][wx].items.append(self.db.item_db.search_item(name=weapon_name))
+        if cells:
+            gy, gx = cells.pop()
+            level.matrix[gy][gx].gold += random.randint(20, 40 + depth * 5)
+        pool = self.db.item_db.potions + self.db.item_db.scrolls
+        for _ in range(2):
+            if cells:
+                cy, cx = cells.pop()
+                level.matrix[cy][cx].items.append(random.choice(pool))
+
     def enter_level(self, depth: int, mode: str) -> None:
         if depth not in self.levels:
             self.levels[depth] = self._new_level(depth)
@@ -215,33 +333,60 @@ class Dungeon:
             self.player.location = self.map.stairs_down
         else:
             self.player.location = self.map.stairs_up
+        self.player.energy = TURN  # ready to act immediately on arrival
         self.map.update_fov()
         if mode == "down":
             self.message(f"[stairs]You arrive on Depth {depth}.[/stairs]")
         else:
             self.message(f"[stairs]You climb to Depth {depth}.[/stairs]")
 
-    # --- turn engine ----------------------------------------------------
-    def take_turn(self) -> None:
+    # --- turn engine (energy scheduler) --------------------------------
+    def spend_turn(self) -> None:
+        self.player.energy -= TURN
         self.moves += 1
         self.time.add()
-        self.world_tick()
+
+    def game_tick(self) -> None:
+        """One unit of world time: grant energy, tick statuses, run monster actions."""
+        p = self.player
+        p.energy += p.effective_speed()
+        p.status.tick(p, self)
+        if p.health <= 0:
+            self.game_over("dead")
+            return
+        for e in self.map.enemies:
+            e.energy += e.effective_speed()
+        for e in list(self.map.enemies):
+            if e.health > 0:
+                e.status.tick(e, self)
+                if e.health <= 0:
+                    self.on_enemy_death(e)
+        for e in list(self.map.enemies):
+            while e.health > 0 and e.energy >= TURN:
+                e.act()
+                e.energy -= TURN
+                if self.player.health <= 0:
+                    self.game_over("dead")
+                    return
+
+    def advance_world(self) -> None:
+        """Advance time until the player can act again, then settle fog and detection."""
+        while self.player.energy < TURN and not self.over:
+            self.game_tick()
+        if self.over:
+            return
         if self.player.health <= 0:
             self.game_over("dead")
             return
-        if self.map.auto_detect_secret():
+        found = self.map.auto_detect_secret()
+        if found == "door":
             self.message("[warn]You notice a hidden door nearby![/warn]")
+        elif found == "trap":
+            self.message("[warn]You spot a hidden trap nearby![/warn]")
         self.map.update_fov()
 
-    def world_tick(self) -> None:
-        for enemy in list(self.map.enemies):
-            if enemy.health > 0:
-                enemy.act()
-                if self.player.health <= 0:
-                    return
-
     def on_enemy_death(self, enemy) -> None:
-        self.player.xp += enemy.xp_drop
+        self.player.gain_xp(enemy.xp_drop)
         self.map.remove_occupant(enemy)
         if enemy in self.map.enemies:
             self.map.enemies.remove(enemy)
@@ -260,6 +405,8 @@ class Dungeon:
         """Open an NPC's menu. Returns True if a turn was spent (the player stepped past)."""
         result = None
         if isinstance(npc, DungeonTrader):
+            for item in npc.stuff:  # merchants' wares are displayed identified
+                self.identify(item, announce=False)
             result = self.menu.trader(npc)
         elif isinstance(npc, DungeonHealer):
             result = self.menu.healer(npc)
@@ -294,7 +441,7 @@ class Dungeon:
             return False
         cell.items.remove(item)
         self.player.inventory.append(item)
-        self.message(f"You pick up the {style_text(item.name, 'item')}.")
+        self.message(f"You pick up the {style_text(self.display_name(item), 'item')}.")
         return True
 
     def pickup(self) -> bool:
@@ -324,68 +471,287 @@ class Dungeon:
         else:
             self.enter_level(self.depth - 1, mode="up")
 
-    def use_scroll(self, scroll) -> None:
+    def apply_potion(self, pot) -> None:
+        p = self.player
+        appearance = self.display_name(pot)
+        was_unknown = appearance != pot.name
+        self.identify(pot, announce=False)  # learned by drinking; named in the message below
+        parts = []
+        if pot.effect == "curing":
+            cured = p.status.clear_harmful()
+            parts.append("the poison drains away" if "poison" in cured else "you feel cleansed")
+        elif pot.effect == "might":
+            p.status.add("might", pot.duration, pot.potency)
+            parts.append("[might]power surges through you[/might]")
+        elif pot.effect == "haste":
+            p.status.add("haste", pot.duration, pot.potency)
+            parts.append("[haste]the world slows around you[/haste]")
+        elif pot.effect == "regen":
+            p.status.add("regen", pot.duration, pot.potency)
+            parts.append("[regen]your wounds begin to knit[/regen]")
+        if pot.hp_change > 0:
+            if p.health < p.max_health:
+                healed = min(p.max_health - p.health, pot.hp_change)
+                p.health += healed
+                parts.append("you feel rejuvenated")
+            elif not pot.effect:
+                parts.append("nothing seems to happen")
+        effect_text = f" {', '.join(parts)}." if parts else ""
+        real = style_text(pot.name, "item")
+        if was_unknown:
+            self.message(f"You quaff the {style_text(appearance, 'item')} — "
+                         f"it is [success]{real}[/success]!{effect_text}")
+        else:
+            self.message(f"You quaff the {real}.{effect_text}")
+
+    def use_scroll(self, scroll) -> bool:
+        appearance = self.display_name(scroll)
+        was_unknown = appearance != scroll.name
+        self.identify(scroll, announce=False)  # learned by reading; named in the message below
+        real = style_text(scroll.name, "item")
+        read = (f"You read the {style_text(appearance, 'item')} — it is [success]{real}[/success]!"
+                if was_unknown else f"You read the {real}.")
+        if scroll.effect == "identify":
+            self.message(read)
+            target = self.menu.choose_unidentified(exclude=scroll)
+            if target is not None:
+                self.identify(target)
+            else:
+                self.message("You have nothing else to identify.")
+            return True
         if scroll.effect == "magic_mapping":
             self.map.reveal_all()
-            self.message(f"You read the {style_text(scroll.name, 'item')}. The floor's layout floods into your mind.")
+            self.message(f"{read} The floor's layout floods into your mind.")
         elif scroll.effect == "teleport":
             self.player.location = self.map.random_walkable()
             self.map.update_fov()
-            self.message(f"You read the {style_text(scroll.name, 'item')} and blink across the floor.")
+            self.message(f"{read} You blink across the floor.")
+        return True
 
     def search(self) -> None:
         if self.map.search(self.player.y, self.player.x):
-            self.message("[warn]You find a hidden door![/warn]")
+            self.message("[warn]You uncover something hidden nearby![/warn]")
         else:
-            self.message("You search the nearby walls but find nothing.")
+            self.message("You search the area but find nothing.")
+
+    # --- traps ----------------------------------------------------------
+    def trigger_trap(self, cell) -> None:
+        kind = cell.trap
+        cell.trap_hidden = False
+        p = self.player
+        if kind == "dart":
+            dmg = random.randint(2, 4 + self.depth)
+            p.health -= dmg
+            self.message(f"[trap]A dart trap fires![/trap] You take {dmg} damage.")
+        elif kind == "poison":
+            dmg = random.randint(1, 3)
+            p.health -= dmg
+            p.status.add("poison", random.randint(4, 7), 1 + self.depth // 4)
+            self.message(f"[trap]A needle springs out![/trap] [poison]You are poisoned![/poison]")
+        elif kind == "teleport":
+            p.location = self.map.random_walkable()
+            self.map.update_fov()
+            self.message("[trap]A teleport trap whisks you across the floor![/trap]")
+        elif kind == "alarm":
+            self.awaken_floor()
+            self.message("[trap]An alarm trap blares! The floor's monsters stir.[/trap]")
+
+    # --- temple altar ---------------------------------------------------
+    def bless_at_altar(self, cell) -> None:
+        cell.feature = None  # a single blessing per altar
+        p = self.player
+        p.health = p.max_health
+        p.status.add("regen", 15, 2)
+        self.message("[success]You kneel at the ancient altar. Warmth floods you — "
+                     "fully healed and blessed with [regen]Regeneration[/regen].[/success]")
+
+    # --- ranged combat --------------------------------------------------
+    def fire(self) -> bool:
+        weapon = self.player.equipped
+        if not getattr(weapon, "ranged", False):
+            self.message("You have no ranged weapon equipped.")
+            return False
+        rng = weapon.range
+        py, px = self.player.location
+
+        def reachable(e):
+            return (max(abs(e.y - py), abs(e.x - px)) <= rng
+                    and self.map._line_of_sight(py, px, e.y, e.x))
+
+        targets = sorted((e for e in self.map.visible_enemies() if reachable(e)),
+                         key=lambda e: max(abs(e.y - py), abs(e.x - px)))
+        if not targets:
+            self.message("There is no target in range.")
+            return False
+        idx = 0
+        cursor = list(targets[idx].location)
+        while True:
+            self._show_target(cursor)
+            self.render()
+            key = keys.read_key()
+            if key in (keys.ESC, "q"):
+                self._clear_target()
+                return False
+            if key in (keys.ENTER, "f"):
+                break
+            if key == keys.TAB:
+                idx = (idx + 1) % len(targets)
+                cursor = list(targets[idx].location)
+                continue
+            d = keys.read_direction(key)
+            if d:
+                dy, dx = DIR_DELTA[d]
+                ny, nx = cursor[0] + dy, cursor[1] + dx
+                if self.map.in_bounds(ny, nx):
+                    cursor = [ny, nx]
+        ty, tx = cursor
+        self._clear_target()
+        enemy = self.map.matrix[ty][tx].occupant
+        if (enemy and getattr(enemy, "is_enemy", False)
+                and max(abs(ty - py), abs(tx - px)) <= rng
+                and self.map._line_of_sight(py, px, ty, tx)):
+            self.ranged_attack(enemy)
+        else:
+            self.message("Your shot flies wide and strikes nothing.")
+        return True
+
+    def _show_target(self, cursor) -> None:
+        self.target_cursor = (cursor[0], cursor[1])
+        self.target_path = self.map.line_points(
+            self.player.y, self.player.x, cursor[0], cursor[1])[1:-1]
+
+    def _clear_target(self) -> None:
+        self.target_cursor = None
+        self.target_path = None
+
+    def ranged_attack(self, enemy) -> None:
+        weapon = self.player.equipped
+        en = style_text(enemy.name, "enemy")
+        wn = style_text(weapon.name, "weapons")
+        if self.godmode:
+            self.message(f"[warn][GOD][/warn] Your shot vaporises the {en}.")
+            enemy.health = 0
+            self.on_enemy_death(enemy)
+            return
+        dmg_bonus, acc_bonus = self.player.combat_bonus()
+        if random.randint(1, 100) <= weapon.accuracy + acc_bonus:
+            raw = random.randint(weapon.attack_range[0], weapon.attack_range[1])
+            damage = max(1, weapon.base_attack + raw + dmg_bonus)
+            self.message(f"You shoot the {en} with your {wn}.", drop=damage)
+            enemy.health -= damage
+            if enemy.health <= 0:
+                self.on_enemy_death(enemy)
+        else:
+            self.message(f"Your shot whistles past the {en}.")
+
+    # --- autoexplore ----------------------------------------------------
+    def autoexplore(self) -> None:
+        for _ in range(1000):
+            if self.over or self.map.visible_enemies():
+                if self.map.visible_enemies():
+                    self.message("[warn]A monster comes into view.[/warn]")
+                break
+
+            def passable(y, x):
+                c = self.map.matrix[y][x]
+                if c.occupant is not None:
+                    return False
+                if c.terrain in (T.WALL, T.SECRET_DOOR):
+                    return False
+                if c.trap and not c.trap_hidden:
+                    return False
+                return True
+
+            def is_goal(cur):
+                y, x = cur
+                if not self.map.matrix[y][x].explored:
+                    return False
+                for dy, dx in DIR_DELTA.values():
+                    ny, nx = y + dy, x + dx
+                    if self.map.in_bounds(ny, nx) and not self.map.matrix[ny][nx].explored:
+                        return True
+                return False
+
+            path = self.map.bfs_path(self.player.location, is_goal, passable)
+            if not path:
+                self.message("[flavor]There is nothing left to explore here.[/flavor]")
+                break
+            ny, nx = path[0]
+            direction = self._dir_to(ny, nx)
+            if direction is None or not self.player.move(direction):
+                break
+            self.spend_turn()
+            self.advance_world()
+            self.render()
+            time.sleep(0.03)
+
+    def _dir_to(self, ny: int, nx: int) -> str | None:
+        return {(-1, 0): "n", (1, 0): "s", (0, -1): "w", (0, 1): "e",
+                (-1, -1): "nw", (-1, 1): "ne", (1, -1): "sw", (1, 1): "se"}.get(
+            (ny - self.player.y, nx - self.player.x))
 
     # --- main loop ------------------------------------------------------
     def gameloop(self) -> None:
         self.time = DungeonTimeData(game=self)
         self.log.info(f"started game at {time.time():.2f}")
-        self.render()
+        self.player.energy = TURN
         while not self.over:
+            self.advance_world()
+            if self.over:
+                break
+            self.render()
             key = keys.read_key()
-            self.handle(key)
-            if not self.over:
-                self.render()
+            if self.handle(key):
+                self.spend_turn()
 
-    def handle(self, key: str) -> None:
+    def handle(self, key: str) -> bool:
+        """Dispatch one keypress. Returns True if the action spent a game turn."""
         direction = keys.read_direction(key)
         if direction:
-            if self.player.move(direction):
-                self.take_turn()
-            return
+            if self.player.status.has("confusion") and random.random() < 0.5:
+                direction = random.choice(list(keys.MOVE_KEYS.values()))
+            return self.player.move(direction)
         if key == "g":
-            if self.pickup():
-                self.take_turn()
-        elif key in ("d", "i"):
+            return self.pickup()
+        if key in ("d", "i"):
             self.menu.pack()
-        elif key == ">":
+            return False
+        if key == "f":
+            return self.fire()
+        if key == "o":
+            self.autoexplore()
+            return False
+        if key == ">":
             self.descend()
-        elif key == "<":
+            return False
+        if key == "<":
             self.ascend()
-        elif key == "s":
+            return False
+        if key == "s":
             self.search()
-            self.take_turn()
-        elif key in (".", keys.SPACE):
+            return True
+        if key in (".", keys.SPACE):
             self.message("You wait.")
-            self.take_turn()
-        elif key == "p":
+            return True
+        if key == "p":
             self.time.pause_menu()
-        elif key == "~":
+            return False
+        if key == "~":
             self.godmode = not self.godmode
             if self.godmode:
                 self.map.reveal_all()
             self.message(f"[warn]Developer god mode {'ENABLED' if self.godmode else 'disabled'}.[/warn]")
-        elif key == "?":
+            return False
+        if key == "?":
             self.help_screen()
-        elif key == keys.ESC:
+            return False
+        if key == keys.ESC:
             self.over = True
             self.log.info("game exited by player")
             clear_screen()
             print("Exiting [Dungeon]...")
             sys.exit()
+        return False
 
     def help_screen(self) -> None:
         clear_screen()
@@ -393,10 +759,12 @@ class Dungeon:
             "[menu_header]Dungeon.py — Controls[/menu_header]\n\n"
             "[controls]arrows[/controls] or [controls]hjkl[/controls]  move / attack (walk into a monster)\n"
             "[controls]yubn[/controls]  diagonal movement (nw / ne / sw / se)\n"
+            "[controls]f[/controls]  fire a ranged weapon (aim, then [controls]f[/controls]/[controls]enter[/controls]; [controls]tab[/controls] next target)\n"
+            "[controls]o[/controls]  autoexplore the floor (stops when a monster appears)\n"
             "[controls]g[/controls]  pick up items on your tile (choose which, or take all)\n"
             "[controls]i[/controls] / [controls]d[/controls]  open pack — use, equip, unequip, drop\n"
             "[controls]>[/controls] / [controls]<[/controls]  descend / ascend stairs\n"
-            "[controls]s[/controls]  search adjacent walls for secret doors\n"
+            "[controls]s[/controls]  search adjacent tiles for secret doors and traps\n"
             "[controls].[/controls] or [controls]space[/controls]  wait one turn\n"
             "[controls]p[/controls]  pause    [controls]esc[/controls]  quit\n\n"
             "[flavor]At a trader/healer, press [controls]space[/controls] to step past them.[/flavor]\n"
