@@ -32,13 +32,13 @@ into foes; keep an eye on your HP bar.
 Instructions to download can be found [here](INSTRUCTIONS.md)
 
 ## Changelog:
-15/6/26 v2.1 — "Caverns & Crosscuts"
+15/6/26 v2.1 - "Caverns & Crosscuts"
 - Diagonal movement: player uses `y`/`u`/`b`/`n`; enemies chase with 8-direction pathfinding
 - Variable map sizes per floor (50-75 wide, 22-32 tall) instead of a fixed box
 - Three level generators randomly chosen per floor: rooms-and-corridors (with oval rooms), cellular automata caves, and BSP-structured layouts
 - Expanded name generator: 73 first names, 40 surnames, 26 epithets (was 48/24/11)
 
-15/6/26 v2.0 — "Stone Soup" overhaul
+15/6/26 v2.0 - "Stone Soup" overhaul
 - Multi-floor descent with up/down stairs and the Orb of Zot win condition (find it, escape)
 - Rooms-and-corridors level generation with doors, secret doors and hidden vault rooms
 - Rebuilt rich UI: map panel + hero sidebar (HP bar, depth, objective) + scrolling message log
