@@ -11,3 +11,7 @@ Tier 3 — Unique, speculative
 7. LLM-Generated Dungeon Themes — Before generating a floor, prompt an LLM for a theme: "Generate a floor theme for depth 4: biome, enemies, traps, and a special mechanic." Then the generator populates with theme-appropriate tiles, monsters, and hazards. This would make each run feel genuinely different.
 8. Enemy Negotiation — Instead of always fighting, enemies could parley. A goblin might beg for gold, a skeleton might demand you leave its crypt. Use an LLM to generate the offer and parse the player's typed response. High novelty, high complexity.
 For maximum impact with minimum code: I'd start with #1 (LLM NPC dialogue) and #2 (adaptive DM hints) — they reuse existing systems (NPC interaction, message log) and don't require new UI or entity types. You could even support both remote APIs and local models (Ollama) so the game works offline.
+
+I want you to put various terrain and map elements such as in: http://crawl.chaosforge.org/Dungeon_feature
+In this way, ponds can be made, walls can be built and broken in the future, florae.
+Map scenery rehaul, so, After this, LLM-Generated Dungeon Themes and/or map generation algorithm can generate biomes with interesting buildings, scenery, etc.
