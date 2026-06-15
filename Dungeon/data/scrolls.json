@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Scroll of Magic Mapping",
+        "description": "Reading this reveals the layout of the current floor.",
+        "cost": 8,
+        "effect": "magic_mapping"
+    },
+    {
+        "name": "Scroll of Teleportation",
+        "description": "Reading this whisks you to a random spot on the floor. A lifesaver in a pinch.",
+        "cost": 10,
+        "effect": "teleport"
+    }
+]

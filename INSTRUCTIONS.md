@@ -21,10 +21,14 @@ Note: Ensure that all files in the folder are kept in the SAME place.
 Download Python3 Installer from https://www.python.org/downloads/
 -> Make sure to choose 3.x versions
 
-Dungeon.py is known to work in the following versions:
-- Python 3.7.5
+Dungeon.py runs on Python 3.10+ (tested on 3.11 and 3.14).
 
-It may not work as intended on other versions
+It only needs two packages, `rich` and `tinydb`. The launcher will offer to install
+them for you on first run, or you can install them yourself with:
+
+```
+pip install -r requirements.txt
+```
 
 When at the Installer
 1. Check/Tick "Add Python 3.x to PATH"

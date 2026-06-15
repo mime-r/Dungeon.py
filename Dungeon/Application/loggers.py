@@ -1,53 +1,56 @@
-import os
 import sys
 import time
+from enum import Enum
+from pathlib import Path
+
 from .utils import current_time
 
-cwd = os.getcwd()
-
-applicationName = "dungeon"
+_APPLICATION_NAME = "dungeon"
 
 
-class Logger:
-    logs_path = os.path.expandvars(fr'{cwd}/logs')
-
-    def __init__(self):
-        if not os.path.exists(self.logs_path):
-            os.makedirs(self.logs_path)
-        self.log_file = os.path.join(self.logs_path, f"{applicationName}-{round(time.time())}.log")
-
-        # init convenient lambdas
-        self.info = lambda this: self.log(LogType.INFO,this)
-        self.debug = lambda this: self.log(LogType.DEBUG, this)
-        self.fatal = lambda this: self.log(LogType.FATAL, this)
-        self.time_logged = lambda start, func, end: (
-            self.info(f"{start} at {time.time():.2f}"),
-            func(),
-            self.info(f"{end} at {time.time():.2f}")
-        )
-
-    def log(self, log_type, this):
-        with open(self.log_file, "a") as f:
-            f.write(f"{current_time()} [{log_type}] {this}\n")
-        if log_type == "FATAL":
-            print(f"[FATAL ERROR]: {this}\n\n[Logs: {self.log_file}]\n{self.get_logs()}\n\n[enter to exit]")
-            try:
-                import keyboard
-                while True:
-                    if keyboard.read_key() and keyboard.is_pressed("enter"):
-                        break
-            except:
-                input()
-            sys.exit(0)
-
-    def get_logs(self):
-        with open(self.log_file, "r") as f:
-            logs = f.read()
-        return logs
-
-class LogType:
+class LogType(str, Enum):
     INFO = "INFO"
     DEBUG = "DEBUG"
     ERROR = "ERROR"
     FATAL = "FATAL"
 
+
+class Logger:
+    logs_path: Path = Path.cwd() / "logs"
+
+    def __init__(self) -> None:
+        self.logs_path.mkdir(parents=True, exist_ok=True)
+        self.log_file: Path = self.logs_path / f"{_APPLICATION_NAME}-{round(time.time())}.log"
+
+    def info(self, message: str) -> None:
+        self.log(LogType.INFO, message)
+
+    def debug(self, message: str) -> None:
+        self.log(LogType.DEBUG, message)
+
+    def fatal(self, message: str) -> None:
+        self.log(LogType.FATAL, message)
+
+    def time_logged(self, start: str, func, end: str) -> None:
+        self.info(f"{start} at {time.time():.2f}")
+        func()
+        self.info(f"{end} at {time.time():.2f}")
+
+    def log(self, log_type: LogType, message: str) -> None:
+        with open(self.log_file, "a") as f:
+            f.write(f"{current_time()} [{log_type}] {message}\n")
+        if log_type == LogType.FATAL:
+            print(f"[FATAL ERROR]: {message}\n\n[Logs: {self.log_file}]\n{self.get_logs()}\n\n[press any key to exit]")
+            try:
+                from . import input as keys
+                keys.read_key()
+            except Exception:
+                try:
+                    input()
+                except Exception:
+                    pass
+            sys.exit(0)
+
+    def get_logs(self) -> str:
+        with open(self.log_file, "r") as f:
+            return f.read()

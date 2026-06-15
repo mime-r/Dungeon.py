@@ -1,30 +1,142 @@
 [
     {
         "name": "Fists",
-        "description": "Your trusty pair of fists",
+        "description": "Your trusty pair of fists.",
         "cost": 0,
         "type": "MELEE",
         "base_attack": 1,
         "attack_range": [0, 2],
         "accuracy": 50,
         "texts": {
-            "critical_hit": "You deliver a smashing blow with your {}.",
+            "critical_hit": "You deliver a smashing blow to the {0} with your {1}.",
             "hit": "You hit the {0} with your {1}.",
-            "missed_hit": "You flail your arms, failing to even touch the {}."
+            "missed_hit": "You flail your arms, failing to even touch the {0}."
         }
     },
     {
         "name": "Dagger",
-        "description": "A sharp lightweight dagger",
-        "cost": 4,
+        "description": "A sharp, lightweight dagger. Quick but light.",
+        "cost": 6,
         "type": "MELEE",
         "base_attack": 2,
         "attack_range": [0, 4],
+        "accuracy": 55,
+        "texts": {
+            "critical_hit": "You drive your {1} into the {0} up to the hilt!",
+            "hit": "You slash the {0} with your {1}.",
+            "missed_hit": "Your {1} whistles harmlessly past the {0}."
+        }
+    },
+    {
+        "name": "Quarterstaff",
+        "description": "A balanced wooden staff. Reliable and forgiving.",
+        "cost": 10,
+        "type": "MELEE",
+        "base_attack": 3,
+        "attack_range": [0, 5],
+        "accuracy": 60,
+        "texts": {
+            "critical_hit": "You crack your {1} down on the {0} in a perfect arc!",
+            "hit": "You rap the {0} smartly with your {1}.",
+            "missed_hit": "Your {1} swishes past the {0}."
+        }
+    },
+    {
+        "name": "Short Sword",
+        "description": "A dependable short blade favoured by adventurers.",
+        "cost": 14,
+        "type": "MELEE",
+        "base_attack": 3,
+        "attack_range": [0, 4],
+        "accuracy": 55,
+        "texts": {
+            "critical_hit": "You run the {0} clean through with your {1}!",
+            "hit": "You cut the {0} with your {1}.",
+            "missed_hit": "Your {1} glances past the {0}."
+        }
+    },
+    {
+        "name": "Hand Axe",
+        "description": "A heavy chopping axe. Hits hard when it lands.",
+        "cost": 16,
+        "type": "MELEE",
+        "base_attack": 4,
+        "attack_range": [0, 4],
         "accuracy": 50,
         "texts": {
-            "critical_hit": "You stab viciously with your {}.",
-            "hit": "You hit the {0} with your {1}.",
-            "missed_hit": "You flail your dagger, failing to even touch the {}."
+            "critical_hit": "You bury your {1} deep in the {0}!",
+            "hit": "You chop at the {0} with your {1}.",
+            "missed_hit": "Your {1} bites into the wall beside the {0}."
+        }
+    },
+    {
+        "name": "Mace",
+        "description": "A spiked iron mace. Crushes bone and armour alike.",
+        "cost": 18,
+        "type": "MELEE",
+        "base_attack": 4,
+        "attack_range": [1, 5],
+        "accuracy": 50,
+        "texts": {
+            "critical_hit": "You bring your {1} down on the {0} with a sickening crunch!",
+            "hit": "You smash the {0} with your {1}.",
+            "missed_hit": "Your {1} thuds against the flagstones past the {0}."
+        }
+    },
+    {
+        "name": "Spear",
+        "description": "A long spear with good reach.",
+        "cost": 20,
+        "type": "MELEE",
+        "base_attack": 4,
+        "attack_range": [1, 6],
+        "accuracy": 55,
+        "texts": {
+            "critical_hit": "You skewer the {0} on your {1}!",
+            "hit": "You stab the {0} with your {1}.",
+            "missed_hit": "Your {1} jabs past the {0}."
+        }
+    },
+    {
+        "name": "Long Sword",
+        "description": "A fine balanced long sword. The mark of a real warrior.",
+        "cost": 30,
+        "type": "MELEE",
+        "base_attack": 6,
+        "attack_range": [1, 7],
+        "accuracy": 55,
+        "texts": {
+            "critical_hit": "You sweep your {1} through the {0} in a single brilliant stroke!",
+            "hit": "You hew the {0} with your {1}.",
+            "missed_hit": "Your {1} rings against stone beside the {0}."
+        }
+    },
+    {
+        "name": "War Axe",
+        "description": "A brutal two-handed war axe. Devastating but unwieldy.",
+        "cost": 40,
+        "type": "MELEE",
+        "base_attack": 8,
+        "attack_range": [1, 9],
+        "accuracy": 45,
+        "texts": {
+            "critical_hit": "You cleave the {0} from shoulder to hip with your {1}!",
+            "hit": "You hack at the {0} with your {1}.",
+            "missed_hit": "The weight of your {1} drags you off balance, missing the {0}."
+        }
+    },
+    {
+        "name": "Sword of Zot",
+        "description": "An ancient blade humming with buried power. Found, never sold.",
+        "cost": 0,
+        "type": "MELEE",
+        "base_attack": 9,
+        "attack_range": [2, 10],
+        "accuracy": 65,
+        "texts": {
+            "critical_hit": "Your {1} flares with golden light and shears clean through the {0}!",
+            "hit": "You strike the {0} with the singing {1}.",
+            "missed_hit": "Your {1} hums, hungry, as it misses the {0}."
         }
     }
 ]

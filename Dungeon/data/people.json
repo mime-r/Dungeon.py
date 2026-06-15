@@ -1,25 +1,46 @@
 [
-	{
-		"occupation": "Chemist",
-		"symbol": "C",
-		"type": "TRADER",
-		"potential_sales": [
-			{
-				"item": "Weak Healing Potion",
-				"chance": 100
-			},
-			{
-				"item": "Medium Healing Potion",
-				"chance": 100
-			},
-			{
-				"item": "Strong Healing Potion",
-				"chance": 50
-			},
-			{
-				"item": "Cloth Bag",
-				"chance": 50
-			}
-		]
-	}
+    {
+        "occupation": "Chemist",
+        "symbol": "C",
+        "type": "TRADER",
+        "potential_sales": [
+            { "item": "Weak Healing Potion", "chance": 100 },
+            { "item": "Medium Healing Potion", "chance": 100 },
+            { "item": "Strong Healing Potion", "chance": 60 },
+            { "item": "Scroll of Teleportation", "chance": 40 }
+        ]
+    },
+    {
+        "occupation": "Blacksmith",
+        "symbol": "B",
+        "type": "TRADER",
+        "potential_sales": [
+            { "item": "Dagger", "chance": 100 },
+            { "item": "Short Sword", "chance": 80 },
+            { "item": "Hand Axe", "chance": 70 },
+            { "item": "Mace", "chance": 70 },
+            { "item": "Spear", "chance": 60 },
+            { "item": "Long Sword", "chance": 40 },
+            { "item": "War Axe", "chance": 25 }
+        ]
+    },
+    {
+        "occupation": "Merchant",
+        "symbol": "M",
+        "type": "TRADER",
+        "potential_sales": [
+            { "item": "Medium Healing Potion", "chance": 80 },
+            { "item": "Scroll of Magic Mapping", "chance": 70 },
+            { "item": "Scroll of Teleportation", "chance": 60 },
+            { "item": "Cloth Bag", "chance": 60 },
+            { "item": "Leather Pack", "chance": 30 },
+            { "item": "Quarterstaff", "chance": 40 }
+        ]
+    },
+    {
+        "occupation": "Healer",
+        "symbol": "H",
+        "type": "HEALER",
+        "heal_cost_per_hp": 1
+    }
 ]

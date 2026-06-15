@@ -1,0 +1,30 @@
+{
+    "first": [
+        "Aldric", "Bramwell", "Cedric", "Doran", "Eamon", "Faelan", "Gareth", "Hadrian",
+        "Ilric", "Joran", "Kael", "Loras", "Maric", "Nethric", "Orin", "Perrin",
+        "Quill", "Roderic", "Soren", "Tarian", "Ulric", "Varis", "Wymar", "Yorick",
+        "Alia", "Brienna", "Caelia", "Despina", "Elowen", "Fenna", "Greta", "Halia",
+        "Isolde", "Jessa", "Kyra", "Liraine", "Maeve", "Nessa", "Ophira", "Petra",
+        "Riona", "Saskia", "Talia", "Una", "Vesper", "Wren", "Yseult", "Zinnia",
+        "Arin", "Corvin", "Draven", "Eldric", "Harkon", "Jarius", "Korbin", "Leoric",
+        "Mordecai", "Osric", "Silas", "Theron", "Zephyr",
+        "Aria", "Bryn", "Cassia", "Elara", "Fiora", "Kestra", "Lyra",
+        "Seraphina", "Vanya", "Willow", "Yara", "Zara"
+    ],
+    "surname": [
+        "Ashforge", "Blackbriar", "Coppervein", "Duskwater", "Emberlyn", "Fellhammer",
+        "Greymoor", "Hollowbrook", "Ironwood", "Kettlebourne", "Lanternfell", "Mossgrove",
+        "Nightingale", "Oakenshield", "Pyrewood", "Quarryman", "Ravenhill", "Stonewell",
+        "Thornfield", "Underbough", "Vexley", "Wolfsbane", "Yarrowmane", "Zelkova",
+        "Bloodmoon", "Coldwater", "Darkwood", "Eastbrook", "Firebrand", "Goldweaver",
+        "Hightower", "Icewind", "Jadeheart", "Keenblade", "Lightfoot", "Northwind",
+        "Oathkeeper", "Redmane", "Silverstream", "Trueheart"
+    ],
+    "epithet": [
+        "the Weary", "the Bold", "the Quick", "the Patient", "the Grim", "the Kindly",
+        "the Wandering", "the Shrewd", "of the Deep Roads", "the Lamplit", "the Steadfast",
+        "the Unyielding", "the Cunning", "the Fierce", "the Wise", "the Shadow",
+        "the Brave", "the Reckless", "the Silent", "the Honorable", "the Ruthless",
+        "the Vengeful", "the Ironclad", "the Nightborn", "the Dawnwalker", "the Stormtossed"
+    ]
+}

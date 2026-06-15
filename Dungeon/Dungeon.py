@@ -1,6 +1,13 @@
 # Standard Imports
 import os, sys
 
+# Ensure unicode glyphs (block bars, box drawing) never crash on legacy code pages.
+for _stream in (sys.stdout, sys.stderr):
+	try:
+		_stream.reconfigure(encoding="utf-8", errors="replace")
+	except Exception:
+		pass
+
 # App Imports
 from Application.modules import check_modules
 from Application.loggers import Logger
@@ -8,14 +15,10 @@ from Application.loggers import Logger
 
 dependencies = {
 	"required": [
-		"pandas",
 		"tinydb",
-		"keyboard",
 		"rich"
 	],
-	"optional": [
-		"names"
-	]
+	"optional": []
 }
 
 if __name__ == "__main__":

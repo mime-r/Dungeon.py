@@ -1,2 +1,3 @@
-cd ../Dungeon
-python3 dungeon.py
+#!/usr/bin/env bash
+cd "$(dirname "$0")/../Dungeon" || exit 1
+python3 Dungeon.py

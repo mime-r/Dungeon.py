@@ -1,421 +1,318 @@
 # -*- coding: utf-8 -*-
+"""Map model and the player entity.
 
-# Credits: https://github.com/boppreh/maze/blob/master/maze.py
-# I edited a lil bit
+A floor is a matrix of :class:`DungeonCell`. Each cell has a *terrain* (floor / wall /
+door / stairs), an optional living *occupant* (enemy or NPC), ground *items*, and a
+*gold* pile. The player is tracked separately by location and drawn on top.
+"""
+
 import random
-import os
-import time
-import keyboard
-from ..utils import style_text, controls_style, clear_screen
-from ..config import config
-from .items import DungeonItem, DungeonWeapon, DungeonPotion
-from pandas import DataFrame
 
-# Easy to read representation for each cardinal direction.
-N, S, W, E = ('n', 's', 'w', 'e')
+from ..utils import style_text
+from ..config import config
+
+T = config.terrain
+
+DIRS = {
+    "n": (-1, 0), "s": (1, 0), "w": (0, -1), "e": (0, 1),
+    "ne": (-1, 1), "nw": (-1, -1), "se": (1, 1), "sw": (1, -1),
+}
+
+
+class DungeonCell:
+    """A single tile: terrain, an optional occupant, ground items and gold."""
+
+    def __init__(self, game, terrain: str) -> None:
+        self.game = game
+        self.terrain = terrain
+        self.occupant = None
+        self.items: list = []
+        self.gold: int = 0
+        self.explored: bool = False
+
+    @property
+    def object(self):
+        return self.items[-1] if self.items else None
+
+    @property
+    def walkable(self) -> bool:
+        return self.terrain in T.walkable
+
+    def item_pickup(self):
+        return self.items.pop() if self.items else None
+
 
 class DungeonPlayer:
-    def __init__(self, health, max_health, max_inventory, coins, xp, equipped, game):
+    """The player character: position, health, inventory and bump-to-attack combat."""
+
+    def __init__(self, health, max_health, max_inventory, coins, xp, equipped, game) -> None:
         self.health = health
         self.max_health = max_health
         self.xp = xp
         self.coins = coins
-        self.inventory = []
+        self.inventory: list = []
         self.max_inventory = max_inventory
         self.equipped = equipped
-        self.location = (0, 0)
-        self.name = None
+        self.location: tuple[int, int] = (0, 0)
+        self.name: str | None = None
+        self.has_orb: bool = False
         self.game = game
 
     @property
-    def x(self):
+    def x(self) -> int:
         return self.location[1]
 
     @property
-    def y(self):
+    def y(self) -> int:
         return self.location[0]
 
     @property
-    def cell(self):
-        return self.game.map.matrix[self.y][self.x].inventory
+    def cell(self) -> DungeonCell:
+        return self.game.map.matrix[self.y][self.x]
 
-    def print_inventory(self):
-        self.game.print(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", highlight=False)
-        self.game.print(f"Health: ({self.health} / {self.max_health})", style="health", highlight=False)
-        self.game.print(f"Coins: {self.coins}\n", style="coin", highlight=False)
-        if len(self.inventory) == 0:
-            print("You have nothing in your inventory!\n")
+    def move(self, direction: str) -> bool:
+        """Attempt to act in a direction. Returns True if a turn was spent."""
+        dy, dx = DIRS[direction]
+        ny, nx = self.y + dy, self.x + dx
+        game = self.game
+        if not game.map.in_bounds(ny, nx):
+            return False
+        cell = game.map.matrix[ny][nx]
+
+        if cell.occupant is not None:
+            if getattr(cell.occupant, "is_enemy", False):
+                self.attack(cell.occupant)
+                return True
+            return game.interact_npc(cell.occupant)  # bump an NPC to trade/heal or step past
+
+        if cell.terrain == T.DOOR_CLOSED:
+            cell.terrain = T.DOOR_OPEN
+            game.message("You open the door.")
+            return True
+        if cell.terrain in T.blocks_sight:  # wall or undiscovered secret door
+            return False
+        if not cell.walkable:
+            return False
+
+        self.location = (ny, nx)
+        self._on_enter(cell)
+        return True
+
+    def _on_enter(self, cell: DungeonCell) -> None:
+        game = self.game
+        if cell.gold > 0:
+            game.player.coins += cell.gold
+            game.message(f"You pick up {style_text(str(cell.gold) + ' gold', 'gold')}.")
+            cell.gold = 0
+        if cell.items:
+            game.map.announce_items(cell)
+        if cell.terrain == T.STAIRS_DOWN:
+            game.message(f"There is a staircase {style_text('down', 'stairs')} here. Press {style_text('>', 'controls')}.")
+        elif cell.terrain == T.STAIRS_UP:
+            game.message(f"There is a staircase {style_text('up', 'stairs')} here. Press {style_text('<', 'controls')}.")
+
+    def attack(self, enemy) -> None:
+        weapon = self.equipped
+        enemy_name = style_text(enemy.name, "enemy")
+        weapon_name = style_text(weapon.name, "weapons")
+        if self.game.godmode:
+            self.game.message(f"[warn][GOD][/warn] You annihilate the {enemy_name}.")
+            enemy.health = 0
+            self.game.on_enemy_death(enemy)
+            return
+        if random.randint(1, 100) <= weapon.accuracy:
+            damage = weapon.base_attack + random.randint(weapon.attack_range[0], weapon.attack_range[1])
+            crit = damage == weapon.base_attack + weapon.attack_range[1]
+            template = weapon.texts.critical_hit if crit else weapon.texts.hit
+            self.game.message(template.format(enemy_name, weapon_name), drop=damage)
+            enemy.health -= damage
+            if enemy.health <= 0:
+                self.game.on_enemy_death(enemy)
+        else:
+            self.game.message(weapon.texts.missed_hit.format(enemy_name, weapon_name))
+
+    def print_inventory(self) -> None:
+        p = self.game.print
+        p(f"Inventory ({len(self.inventory)} / {self.max_inventory})", style="inventory", highlight=False)
+        p(f"Health: ({self.health} / {self.max_health})", style="health", highlight=False)
+        p(f"Coins: {self.coins}\n", style="coin", highlight=False)
+        if not self.inventory:
+            p("You have nothing in your inventory.\n", highlight=False)
         else:
             for index, item in enumerate(self.inventory):
-                self.game.print("{0}: {1}\n\t{2}".format(index+1, style_text(item.name, 'item'), item.description))
+                p(f"{index + 1}: {style_text(item.name, 'item')}\n\t{item.description}")
 
-    def inventory_wrapper(self):
-        clear_screen()
-        self.print_inventory()
-        self.game.print(f"\nPress {controls_style('e')} to {style_text('exit', 'action')}.", highlight=False)
-        # time.sleep(0.5)
-        while True:
-            if keyboard.is_pressed("e"):
-                break
-
-    def move(self, direction):
-        y, x = self.location
-        condition, new_y, new_x = {
-            "e": ((x < (config.map.max_x)), y, x+1),
-            "w": ((x > 0), y, x-1),
-            "n": ((y > 0), y-1, x),
-            "s": ((y < (config.map.max_y)), y+1, x)
-        }.get(direction)
-        if condition:
-            if self.game.map.matrix[new_y][new_x].symbol != config.symbols.wall:
-                self.game.map.matrix[y][x] = self.game.map.matrix[y][x].inventory
-                self.game.map.matrix[new_y][new_x] = self.game.map.cell(
-                    symbol=config.symbols.player,
-                    explored=True,
-                    inventory=self.game.map.matrix[new_y][new_x]
-                )
-
-                self.location = (new_y, new_x)
-        self.game.log.info(f"moved {direction}")
-        self.game.map.update_adjacent_cells()
-        self.game.event()
-
-    def attack_turn(self, enemy):
-        if not random.randint(1, 100) < self.equipped.accuracy:
-            attack_damage = self.equipped.base_attack + random.randint(
-                self.equipped.attack_range[0], self.equipped.attack_range[1])
-            if attack_damage == self.equipped.base_attack + self.equipped.attack_range[1]:
-                # Max Damage
-                self.game.print(
-                    self.equipped.texts.critical_hit.format(style_text(self.equipped.name, 'weapons')), highlight=False)
-            else:
-                self.game.print(
-                    self.equipped.texts.hit.format(style_text(enemy.name, 'enemy'), style_text(self.equipped.name, 'weapons')), highlight=False)
-            #self.print(f"\n[enemy]{enemy.name}\'s[/enemy] health [hp_drop]-{attack_damage}[/hp_drop]\n", highlight=False)
-            return (enemy.health - attack_damage), attack_damage
-        else:
-            self.game.print(self.equipped.texts.missed_hit.format(style_text(enemy.name, 'enemy')), highlight=False)
-            return enemy.health, 0
-
-class DungeonCell:
-    def __init__(self, game, symbol, explored, inventory):
-        self.symbol = symbol
-        self.explored = explored
-        self.inventory = inventory
-        self.game = game
-
-    @property
-    def object(self):
-        return self.inventory[0]
-
-    def item_pickup(self):
-        self.game.player.inventory.append(self.inventory.pop(0))
-
-    def print_inventory(self):
-        if len(self.inventory) > 0 and isinstance(self.object, DungeonItem):
-            inventory = list(filter(
-                lambda x: isinstance(x, DungeonItem),
-                self.inventory
-            ))
-            constructor = ""
-            if len(inventory) == 1:
-                constructor = style_text(self.object.name, 'item')
-            elif len(inventory) > 1:
-                constructor = '{} and {}'.format(
-                    ', '.join(map(
-                        lambda item: style_text(item.name, 'item'),
-                        inventory[:-1])
-                    ),
-                    style_text(inventory[-1].name, 'item')
-                )
-            self.game.print("You see a {} here.".format(constructor))
 
 class DungeonMap:
-    def __init__(self, game):
+    """One dungeon floor: a matrix of cells plus structural anchors and fog-of-war."""
+
+    def __init__(self, game, layout) -> None:
         self.game = game
-        self.matrix = []
-
-        for i, row in enumerate(GeneratedMap(int(config.map.width/2), int(config.map.height/2))._to_str_matrix()):
-            self.matrix.append([])
-            for n, cell in enumerate(row):
-                if cell == "O":
-                    self.matrix[i].append(self.cell(symbol=config.symbols.wall))
-                else:
-                    self.matrix[i].append(self.cell(symbol=config.symbols.empty))
-
-    def cell(self, symbol, explored=False, inventory=None):
-        return DungeonCell(
-            game=self.game,
-            symbol=symbol,
-            explored=explored,
-            inventory=inventory if inventory else []
-        )
-
-    def get_debug_map(self):
-        base_map = []
-        index = -1
-        for row in self.matrix:
-            base_map.append([])
-            index += 1
-            for cell in row:
-                if cell.symbol != config.symbols.empty:
-                    base_map[index].append(cell.symbol)
-                elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], DungeonItem):
-                    obj_type = type(cell.inventory[0])
-                    base_map[index].append({
-                        DungeonWeapon: config.symbols.weapons,
-                        DungeonPotion: config.symbols.potions
-                    }.get(obj_type))
-                else:
-                    base_map[index].append(cell.symbol)
-        return str(DataFrame(base_map)).replace(config.symbols.unknown, ' ')
-
-    def print(self):
-        self.ui()
-        self.controls()
-
-    def ui(self):
-        clear_screen()
-        self.game.print("[Dungeon]", style="game_header", end=" ", highlight=False)
-        self.game.print(f"Move: {self.game.moves}", style="move_count", end=" ", highlight=False)
-        self.game.print(f"Health: ({self.game.player.health} / {self.game.player.max_health})", style="health", end=" ", highlight=False)
-        self.game.print(f"XP: {self.game.player.xp}", style="xp_count", end=" ", highlight=False)
-        self.game.print(f"Coins: {self.game.player.coins}", style="coin", end=" ", highlight=False)
-        self.game.print(f"Inventory ({len(self.game.player.inventory)} / {self.game.player.max_inventory})", style="inventory", end=" ", highlight=False)
-        self.game.print(f"Time: {(self.game.time.elapsed):.2f}s", style="time_count", highlight=False)
-        temp_map = []
-        index = -1
-        for row in self.matrix:
-            temp_map.append([])
-            index += 1
-            for cell in row:
-                if cell.explored == False:
-                    temp_map[index].append(config.symbols.unknown)
-                else:
-                    # Make enemy hidden
-                    if cell.symbol != config.symbols.empty and cell.symbol not in config.symbols.enemies:
-                        temp_map[index].append(cell.symbol)
-                    elif len(cell.inventory) > 0 and isinstance(cell.inventory[0], DungeonItem):
-                        obj_type = type(cell.inventory[0])
-                        temp_map[index].append({
-                            "weapons": config.symbols.weapons,
-                            DungeonPotion: config.symbols.potions
-                        }.get(obj_type))
-                    else:
-                        temp_map[index].append(config.symbols.empty)
-
-        map_str = str(DataFrame(temp_map))
-        styling = [
-            (config.symbols.unknown, "unknown"),
-            (config.symbols.wall, "wall"),
-            (config.symbols.chemist, "chemist"),
-            (config.symbols.player, "player"),
-            (config.symbols.target, "target"),
-            (config.symbols.empty, "empty"),
-            (config.symbols.potions, "potions"),
-            (config.symbols.weapons, "weapons")
+        self.width = layout.width
+        self.height = layout.height
+        self.max_y = layout.height - 1
+        self.max_x = layout.width - 1
+        self.matrix: list[list[DungeonCell]] = [
+            [DungeonCell(game=game, terrain=terrain) for terrain in row]
+            for row in layout.terrain
         ]
-        for symbol, style in styling:
-            map_str = map_str.replace(symbol, style_text(symbol, style))
-        for num in "0123456789":
-            map_str = map_str.replace(num, style_text(num, 'grid_num'))
-        self.game.print(map_str, highlight=False)
-        
-    def controls(self):
-        self.game.print(f"""
-Press {controls_style('arrow keys')} to {style_text('move', 'action')}.
-Press {controls_style('i')} to {style_text('interact', 'action')} with {style_text('people', 'occupation')} or {style_text('pick up', 'action')} {style_text('items', 'item')}.
-Press {controls_style('u')} to {style_text('equip/use items', 'action')}.
-Press {controls_style('d')} to {style_text('drop items', 'action')}.
-Press {controls_style('p')} to {style_text('pause', 'action')}.
-Press {controls_style('esc')} to {style_text('exit', 'action')}.
-""", highlight=False)
+        self.rooms = layout.rooms
+        self.stairs_up = layout.stairs_up
+        self.stairs_down = layout.stairs_down
+        self.vault_cells = layout.vault_cells
+        self.floor_cells = layout.floor_cells
+        self.enemies: list = []
+        self.npcs: list = []
+        self.visible: set[tuple[int, int]] = set()
 
-    def update_adjacent_cells(self):
-        y, x = self.game.player.location
-        adjacent_cells = [
-            (y-1, x-1), (y-1, x), (y-1, x+1),
-            (y, x-1), (y, x), (y, x+1),
-            (y+1, x-1), (y+1, x), (y+1, x+1)
+    # --- geometry -------------------------------------------------------
+    def in_bounds(self, y: int, x: int) -> bool:
+        return 0 <= y <= self.max_y and 0 <= x <= self.max_x
+
+    def cell(self, y: int, x: int) -> DungeonCell:
+        return self.matrix[y][x]
+
+    def random_walkable(self, exclude=None) -> tuple[int, int]:
+        exclude = exclude or set()
+        candidates = [
+            (y, x) for (y, x) in self.floor_cells
+            if self.matrix[y][x].occupant is None
+            and (y, x) not in exclude
+            and (y, x) != self.game.player.location
         ]
-        for y, x in adjacent_cells:
-            if (y < 0 or y > config.map.max_y) or (x < 0 or x > config.map.max_x):
-                continue
-            self.matrix[y][x].explored = True
+        return random.choice(candidates) if candidates else self.stairs_up
 
+    # --- occupants ------------------------------------------------------
+    def place_occupant(self, entity, y: int, x: int) -> None:
+        self.matrix[y][x].occupant = entity
+        entity.location = (y, x)
 
-        """
-        # Prevent Border Sneak-peaking
-        if not self.player.x == 0:
-            if not self.player.y == 0:
-                self.map.matrix[self.player.y-1][self.player.x-1][1] = 1 # North West
-            if not self.player.x == (config.map.height - 1):
-                self.map.matrix[self.player.y+1][self.player.x-1][1] = 1 # South West
-            self.map.matrix[self.player.y][self.player.x-1][1] = 1 # West
-        if not self.player.x == (config.map.width):
-            if not self.player.y == 0:
-                self.map.matrix[self.player.y-1][self.player.x+1][1] = 1 # North East
-            if not self.player.x == (config.map.height - 1): ###
-                self.map.matrix[self.player.y+1][self.player.x+1][1] = 1 # South East
-            self.map.matrix[self.player.y][self.player.x+1][1] = 1 # East
-        if not self.player.y == 0:
-            self.map.matrix[self.player.y-1][self.player.x][1] = 1 # North
-        if not self.player.x == (config.map.height - 1):
-            self.map.matrix[self.player.y+1][self.player.x][1] = 1 # South
-        """
+    def remove_occupant(self, entity) -> None:
+        y, x = entity.location
+        if self.matrix[y][x].occupant is entity:
+            self.matrix[y][x].occupant = None
 
-class Cell(object):
-    """
-    Class for each individual cell. Knows only its position and which walls are
-    still standing.
-    """
+    def move_occupant(self, entity, ny: int, nx: int) -> None:
+        self.remove_occupant(entity)
+        self.place_occupant(entity, ny, nx)
 
-    def __init__(self, x, y, walls):
-        self.x = x
-        self.y = y
-        self.walls = set(walls)
-
-    def __contains__(self, item):
-        # N in cell
-        return item in self.walls
-
-    def is_full(self):
-        """
-        Returns True if all walls are still standing.
-        """
-        return len(self.walls) == 4
-
-    def _wall_to(self, other):
-        """
-        Returns the direction to the given cell from the current one.
-        Must be one cell away only.
-        """
-        assert abs(self.x - other.x) + abs(self.y -
-                                           other.y) == 1, '{}, {}'.format(self, other)
-        if other.y < self.y:
-            return N
-        elif other.y > self.y:
-            return S
-        elif other.x < self.x:
-            return W
-        elif other.x > self.x:
-            return E
+    def announce_items(self, cell: DungeonCell) -> None:
+        items = cell.items
+        if not items:
+            return
+        if len(items) == 1:
+            label = style_text(items[0].name, "item")
         else:
-            assert False
+            label = "{} and {}".format(
+                ", ".join(style_text(i.name, "item") for i in items[:-1]),
+                style_text(items[-1].name, "item"),
+            )
+        self.game.message(f"You see {label} here.")
 
-    def connect(self, other):
-        """
-        Removes the wall between two adjacent cells.
-        """
-        other.walls.remove(other._wall_to(self))
-        self.walls.remove(self._wall_to(other))
-
-
-class GeneratedMap(object):
-    """
-    Map class containing full board and maze generation algorithms.
-    """
-
-    def __init__(self, width=20, height=10):
-        """
-        Creates a new maze with the given sizes, with all walls standing.
-        """
-        self.width = width
-        self.height = height
-        self.cells = []
-        for y in range(self.height):
-            for x in range(self.width):
-                self.cells.append(Cell(x, y, [N, S, E, W]))
-
-        self.randomize()
-
-    def __getitem__(self, index):
-        """
-        Returns the cell at index = (x, y).
-        """
-        x, y = index
-        if 0 <= x < self.width and 0 <= y < self.height:
-            return self.cells[x + y * self.width]
-        else:
-            return None
-
-    def neighbors(self, cell):
-        """
-        Returns the list of neighboring cells, not counting diagonals. Cells on
-        borders or corners may have less than 4 neighbors.
-        """
-        x = cell.x
-        y = cell.y
-        for new_x, new_y in [(x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)]:
-            neighbor = self[new_x, new_y]
-            if neighbor is not None:
-                yield neighbor
-
-    def _to_str_matrix(self):
-        """
-        Returns a matrix with a pretty printed visual representation of this
-        maze. Example 5x5:
-        OOOOOOOOOOO
-        O       O O
-        OOO OOO O O
-        O O   O   O
-        O OOO OOO O
-        O   O O   O
-        OOO O O OOO
-        O   O O O O
-        O OOO O O O
-        O     O   O
-        OOOOOOOOOOO
-        """
-        str_matrix = [['O'] * (self.width * 2 + 1)
-                      for i in range(self.height * 2 + 1)]
-
-        for cell in self.cells:
-            x = cell.x * 2 + 1
-            y = cell.y * 2 + 1
-            str_matrix[y][x] = ' '
-            if N not in cell and y > 0:
-                str_matrix[y - 1][x + 0] = ' '
-            if S not in cell and y + 1 < self.width:
-                str_matrix[y + 1][x + 0] = ' '
-            if W not in cell and x > 0:
-                str_matrix[y][x - 1] = ' '
-            if E not in cell and x + 1 < self.width:
-                str_matrix[y][x + 1] = ' '
-
-        wall_corners = [
-            (0, 0),
-            (0, config.map.max_x),
-            (0, config.map.max_x),
-            (config.map.max_y, config.map.max_x)
-        ]
-        new_matrix = str_matrix
-        for row_index, row in enumerate(str_matrix):
-            for element_index, element in enumerate(row):
-                if (row_index, element_index) in wall_corners:
+    # --- fog of war -----------------------------------------------------
+    def update_fov(self) -> None:
+        self.visible = set()
+        py, px = self.game.player.location
+        r = config.depth.sight_radius
+        for y in range(max(0, py - r), min(self.max_y, py + r) + 1):
+            for x in range(max(0, px - r), min(self.max_x, px + r) + 1):
+                if (y - py) ** 2 + (x - px) ** 2 > r * r:
                     continue
+                if self._line_of_sight(py, px, y, x):
+                    self.visible.add((y, x))
+                    self.matrix[y][x].explored = True
 
-                if element == "O" and random.randint(1, 2) == 1:
-                    new_matrix[row_index][element_index] = " "
+    def _line_of_sight(self, y0, x0, y1, x1) -> bool:
+        for (y, x) in _bresenham(y0, x0, y1, x1)[1:-1]:
+            if self.matrix[y][x].terrain in T.blocks_sight:
+                return False
+        return True
 
-        return str_matrix
+    def reveal_all(self) -> None:
+        for row in self.matrix:
+            for cell in row:
+                cell.explored = True
 
-    def randomize(self):
-        """
-        Knocks down random walls to build a random perfect maze.
-        Algorithm from http://mazeworks.com/mazegen/mazetut/index.htm
-        """
-        cell_stack = []
-        cell = random.choice(self.cells)
-        n_visited_cells = 1
+    def visible_enemies(self) -> list:
+        god = getattr(self.game, "godmode", False)
+        return [e for e in self.enemies if god or (e.y, e.x) in self.visible]
 
-        while n_visited_cells < len(self.cells):
-            neighbors = [c for c in self.neighbors(cell) if c.is_full()]
-            if len(neighbors):
-                neighbor = random.choice(neighbors)
-                cell.connect(neighbor)
-                cell_stack.append(cell)
-                cell = neighbor
-                n_visited_cells += 1
-            else:
-                cell = cell_stack.pop()
+    def visible_npcs(self) -> list:
+        god = getattr(self.game, "godmode", False)
+        return [n for n in self.npcs if god or n.location in self.visible]
+
+    def search(self, y: int, x: int) -> bool:
+        found = False
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)):
+            ny, nx = y + dy, x + dx
+            if self.in_bounds(ny, nx) and self.matrix[ny][nx].terrain == T.SECRET_DOOR:
+                self.matrix[ny][nx].terrain = T.DOOR_CLOSED
+                found = True
+        return found
+
+    def auto_detect_secret(self) -> bool:
+        py, px = self.game.player.location
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ny, nx = py + dy, px + dx
+            if self.in_bounds(ny, nx) and self.matrix[ny][nx].terrain == T.SECRET_DOOR:
+                if random.randint(1, 4) == 1:
+                    self.matrix[ny][nx].terrain = T.DOOR_CLOSED
+                    return True
+        return False
+
+    # --- rendering ------------------------------------------------------
+    def render_grid(self) -> list[list[tuple[str, str]]]:
+        """Return rows of (glyph, literal-rich-style) tuples for the UI map panel."""
+        styles = config.styles
+        god = getattr(self.game, "godmode", False)
+        player_loc = self.game.player.location
+        rows = []
+        for y, row in enumerate(self.matrix):
+            out = []
+            for x, cell in enumerate(row):
+                visible = (y, x) in self.visible or god
+                if not cell.explored and not visible:
+                    out.append((config.symbols.unknown, styles["unknown"]))
+                    continue
+                glyph, name = self._glyph(cell, y, x, player_loc, visible)
+                style = styles.get(name, name)
+                if not visible:
+                    style = "dim " + style
+                out.append((glyph, style))
+            rows.append(out)
+        return rows
+
+    def _glyph(self, cell, y, x, player_loc, visible):
+        if (y, x) == player_loc:
+            return config.symbols.player, "player"
+        if visible and cell.occupant is not None:
+            occ = cell.occupant
+            return occ.symbol, getattr(occ, "style", "enemy")
+        if cell.gold > 0:
+            return config.symbols.gold, "gold"
+        if cell.items:
+            top = cell.items[-1]
+            return top.symbol, config.symbols.tile_style.get(top.symbol, "item")
+        glyph = config.symbols.terrain_glyph.get(cell.terrain, config.symbols.empty)
+        return glyph, config.symbols.tile_style.get(glyph, "floor")
+
+
+def _bresenham(y0, x0, y1, x1):
+    points = []
+    dy = abs(y1 - y0)
+    dx = abs(x1 - x0)
+    sy = 1 if y0 < y1 else -1
+    sx = 1 if x0 < x1 else -1
+    err = dx - dy
+    while True:
+        points.append((y0, x0))
+        if y0 == y1 and x0 == x1:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+    return points

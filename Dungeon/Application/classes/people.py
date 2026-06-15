@@ -1,70 +1,85 @@
-from random import randint
+import json
+import random
+from pathlib import Path
+
+DATA_DIR = Path(__file__).parent.parent.parent / "data"
+
+_NAME_POOL: dict | None = None
+
+
+def _name_pool() -> dict:
+    global _NAME_POOL
+    if _NAME_POOL is None:
+        try:
+            with open(DATA_DIR / "names.json", "r", encoding="utf-8") as f:
+                _NAME_POOL = json.load(f)
+        except Exception:
+            _NAME_POOL = {"first": ["Adventurer"], "surname": ["Nameless"], "epithet": []}
+    return _NAME_POOL
 
 
 class DungeonPeople:
-    def __init__(self, occupation):
+    """Base NPC class with a randomly generated name."""
+
+    def __init__(self, occupation: str) -> None:
         self.name = DungeonPeople.generate_name()
         self.occupation = occupation
 
     @staticmethod
-    def generate_name():
-        try:
-            import names
-            if randint(1, 2) == 1:
-                gender = "male"
-            else:
-                gender = "female"
-            return str(names.get_full_name(gender))
-        except:
-            return "John Doe"
+    def generate_name() -> str:
+        """Build a varied fantasy name from curated lists (no external dependency)."""
+        pool = _name_pool()
+        first = random.choice(pool["first"])
+        if pool.get("epithet") and random.randint(1, 4) == 1:
+            return f"{first} {random.choice(pool['epithet'])}"
+        return f"{first} {random.choice(pool['surname'])}"
+
 
 class DungeonTrader(DungeonPeople):
-    def __init__(self, potential_sales, occupation="trader"):
+    """A trader NPC with a randomized inventory of items for sale."""
+
+    def __init__(self, potential_sales, occupation: str = "trader") -> None:
         super().__init__(occupation=occupation)
-        self.stuff = []
-        for sale in potential_sales:
-            if randint(1, 100) < sale.chance:
-                self.stuff.append(sale.item)
+        self.stuff = [sale.item for sale in potential_sales if random.randint(1, 100) <= sale.chance]
+
+
+class DungeonHealer(DungeonPeople):
+    """A healer NPC who restores HP in exchange for coins."""
+
+    def __init__(self, heal_cost_per_hp: int = 1, occupation: str = "Healer") -> None:
+        super().__init__(occupation=occupation)
+        self.heal_cost_per_hp = heal_cost_per_hp
+
 
 class DungeonPeopleLoader:
-    def __init__(self, game, data):
+    """Builds a DungeonPeople instance from JSON data."""
+
+    def __init__(self, game, data) -> None:
         self.game = game
         self.data = data
-        self.type = {
-            "TRADER": DungeonTrader
-        }.get(self.data.type)
+        self.type = {"TRADER": DungeonTrader, "HEALER": DungeonHealer}.get(self.data.type)
 
     def load(self):
         people_data = self.data
         if self.type == DungeonTrader:
-            potential_sales = map(
-                lambda sale_dict: TraderSales(
+            potential_sales = (
+                TraderSales(
                     item=self.game.db.item_db.search_item(name=sale_dict["item"]),
                     chance=sale_dict["chance"],
-                ),
-                people_data.potential_sales
+                )
+                for sale_dict in people_data.potential_sales
             )
-            return DungeonTrader(
-                potential_sales=potential_sales,
-                occupation=people_data.occupation
+            return DungeonTrader(potential_sales=potential_sales, occupation=people_data.occupation)
+        if self.type == DungeonHealer:
+            return DungeonHealer(
+                heal_cost_per_hp=getattr(people_data, "heal_cost_per_hp", 1),
+                occupation=people_data.occupation,
             )
+
 
 class TraderSales:
-    def __init__(self, item, chance):
+    """Pairs an item with its stock probability (0-100)."""
+
+    def __init__(self, item, chance: int) -> None:
         self.item = item
         self.chance = chance
-
-class things:
-    def __init__(self):
-        self.stones = {}
-
-        """ Idea?
-        self.redbull_drink = {
-            "name": "redbull",
-            "description": "This sugar-loaded drink increases your attack by 50\% for the next 15 turns.",
-            "cost": 10,
-            "type": "health-potion",
-            "use": ["use"],
-            "increase-health-by": 25
-        }
-        """

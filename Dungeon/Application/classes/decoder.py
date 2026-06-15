@@ -1,60 +1,49 @@
 import json
-import collections
+import types
+from pathlib import Path
 
-from .items import *
-from .weapons import *
+from .items import DungeonItem, DungeonWeapon, DungeonPotion, DungeonInventory, DungeonScroll
+from .weapons import DungeonWeaponTexts
 from .enemies import DungeonEnemyLoader
 from .people import DungeonPeopleLoader
 
+DATA_DIR = Path(__file__).parent.parent.parent / "data"
+
+
 class DungeonJSONDecoder:
-	def __init__(self, game):
-		self.game = game
+    """Loads and parses JSON data files into game objects."""
 
-	def load(self, file):
-		with open(file, 'r') as f:
-			data = json.load(f)
-		return data
+    def __init__(self, game) -> None:
+        self.game = game
 
-	def fetch_loaders(self, data_file, loader_class):
-		data_list = self.load(data_file)
-		decoded = []
-		for data in data_list:
-			decoded.append(loader_class(
-				game=self.game,
-				data=collections.namedtuple("Data", data.keys())(*data.values())
-			))
-		return decoded
+    def _load(self, file: Path) -> list[dict]:
+        with open(file, "r") as f:
+            return json.load(f)
 
-	def fetch_enemies(self):
-		return self.fetch_loaders(
-			data_file="data/enemies.json",
-			loader_class=DungeonEnemyLoader
-		)
+    def _fetch_loaders(self, data_file: Path, loader_class) -> list:
+        decoded = []
+        for data in self._load(data_file):
+            decoded.append(loader_class(game=self.game, data=types.SimpleNamespace(**data)))
+        return decoded
 
-	def fetch_people(self):
-		return self.fetch_loaders(
-			data_file="data/people.json",
-			loader_class=DungeonPeopleLoader
-		)
+    def fetch_enemies(self) -> list:
+        return self._fetch_loaders(DATA_DIR / "enemies.json", DungeonEnemyLoader)
 
-	def fetch_potions(self):
-		data_list = self.load("data/potions.json")
-		decoded = []
-		for data in data_list:
-			decoded.append(DungeonPotion(*data.values()))
-		return decoded
+    def fetch_people(self) -> list:
+        return self._fetch_loaders(DATA_DIR / "people.json", DungeonPeopleLoader)
 
-	def fetch_weapons(self):
-		data_list = self.load("data/weapons.json")
-		decoded = []
-		for data in data_list:
-			data["texts"] = DungeonWeaponTexts(*data["texts"].values())
-			decoded.append(DungeonWeapon(*data.values()))
-		return decoded
+    def fetch_potions(self) -> list[DungeonPotion]:
+        return [DungeonPotion(*data.values()) for data in self._load(DATA_DIR / "potions.json")]
 
-	def fetch_inventory(self):
-		data_list = self.load("data/inventory.json")
-		decoded = []
-		for data in data_list:
-			decoded.append(DungeonInventory(*data.values()))
-		return decoded
+    def fetch_weapons(self) -> list[DungeonWeapon]:
+        decoded = []
+        for data in self._load(DATA_DIR / "weapons.json"):
+            data["texts"] = DungeonWeaponTexts(*data["texts"].values())
+            decoded.append(DungeonWeapon(*data.values()))
+        return decoded
+
+    def fetch_inventory(self) -> list[DungeonInventory]:
+        return [DungeonInventory(*data.values()) for data in self._load(DATA_DIR / "inventory.json")]
+
+    def fetch_scrolls(self) -> list[DungeonScroll]:
+        return [DungeonScroll(*data.values()) for data in self._load(DATA_DIR / "scrolls.json")]

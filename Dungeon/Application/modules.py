@@ -1,14 +1,34 @@
 # https://github.com/The-Duck-Syndicate/encry-duck/blob/master/encry-duck.py
-from importlib import import_module
-from subprocess import getoutput
+import importlib
 import os
 import platform
+import subprocess
+import sys
+from importlib import import_module
 
-from Application.loggers import LogType
+
+def _clear():
+    os.system("cls" if platform.system() == "Windows" else "clear")
+
+
+def _pip_install(module, logger) -> bool:
+    """Install *module* into the interpreter that is actually running the game.
+
+    Uses ``sys.executable`` (not a bare ``python``/``python3`` from PATH, which may be a
+    different, pip-less interpreter) and bootstraps pip via ensurepip when it is missing.
+    """
+    exe = sys.executable
+    if subprocess.run([exe, "-m", "pip", "--version"]).returncode != 0:
+        logger.info("pip not found in this interpreter; bootstrapping with ensurepip")
+        subprocess.run([exe, "-m", "ensurepip", "--upgrade"])
+    result = subprocess.run([exe, "-m", "pip", "install", module])
+    importlib.invalidate_caches()
+    return result.returncode == 0
+
 
 def check_modules(modules, name, logger):
-    """String[] modules"""
-    logger.debug(f"starting import checks with {getoutput('python3 --version') if platform.system() == 'Linux' else getoutput('python --version')}")
+    """Ensure every required (and offered optional) module can be imported."""
+    logger.debug(f"starting import checks with {sys.executable} ({platform.python_version()})")
     logger.info("Importing libraries...")
     all_modules = modules["required"] + modules["optional"]
     for module in all_modules:
@@ -16,30 +36,44 @@ def check_modules(modules, name, logger):
         try:
             globals()[module] = import_module(module)
             logger.info(f"Successfully imported {module}")
+            continue
         except ModuleNotFoundError:
-            while True:
-                prompt_msg = f"{name} requires \"{module}\" to run." if module in modules["required"] else f"{module} is optional."
-                kb = input(f"The module \"{module}\" not found, {prompt_msg}\nDo you want to install it? (y/n): ")
-                os.system("cls" if platform.system() == 'Windows' else 'clear')
+            pass
 
-                if kb.lower() in ["y", "n"]:
-                    if kb.lower() == "n":
-                        if module in modules["required"]:
-                            logger.fatal(f"{module} install denied. {name} cannot run without {module}. Please install it manually and run {name} again!")
-                        else:
-                            logger.info(f"{module} install denied. {name} can run without the optional {module}.")
-                            break
-                    else:
-                        logger.info(f"attempting to install {module}")
-                        try:
-                            os.system(f"{'python3' if platform.system() == 'Linux' else 'python'} -m pip install {module}")
-                            os.system("cls" if platform.system() == 'Windows' else 'clear')
-                            globals()[module] = import_module(module)
-                            logger.info(f"Successfully install and imported {module}")
-                        except:
-                            logger.info(f"{module} failed to install. {name} cannot run without {module}. Please install it manually and run {name} again!")
-                        break
+        required = module in modules["required"]
+        while True:
+            prompt_msg = f"{name} requires \"{module}\" to run." if required else f"\"{module}\" is optional."
+            kb = input(f"The module \"{module}\" was not found. {prompt_msg}\nInstall it now? (y/n): ").strip().lower()
+            if kb not in ("y", "n"):
+                print("Please enter either y or n.")
+                continue
+            _clear()
+            if kb == "n":
+                if required:
+                    logger.fatal(
+                        f"{module} is required and was not installed.\n"
+                        f"Install it manually with:\n    \"{sys.executable}\" -m pip install {module}\n"
+                        f"or run the game with the 'py' launcher (py Dungeon.py)."
+                    )
                 else:
-                    print("Please enter either y/n!")
-                    continue
+                    logger.info(f"{module} install declined; {name} can run without it.")
+                break
 
+            logger.info(f"attempting to install {module} into {sys.executable}")
+            installed = False
+            try:
+                installed = _pip_install(module, logger)
+                if installed:
+                    globals()[module] = import_module(module)
+                    logger.info(f"Successfully installed and imported {module}")
+            except Exception as exc:
+                logger.info(f"{module} install raised: {exc}")
+                installed = False
+            _clear()
+            if not installed and required:
+                logger.fatal(
+                    f"Could not install {module} automatically (this interpreter may lack pip).\n"
+                    f"Install it manually with:\n    \"{sys.executable}\" -m pip install {module}\n"
+                    f"or run the game with the 'py' launcher (py Dungeon.py), which uses a Python that has it."
+                )
+            break

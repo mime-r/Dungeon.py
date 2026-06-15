@@ -1,130 +1,258 @@
-import os
-import time
-import keyboard
-from ..utils import style_text, controls_style, clear_screen
-from .items import DungeonInventory, DungeonPotion
+"""Full-screen interaction menus: pack management, tile pickup, trade, healer."""
+
+from rich.table import Table
+
+from .. import input as keys
+from ..utils import style_text, clear_screen
+from .items import DungeonWeapon, DungeonInventory, DungeonPotion, DungeonScroll, DungeonOrb
+
+
+def item_detail(item) -> str:
+    """A short stat string for an item, shown in menus."""
+    if isinstance(item, DungeonWeapon):
+        lo, hi = item.attack_range
+        return f"Atk {item.base_attack} (+{lo}-{hi}), {item.accuracy}% acc"
+    if isinstance(item, DungeonPotion):
+        return f"heals +{item.hp_change} HP"
+    if isinstance(item, DungeonScroll):
+        return item.effect.replace("_", " ").title()
+    if isinstance(item, DungeonInventory):
+        return f"+{item.inventory} pack slots"
+    if isinstance(item, DungeonOrb):
+        return "the win objective"
+    return ""
+
 
 class DungeonMenu:
-	def __init__(self, game):
-		self.game = game
-		self.header = DungeonHeaders(game=self.game)
-		self.function = DungeonMenuFunctions
-		self.context = lambda function, header, footer=None, trader=None: (
-			DungeonMenuContext(
-				game=self.game,
-				header=header,
-				footer=footer,
-				function=function,
-				trader=trader
-			)
-		)
+    """Renders interaction menus and applies the chosen action."""
 
-	def inventory(self, menu_context):
-		footer, header = menu_context.footer, menu_context.header
-		inventory = menu_context.trader.stuff if menu_context.trader else self.game.player.inventory
-		header()
-		footer()
-		while True:
-			pressed = keyboard.read_key()
-			if pressed.isnumeric():
-				pressed = int(pressed)
-				header()
-				if not ((pressed < len(inventory)+1) and (1 <= pressed)):
-					print("You have chosen an invalid choice.\n")
-					time.sleep(0.2)
-					footer()
-					continue
-				selected_item = inventory[pressed-1]
-				menu_context.function(ctx=DungeonMenuFunctionContext(
-					game=self.game,
-					selected_item=selected_item,
-					pressed=pressed,
-					header=header
-				))
-				time.sleep(0.2)
-				footer()
-			if pressed == "esc":
-				break
+    def __init__(self, game) -> None:
+        self.game = game
 
-class DungeonMenuFunctions:
-	@staticmethod
-	def trader(ctx):
-		item, game = ctx.selected_item, ctx.game
-		if game.player.coins >= item.cost:
-			if len(game.player.inventory) == game.player.max_inventory:
-				print("Your inventory is full.\n")
-			else:
-				print("You have bought the {}\n".format(item.name))
-				game.player.inventory.append(item)
-				game.player.coins -= item.cost
-		else:
-			game.print("You do not have enough money to buy the {}.\n".format(style_text(item.name, 'item')))
+    # --- shared helpers -------------------------------------------------
+    def _read_index(self, count: int) -> int | None:
+        while True:
+            key = keys.read_key()
+            if key in (keys.ESC, "q"):
+                return None
+            if key.isdigit():
+                n = int(key)
+                if 1 <= n <= count:
+                    return n - 1
 
-	@staticmethod
-	def equip(ctx):
-		item, game = ctx.selected_item, ctx.game
-		if isinstance(item, DungeonInventory):
-			game.print("You sling the {} over your shoulders.\n".format(
-				style_text(item.name, 'item')))
-			del game.player.inventory[ctx.pressed-1]
-			game.player.max_inventory += item.inventory
-		elif isinstance(item, DungeonPotion):
-			if game.player.health == game.player.max_health:
-				print(
-					"You are already at maximum health. Try drinking a maximum-health increasing potion.\n")
-			else:
-				if (game.player.health + item.hp_change) > game.player.max_health:
-					game.player.health = game.player.max_health
-				else:
-					game.player.health += item.hp_change
-				game.print("You drink the {}. The strong elixir makes you feel rejuvenated.\n".format(style_text(item.name, 'item')))
-				del game.player.inventory[ctx.pressed-1]
+    def _fists(self):
+        return self.game.db.item_db.search_item(name="Fists")
 
-	@staticmethod
-	def drop(ctx):
-		item, game = ctx.selected_item, ctx.game
-		game.print(f"Do you want to drop the {style_text(item.name, 'item')}?\nPress {controls_style('y')} for {style_text('Yes', 'action')} and {controls_style('n')} for {style_text('No', 'action')}.", highlight=False)
-		while True:
-			if keyboard.is_pressed("y"):
-				ctx.header()
-				del game.player.inventory[ctx.pressed-1]
-				game.print(f"You have dropped the {style_text(item.name, 'item')}!\n")
-				break
-			elif keyboard.is_pressed("n"):
-				ctx.header()
-				game.print(f"You do not drop the {style_text(item.name, 'item')}.\n")
-				break
+    # --- pack (use / equip / unequip / drop) ---------------------------
+    def pack(self) -> None:
+        game, player = self.game, self.game.player
+        while True:
+            inv = player.inventory
+            clear_screen()
+            full = len(inv) >= player.max_inventory
+            header = (
+                f"[menu_header]Pack[/menu_header]  [inventory]{len(inv)}/{player.max_inventory}[/inventory]"
+                + ("   [warn]FULL[/warn]" if full else "")
+            )
+            game.print(header, highlight=False)
+            game.print(f"Equipped: {style_text(player.equipped.name, 'weapons')}  "
+                       f"[flavor]({item_detail(player.equipped)})[/flavor]\n", highlight=False)
+            if not inv:
+                game.print("Your pack is empty.", highlight=False)
+                game.print(f"\nPress {style_text('esc', 'controls')} to return.", highlight=False)
+                keys.read_key()
+                return
+            table = Table(expand=False, border_style="grey37")
+            table.add_column("#", style="controls", justify="right")
+            table.add_column("Item", style="item")
+            table.add_column("Details", style="flavor")
+            table.add_column("", style="success")
+            for i, it in enumerate(inv, 1):
+                equipped = "equipped" if it is player.equipped else ""
+                table.add_row(str(i), it.name, item_detail(it), equipped)
+            game.print(table)
+            game.print(f"\n{style_text('number', 'controls')} to select an item, "
+                       f"{style_text('esc', 'controls')} to exit.", highlight=False)
+            idx = self._read_index(len(inv))
+            if idx is None:
+                return
+            self._item_actions(idx)
 
-class DungeonMenuContext:
-	def __init__(self, game, header, footer, function, trader):
-		self.game = game
-		self.header = header
-		self.footer = footer if footer else lambda: (
-			self.game.player.print_inventory(),
-			self.game.print(f"\nPress {controls_style('esc')} to {style_text('exit', 'action')}.", highlight=False)
-		)
-		self.function = function
-		self.trader = trader
+    def _item_actions(self, idx: int) -> None:
+        game, player = self.game, self.game.player
+        item = player.inventory[idx]
+        if isinstance(item, DungeonWeapon):
+            verb = "unequip" if item is player.equipped else "wield"
+        elif isinstance(item, DungeonPotion):
+            verb = "quaff"
+        elif isinstance(item, DungeonScroll):
+            verb = "read"
+        elif isinstance(item, DungeonInventory):
+            verb = "wear"
+        else:
+            verb = "use"
+        clear_screen()
+        game.print(f"{style_text(item.name, 'item')}  [flavor]{item_detail(item)}[/flavor]\n"
+                   f"{item.description}\n", highlight=False)
+        game.print(f"{style_text('e', 'controls')} {verb}   "
+                   f"{style_text('d', 'controls')} drop   "
+                   f"{style_text('esc', 'controls')} back", highlight=False)
+        key = keys.read_key()
+        if key == "e":
+            self._primary(item, idx, verb)
+        elif key == "d":
+            self._drop(item, idx)
 
-class DungeonMenuFunctionContext:
-	def __init__(self, game, selected_item, pressed, header):
-		self.game = game
-		self.selected_item = selected_item
-		self.pressed = pressed
-		self.header = header
+    def _primary(self, item, idx: int, verb: str) -> None:
+        game, player = self.game, self.game.player
+        if isinstance(item, DungeonWeapon):
+            if item is player.equipped:
+                player.equipped = self._fists()
+                game.message(f"You put away the {style_text(item.name, 'weapons')}.")
+            else:
+                player.equipped = item
+                game.message(f"You wield the {style_text(item.name, 'weapons')}.")
+        elif isinstance(item, DungeonInventory):
+            player.max_inventory += item.inventory
+            player.inventory.pop(idx)
+            game.message(f"You sling the {style_text(item.name, 'item')} over your shoulders. "
+                         f"[inventory](+{item.inventory} slots)[/inventory]")
+        elif isinstance(item, DungeonPotion):
+            if player.health >= player.max_health:
+                game.message("You are already at full health.")
+                return
+            player.health = min(player.max_health, player.health + item.hp_change)
+            player.inventory.pop(idx)
+            game.message(f"You quaff the {style_text(item.name, 'item')}. You feel rejuvenated.")
+        elif isinstance(item, DungeonScroll):
+            player.inventory.pop(idx)
+            game.use_scroll(item)
 
-class DungeonHeaders:
-	def __init__(self, game):
-		self.game = game
+    def _drop(self, item, idx: int) -> None:
+        game, player = self.game, self.game.player
+        if item is player.equipped:
+            player.equipped = self._fists()
+            game.message(f"You unequip and drop the {style_text(item.name, 'weapons')}.")
+        else:
+            game.message(f"You drop the {style_text(item.name, 'item')}.")
+        player.inventory.pop(idx)
+        player.cell.items.append(item)
 
-	def menu(self, menu_name):
-		clear_screen()
-		self.game.print(f"{menu_name} Menu\n", style="menu_header", highlight=False)
+    # --- pick up from the tile you stand on ----------------------------
+    def pickup_menu(self, cell) -> int:
+        """Let the player choose which of several stacked items to take. Returns count."""
+        game, player = self.game, self.game.player
+        picked = 0
+        while cell.items:
+            clear_screen()
+            full = len(player.inventory) >= player.max_inventory
+            game.print(f"[menu_header]Items here[/menu_header]  "
+                       f"[inventory]Pack {len(player.inventory)}/{player.max_inventory}[/inventory]"
+                       + ("   [warn]FULL[/warn]" if full else ""), highlight=False)
+            table = Table(expand=False, border_style="grey37")
+            table.add_column("#", style="controls", justify="right")
+            table.add_column("Item", style="item")
+            table.add_column("Details", style="flavor")
+            for i, it in enumerate(cell.items, 1):
+                table.add_row(str(i), it.name, item_detail(it))
+            game.print(table)
+            game.print(f"\n{style_text('number', 'controls')} take one   "
+                       f"{style_text('a', 'controls')} take all   "
+                       f"{style_text('esc', 'controls')} done", highlight=False)
+            key = keys.read_key()
+            if key in (keys.ESC, "q"):
+                break
+            if key == "a":
+                for it in list(cell.items):
+                    if game.collect_item(it):
+                        picked += 1
+                    else:
+                        break
+                continue
+            if key.isdigit():
+                n = int(key)
+                if 1 <= n <= len(cell.items):
+                    if game.collect_item(cell.items[n - 1]):
+                        picked += 1
+        return picked
 
-	def trader(self, trader):
-		clear_screen()
-		self.game.print(f"{style_text(trader.name, 'name')} - {style_text(trader.occupation, 'occupation')}\n", highlight=False)
-		for index, item in enumerate(trader.stuff):
-			self.game.print(f"{index+1}: {style_text(item.name, 'item')} {style_text(item.cost, 'coin')}", highlight=False)
-			self.game.print(f"\t {item.description}")
-		print("\n")
+    # --- trader ---------------------------------------------------------
+    def trader(self, trader) -> str | None:
+        """Returns 'swap' if the player chose to step past the trader."""
+        while True:
+            stock = trader.stuff
+            clear_screen()
+            self.game.print(
+                f"{style_text(trader.name, 'name')} — {style_text(trader.occupation, 'occupation')}"
+                f"   (your gold: [coin]{self.game.player.coins}[/coin])", highlight=False)
+            if stock:
+                table = Table(title="For sale", title_style="menu_header", expand=False, border_style="grey37")
+                table.add_column("#", style="controls", justify="right")
+                table.add_column("Item", style="item")
+                table.add_column("Cost", style="coin", justify="right")
+                table.add_column("Details", style="flavor")
+                for i, it in enumerate(stock, 1):
+                    table.add_row(str(i), it.name, str(it.cost), item_detail(it))
+                self.game.print(table)
+            else:
+                self.game.print("\nThe stall is bare.", highlight=False)
+            self.game.print(f"\n{style_text('number', 'controls')} buy   "
+                            f"{style_text('space', 'controls')} step past   "
+                            f"{style_text('esc', 'controls')} leave", highlight=False)
+            key = keys.read_key()
+            if key in (keys.ESC, "q"):
+                return None
+            if key == keys.SPACE:
+                return "swap"
+            if key.isdigit() and stock:
+                n = int(key)
+                if 1 <= n <= len(stock):
+                    self._buy(trader, n - 1)
+
+    def _buy(self, trader, idx: int) -> None:
+        game, player = self.game, self.game.player
+        item = trader.stuff[idx]
+        if player.coins < item.cost:
+            game.message(f"You can't afford the {style_text(item.name, 'item')}.")
+            return
+        if len(player.inventory) >= player.max_inventory:
+            game.message("Your pack is full.")
+            return
+        player.coins -= item.cost
+        player.inventory.append(item)
+        trader.stuff.pop(idx)
+        game.message(f"You buy the {style_text(item.name, 'item')} for [coin]{item.cost}[/coin] gold.")
+
+    # --- healer ---------------------------------------------------------
+    def healer(self, healer) -> str | None:
+        """Returns 'swap' if the player chose to step past the healer."""
+        game, player = self.game, self.game.player
+        rate = healer.heal_cost_per_hp
+        while True:
+            clear_screen()
+            missing = player.max_health - player.health
+            full_cost = missing * rate
+            affordable_hp = min(missing, player.coins // rate) if rate else missing
+            self.game.print(
+                f"{style_text(healer.name, 'name')} — {style_text('Healer', 'occupation')}"
+                f"   (your gold: [coin]{player.coins}[/coin])", highlight=False)
+            if missing <= 0:
+                self.game.print("\n\"You are hale and whole, friend.\"", highlight=False)
+            else:
+                self.game.print(
+                    f"\n\"I mend wounds for [coin]{rate}[/coin] gold per point.\"\n"
+                    f"Full heal ({missing} HP) costs [coin]{full_cost}[/coin] gold.", highlight=False)
+            self.game.print(
+                f"\n{style_text('enter', 'controls')} heal {affordable_hp} HP "
+                f"([coin]{affordable_hp * rate}[/coin] gold)   "
+                f"{style_text('space', 'controls')} step past   "
+                f"{style_text('esc', 'controls')} leave", highlight=False)
+            key = keys.read_key()
+            if key in (keys.ESC, "q"):
+                return None
+            if key == keys.SPACE:
+                return "swap"
+            if key == keys.ENTER and affordable_hp > 0:
+                player.coins -= affordable_hp * rate
+                player.health += affordable_hp
+                game.message(f"The healer tends your wounds. [heal](+{affordable_hp} HP)[/heal]")
