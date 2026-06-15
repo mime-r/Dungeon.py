@@ -1,53 +1,40 @@
 # Instructions
 
-This file contains the instructions for the following:
-
-- Installation
-	- Game
-	- Python
-- Running the Game
-
 ## Installation
 
-### Game
-
-1. Install from https://github.com/mime-r/Dungeon.py/archive/main.zip
-2. Unzip "Dungeon.py-main.zip"
-3. Move "Dungeon.py-main" folder to desired place
-Note: Ensure that all files in the folder are kept in the SAME place.
+1. Download from https://github.com/mime-r/Dungeon.py/archive/main.zip
+2. Unzip and move the folder to your desired location
+3. Keep all files in the folder together
 
 ### Python
 
-Download Python3 Installer from https://www.python.org/downloads/
--> Make sure to choose 3.x versions
+Requires **Python 3.10+** (tested on 3.11 and 3.14).
 
-Dungeon.py runs on Python 3.10+ (tested on 3.11 and 3.14).
+Download from https://www.python.org/downloads/
 
-It only needs two packages, `rich` and `tinydb`. The launcher will offer to install
-them for you on first run, or you can install them yourself with:
+During installation, make sure to:
+- Check **"Add Python to PATH"**
+- Ensure **pip** is included
+
+### Dependencies
+
+Dungeon.py only needs `rich` and `tinydb`. The launcher will offer to install them
+on first run, or you can install them manually:
 
 ```
 pip install -r requirements.txt
 ```
 
-When at the Installer
-1. Check/Tick "Add Python 3.x to PATH"
-2. Click "Customize installation"
-3. Make sure "pip" is checked/ticked
-4. Click "Next"
-5. Make sure "Associate files with Python", "Add Python to environment variables" is checked/ticked
-6. Click "Install"
-
 ## Running the Game
 
-Open the game folder  
-Navigate to the "Run" folder,  
-run any of the following accordingly:
+Open the **Run** folder inside the game directory and run the appropriate script:
 
-command_prompt.bat   > to run in command prompt  
-python.bat           > to run with python  
-windows_terminal.bat > to run in windows terminal (recommended)  
-linux_terminal.sh > to run in linux terminal
+| Script | Platform |
+| --- | --- |
+| `command_prompt.bat` | Windows Command Prompt |
+| `python.bat` | Python launcher |
+| `windows_terminal.bat` | Windows Terminal (recommended) |
+| `linux_terminal.sh` | Linux terminal |
 
-To use windows_terminal.bat, you need to install Windows Terminal from Microsoft Store  
-Install from https://www.microsoft.com/en-us/p/windows-terminal/9n0dx20hk701
+For `windows_terminal.bat`, install Windows Terminal from the
+[Microsoft Store](https://www.microsoft.com/en-us/p/windows-terminal/9n0dx20hk701).

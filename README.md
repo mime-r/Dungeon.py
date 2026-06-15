@@ -14,7 +14,7 @@ way back to the surface up-stairs.** Monsters get tougher the deeper you go.
 
 | Key | Action |
 | --- | --- |
-| arrow keys or `h` `j` `k` `l` | move — walk into a monster to attack it |
+| arrow keys or `h` `j` `k` `l` | move - walk into a monster to attack it |
 | `y` `u` `b` `n` | diagonal movement (north-west / north-east / south-west / south-east) |
 | `g` | pick up the item you are standing on |
 | `i` / `d` | use / equip / drink / read / drop items from your pack |
@@ -24,7 +24,7 @@ way back to the surface up-stairs.** Monsters get tougher the deeper you go.
 | `p` | pause · `?` | help · `esc` | quit |
 
 The dungeon is full of doors (`+`), gold (`$`), potions (`!`), scrolls (`?`), weapons
-(`)`), hidden vault rooms, and traders — Chemists, Blacksmiths, Merchants and Healers —
+(`)`), hidden vault rooms, and traders - Chemists, Blacksmiths, Merchants and Healers -
 who can outfit you for the journey down. Combat resolves in the message log as you bump
 into foes; keep an eye on your HP bar.
 
@@ -34,7 +34,7 @@ Instructions to download can be found [here](INSTRUCTIONS.md)
 ## Changelog:
 15/6/26 v2.1 — "Caverns & Crosscuts"
 - Diagonal movement: player uses `y`/`u`/`b`/`n`; enemies chase with 8-direction pathfinding
-- Variable map sizes per floor (50–75 wide, 22–32 tall) instead of a fixed box
+- Variable map sizes per floor (50-75 wide, 22-32 tall) instead of a fixed box
 - Three level generators randomly chosen per floor: rooms-and-corridors (with oval rooms), cellular automata caves, and BSP-structured layouts
 - Expanded name generator: 73 first names, 40 surnames, 26 epithets (was 48/24/11)
 
@@ -50,25 +50,23 @@ Instructions to download can be found [here](INSTRUCTIONS.md)
 - Run scripts fixed (including case-correct Linux launch)
 
 22/8/21 v1.2
-- added compatabilty to linux (WSL currently not supported)
-- MAJOR refactoring of code (credits to NJ)
-- pick up items from the ground
-- Changed to rich libary for UI
+- Linux compatibility (WSL not supported)
+- Major code refactoring
+- Ground item pickups
+- Migrated UI to Rich library
 
 30/7/21 v1.1.6
-- fixed bugs regarding the change of the order of files in v1.1.5
+- Bugfixes for file reorganisation in v1.1.5
 
 29/7/21 v1.1.5
-- major noticible change of files and directory stuff, and fixed a minor bug with importing files :/
+- File and directory restructure; fixed import paths
 
 29/7/21 v1.1
-- major bugfix
-  - fixed the bug where when the user comes to the same square after killing an enemy, an array error comes up.
-  - various other minor bugs regarding arrays and printing
+- Fixed crash when revisiting a tile after killing an enemy
+- Various array and rendering fixes
 
 28/7/21 v1.0
-- minor bugfix
-  - fixed the bug where player could not finish the game due to an annoying array error.
+- Fixed game-breaking array error
 
 ## Credits:
 - [@mime-r](https://github.com/mime-r)
