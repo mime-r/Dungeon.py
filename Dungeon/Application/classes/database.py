@@ -45,6 +45,24 @@ class DungeonEnemyDatabase:
             return None
         return random.choices(candidates, weights=weights, k=1)[0]
 
+    def all_for_depth(self, depth: int) -> list:
+        """Return all spawnable enemy loaders valid for a given depth (unweighted)."""
+        result = []
+        for e in self.enemies:
+            if getattr(e.data, "spawn_weight", 0) <= 0:
+                continue
+            lo, hi = getattr(e.data, "depth", [1, 99])
+            if lo <= depth <= hi:
+                result.append(e)
+        return result
+
+    def random_biased(self, depth: int, preferred_names: list[str]):
+        """Like random_for_depth but biases towards preferred_names when possible."""
+        candidates = [e for e in self.all_for_depth(depth) if e.data.name in preferred_names]
+        if not candidates:
+            return self.random_for_depth(depth)
+        return random.choice(candidates)
+
 
 class DungeonPeopleDatabase:
     """Stores and searches NPC loader instances."""

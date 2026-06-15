@@ -1,10 +1,16 @@
 """Full-screen interaction menus: pack management, tile pickup, trade, healer."""
 
+import time
+
+from rich.live import Live
 from rich.table import Table
+from rich.text import Text
 
 from .. import input as keys
 from ..utils import style_text, clear_screen
-from .items import DungeonWeapon, DungeonInventory, DungeonPotion, DungeonScroll, DungeonOrb
+from .items import DungeonWeapon, DungeonInventory, DungeonPotion, DungeonScroll, DungeonShard
+
+_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
 def item_detail(item) -> str:
@@ -18,8 +24,8 @@ def item_detail(item) -> str:
         return item.effect.replace("_", " ").title()
     if isinstance(item, DungeonInventory):
         return f"+{item.inventory} pack slots"
-    if isinstance(item, DungeonOrb):
-        return "the win objective"
+    if isinstance(item, DungeonShard):
+        return "sigil fragment (1 of 3)"
     return ""
 
 
@@ -104,9 +110,11 @@ class DungeonMenu:
         rec = game.ident.get(getattr(item, "name", None))
         unidentified = bool(rec and not rec["identified"])
         desc = "An unidentified item — use it to discover what it does." if unidentified else item.description
+        lore = rec.get("lore") if rec else None
+        lore_line = f"\n[flavor]{lore}[/flavor]" if lore else ""
         clear_screen()
         game.print(f"{style_text(self._name(item), 'item')}  [flavor]{self._detail(item)}[/flavor]\n"
-                   f"{desc}\n", highlight=False)
+                   f"{desc}{lore_line}\n", highlight=False)
         game.print(f"{style_text('e', 'controls')} {verb}   "
                    f"{style_text('d', 'controls')} drop   "
                    f"{style_text('esc', 'controls')} back", highlight=False)
@@ -217,15 +225,66 @@ class DungeonMenu:
                         picked += 1
         return picked
 
+    # --- LLM helpers ----------------------------------------------------
+    def _npc_greeting(self, npc, role: str) -> str | None:
+        """Generate an in-character greeting via LLM, showing a spinner while waiting."""
+        game = self.game
+        llm = getattr(game, "llm", None)
+        if not llm or not llm.enabled:
+            return None
+        p = game.player
+        background = getattr(p, "background", None) or "adventurer"
+        personality = getattr(npc, "personality", "")
+        if role == "healer":
+            task_hint = "Acknowledge their wounds and offer to heal them."
+        else:
+            items = ", ".join(i.name for i in getattr(npc, "stuff", [])[:3])
+            task_hint = f"The following are the items that you sell (e.g. {items or 'various wares'}). Not necessary to include to sound more natural."
+
+        messages = [
+            {"role": "system", "content": (
+                f"You are {npc.name}, a {npc.occupation} in a dungeon. {personality} "
+                f"Reply with ONLY the spoken dialogue — 1-2 sentences, no thinking"
+                f"no stage directions, no quotation marks, no internal monologue."
+            )},
+            {"role": "user", "content": (
+                f"Depth {game.depth}. A {background} named {p.name} "
+                f"({p.health}/{p.max_health} HP, {p.coins} gold) approaches. "
+                f"Greet them. {task_hint}"
+            )},
+        ]
+
+        future = llm.complete_async(messages)
+
+        # Show NPC header + animated spinner while the LLM generates
+        clear_screen()
+        game.print(
+            f"{style_text(npc.name, 'name')} — {style_text(npc.occupation, 'occupation')}",
+            highlight=False,
+        )
+        with Live(console=game.rich_console, refresh_per_second=10) as live:
+            i = 0
+            while not future.done():
+                live.update(Text.from_markup(
+                    f"[flavor]{_SPINNER[i % len(_SPINNER)]} ...[/flavor]"
+                ))
+                time.sleep(0.1)
+                i += 1
+
+        return future.result()
+
     # --- trader ---------------------------------------------------------
     def trader(self, trader) -> str | None:
         """Returns 'swap' if the player chose to step past the trader."""
+        greeting = self._npc_greeting(trader, "trader")
         while True:
             stock = trader.stuff
             clear_screen()
             self.game.print(
                 f"{style_text(trader.name, 'name')} — {style_text(trader.occupation, 'occupation')}"
                 f"   (your gold: [coin]{self.game.player.coins}[/coin])", highlight=False)
+            if greeting:
+                self.game.print(f"[flavor]\"{greeting}\"[/flavor]\n", highlight=False)
             if stock:
                 table = Table(title="For sale", title_style="menu_header", expand=False, border_style="grey37")
                 table.add_column("#", style="controls", justify="right")
@@ -269,6 +328,7 @@ class DungeonMenu:
         """Returns 'swap' if the player chose to step past the healer."""
         game, player = self.game, self.game.player
         rate = healer.heal_cost_per_hp
+        greeting = self._npc_greeting(healer, "healer")
         while True:
             clear_screen()
             missing = player.max_health - player.health
@@ -277,6 +337,8 @@ class DungeonMenu:
             self.game.print(
                 f"{style_text(healer.name, 'name')} — {style_text('Healer', 'occupation')}"
                 f"   (your gold: [coin]{player.coins}[/coin])", highlight=False)
+            if greeting:
+                self.game.print(f"[flavor]\"{greeting}\"[/flavor]\n", highlight=False)
             if missing <= 0:
                 self.game.print("\n\"You are hale and whole, friend.\"", highlight=False)
             else:

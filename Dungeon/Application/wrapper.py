@@ -33,7 +33,7 @@ class GameWrapper:
             highlight=False,
         )
         self.print(
-            "[flavor]Descend the dungeon, claim the Orb of Zot, and escape to the surface.[/flavor]\n\n"
+            "[flavor]Descend the dungeon, collect three sigil shards, and escape to the surface.[/flavor]\n\n"
             f"Press {style_text('enter', 'controls')} to {style_text('start', 'action')}.\n"
             f"Press {style_text('esc', 'controls')} to {style_text('exit', 'action')}.\n",
             highlight=False,

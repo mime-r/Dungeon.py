@@ -60,7 +60,7 @@ class DungeonPlayer:
         self.location: tuple[int, int] = (0, 0)
         self.name: str | None = None
         self.background: str | None = None
-        self.has_orb: bool = False
+        self.shards: set[str] = set()
         self.game = game
         # progression
         self.level = 1
@@ -149,6 +149,18 @@ class DungeonPlayer:
             game.message(f"You pick up {style_text(str(cell.gold) + ' gold', 'gold')}.")
             cell.gold = 0
         if cell.items:
+            _AUTO_KIND = {
+                "DungeonPotion": "potion", "DungeonScroll": "scroll",
+                "DungeonWeapon": "weapon", "DungeonInventory": "bag",
+            }
+            auto_types = getattr(game, "auto_pickup_types", set())
+            for item in list(cell.items):
+                kind = _AUTO_KIND.get(type(item).__name__)
+                if kind in auto_types and len(self.inventory) < self.max_inventory:
+                    cell.items.remove(item)
+                    self.inventory.append(item)
+                    game.message(f"You pick up the {style_text(game.display_name(item), 'item')}.")
+        if cell.items:
             game.map.announce_items(cell)
         if cell.terrain == T.STAIRS_DOWN:
             game.message(f"There is a staircase {style_text('down', 'stairs')} here. Press {style_text('>', 'controls')}.")
@@ -212,9 +224,12 @@ class DungeonMap:
         self.enemies: list = []
         self.npcs: list = []
         self.visible: set[tuple[int, int]] = set()
+        self.excluded_stairs: set[tuple[int, int]] = set()
         if self.altar:
             ay, ax = self.altar
             self.matrix[ay][ax].feature = "altar"
+        for fy, fx, feat in getattr(layout, "scenery_features", []):
+            self.matrix[fy][fx].feature = feat
 
     # --- geometry -------------------------------------------------------
     def in_bounds(self, y: int, x: int) -> bool:
@@ -329,13 +344,14 @@ class DungeonMap:
 
     # --- rendering ------------------------------------------------------
     def viewport(self, view_w: int, view_h: int) -> tuple[int, int, int, int]:
-        """Window onto the map, centred on the player and clamped to bounds.
+        """Window onto the map, centred on the player (or camera_override) and clamped to bounds.
         Returns (top, left, height, width)."""
         vw = max(1, min(view_w, self.width))
         vh = max(1, min(view_h, self.height))
-        py, px = self.game.player.location
-        top = max(0, min(py - vh // 2, self.height - vh))
-        left = max(0, min(px - vw // 2, self.width - vw))
+        override = getattr(self.game, "camera_override", None)
+        cy, cx = override if override is not None else self.game.player.location
+        top = max(0, min(cy - vh // 2, self.height - vh))
+        left = max(0, min(cx - vw // 2, self.width - vw))
         return top, left, vh, vw
 
     def render_grid(self, view_w: int | None = None, view_h: int | None = None
@@ -348,6 +364,7 @@ class DungeonMap:
         cursor = getattr(self.game, "target_cursor", None)
         path = getattr(self.game, "target_path", None) or ()
         path_set = set(path)
+        stair_cursor = getattr(self.game, "stair_cursor", None)
         top, left, vh, vw = self.viewport(
             view_w or config.map.view_width, view_h or config.map.view_height)
         rows = []
@@ -368,6 +385,8 @@ class DungeonMap:
                         style = styles["target"]
                     elif (y, x) in path_set:
                         style = styles["target_path"]
+                if stair_cursor is not None and (y, x) == stair_cursor:
+                    style = styles.get("stair_cursor", styles["target"])
                 out.append((glyph, style))
             rows.append(out)
         return rows
@@ -385,8 +404,10 @@ class DungeonMap:
             return top.symbol, config.symbols.tile_style.get(top.symbol, "item")
         if cell.trap and not cell.trap_hidden:
             return config.symbols.trap, "trap"
-        if cell.feature == "altar":
-            return config.symbols.altar, "altar"
+        if cell.feature:
+            feat_sym = getattr(config.symbols, cell.feature, None)
+            if feat_sym:
+                return feat_sym, cell.feature
         glyph = config.symbols.terrain_glyph.get(cell.terrain, config.symbols.empty)
         return glyph, config.symbols.tile_style.get(glyph, "floor")
 

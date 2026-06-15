@@ -3,6 +3,7 @@
         "occupation": "Chemist",
         "symbol": "C",
         "type": "TRADER",
+        "personality": "Nervous and excitable, speaks in breathless run-on sentences about reagents and reactions. Prone to accidental self-poisoning. Fiercely proud of their potions.",
         "potential_sales": [
             { "item": "Weak Healing Potion", "chance": 100 },
             { "item": "Medium Healing Potion", "chance": 100 },
@@ -14,6 +15,7 @@
         "occupation": "Blacksmith",
         "symbol": "B",
         "type": "TRADER",
+        "personality": "Gruff, laconic, and proud of their craft. Speaks in short sentences. Distrusts magic and magic-users. Judges adventurers by the quality of their equipment.",
         "potential_sales": [
             { "item": "Dagger", "chance": 100 },
             { "item": "Short Sword", "chance": 80 },
@@ -28,6 +30,7 @@
         "occupation": "Merchant",
         "symbol": "M",
         "type": "TRADER",
+        "personality": "Sly, flattering, and always angling for a better deal. Uses flowery language and vague promises. Hides their anxiety about being this deep underground behind a merchant's smile.",
         "potential_sales": [
             { "item": "Medium Healing Potion", "chance": 80 },
             { "item": "Scroll of Magic Mapping", "chance": 70 },
@@ -42,6 +45,7 @@
         "occupation": "Healer",
         "symbol": "H",
         "type": "HEALER",
+        "personality": "Serene and unhurried, speaks softly and never wastes words. Has seen too much death to be surprised by anything. Quietly disapproves of unnecessary violence.",
         "heal_cost_per_hp": 1
     }
 ]

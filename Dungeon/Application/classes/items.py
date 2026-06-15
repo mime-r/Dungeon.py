@@ -81,15 +81,21 @@ class DungeonScroll(DungeonItem):
         self.effect = effect
 
 
-class DungeonOrb(DungeonItem):
-    """The Orb of Zot: the win objective. Cannot be sold or dropped casually."""
+class DungeonShard(DungeonItem):
+    """One fragment of the Broken Sigil. Collect all three to unlock the exit."""
 
-    symbol = "0"
+    symbol = "*"
 
-    def __init__(self) -> None:
+    DEPTHS: dict[int, str] = {
+        6: "Shard of Flame",
+        7: "Shard of Stone",
+        8: "Shard of Shadow",
+    }
+
+    def __init__(self, name: str) -> None:
         super().__init__(
-            name="Orb of Zot",
-            description="A heavy sphere of crystallised power. Carry it to the surface to win.",
+            name=name,
+            description="A fragment of the Broken Sigil, warm to the touch. Find the other pieces.",
             cost=0,
             actions=[],
         )

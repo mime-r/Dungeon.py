@@ -5,6 +5,7 @@ import time
 import operator
 import traceback
 import random
+from dataclasses import dataclass, field
 
 from tinydb import TinyDB, Query
 from rich.panel import Panel
@@ -14,11 +15,12 @@ from .config import config
 from .utils import style_text, clear_screen
 from .classes.map import DungeonMap, DungeonPlayer
 from .classes.menus import DungeonMenu
-from .classes.items import DungeonOrb, DungeonPotion, DungeonScroll
+from .classes.items import DungeonShard, DungeonPotion, DungeonScroll
 from .classes.database import DungeonDatabase
 from .classes.misc import DungeonTimeData
 from .classes.people import DungeonTrader, DungeonHealer
-from .classes.levelgen import generate_level
+from .classes.levelgen import generate_level, STRUCTURE_CATALOG
+from .llm import LLMClient
 
 print("Loading...")
 
@@ -34,6 +36,38 @@ DIR_DELTA = {
 
 # Weapons seeded into vault treasure, by how deep you are.
 _VAULT_WEAPONS = ["Short Sword", "Mace", "Spear", "Long Sword", "War Axe"]
+
+# Shard floors: depth -> (shard name, guardian name)
+_SHARD_FLOORS = {
+    6: ("Shard of Flame", "Flame Guardian"),
+    7: ("Shard of Stone", "Stone Guardian"),
+    8: ("Shard of Shadow", "Shadow Guardian"),
+}
+
+# Floor themes: LLM-generated per-floor biome data
+@dataclass
+class FloorTheme:
+    name: str = ""
+    description: str = ""
+    layout_bias: str = "any"      # cave | rooms | bsp | any
+    enemy_bias: list = field(default_factory=list)
+    trap_type: str = "any"        # dart | poison | teleport | alarm | any
+    trap_density: str = "normal"  # low | normal | high
+    loot_bias: str = "balanced"   # potions | scrolls | weapons | gold | balanced
+    ambient: str = ""
+    structures: list = field(default_factory=list)        # 0-2 names from STRUCTURE_CATALOG
+    terrain_features: list = field(default_factory=list)  # 0-2 from _VALID_TERRAIN_FEATURES
+
+_THEME_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+_VALID_BIAS_ENEMIES = [
+    "Giant Rat", "Bat", "Kobold", "Goblin", "Orc", "Skeleton", "Zombie",
+    "Giant Spider", "Kobold Slinger", "Ogre", "Wraith", "Troll",
+]
+_VALID_STRUCTURES = {
+    "shrine", "mushroom_grove", "overgrown_room", "ruined_hall",
+    "frozen_pond", "campsite", "poison_marsh", "standing_stones",
+}
+_VALID_TERRAIN_FEATURES = {"lava_pools", "chasms"}
 
 # Randomised appearances for unidentified consumables (shuffled per game).
 _POTION_ADJ = [
@@ -62,8 +96,27 @@ class Dungeon:
         self.levels: dict[int, DungeonMap] = {}
         self.target_cursor = None   # ranged-targeting overlay state
         self.target_path = None
+        self.camera_override = None  # pans viewport to a staircase when set (y, x)
+        self.stair_cursor = None     # highlights a staircase tile in the render
+        self.auto_pickup_types: set[str] = {"potion", "scroll"}
         # Developer god mode: enable from the start with DUNGEON_GODMODE=1, or toggle in-game with `~`.
         self.godmode = os.environ.get("DUNGEON_GODMODE") == "1"
+
+        self.llm = LLMClient()
+        self.log.info(f"LLM status: {self.llm.status}")
+
+        # DM hint state
+        self._hint_future = None
+        self._last_hint_turn: int = -30
+        self._hinted_states: set[str] = set()
+
+        # Item lore state (name -> Future); _lore_done tracks items already attempted
+        self._lore_futures: dict = {}
+        self._lore_done: set[str] = set()
+
+        # Floor theme state
+        self._floor_themes: dict[int, FloorTheme] = {}
+        self._theme_history: list[str] = []
 
         from .classes.ui import DungeonUI
         self.ui = DungeonUI(game=self)
@@ -97,7 +150,11 @@ class Dungeon:
             time.sleep(1.2)
 
         self.enter_level(1, mode="down")
-        self.message(f"[flavor]You descend into the dungeon. Somewhere far below lies the Orb of Zot.[/flavor]")
+        self.message(f"[flavor]You descend into the dungeon. Three shards of a Broken Sigil lie scattered in the depths — find them all.[/flavor]")
+        if self.llm.enabled:
+            self.message(f"[flavor]The dungeon breathes with strange intelligence. ({self.llm.status})[/flavor]")
+        elif self.llm.status != "disabled":
+            self.message(f"[warn]LLM unavailable: {self.llm.status}[/warn]")
         self.log.info("dungeon initialised")
 
     # --- character creation --------------------------------------------
@@ -142,7 +199,98 @@ class Dungeon:
         self.ui.message(text, drop=drop)
 
     def render(self) -> None:
+        self._check_state_triggers()
+        self._flush_hint()
+        self._flush_lore()
         self.ui.render()
+
+    # --- LLM: DM hints -------------------------------------------------
+    def _check_state_triggers(self) -> None:
+        p = self.player
+        if p.max_health and p.health / p.max_health < 0.3:
+            self._queue_hint(f"low_hp_d{self.depth}", {
+                "trigger": "player is critically wounded",
+                "depth": self.depth, "background": p.background,
+                "hp": p.health, "max_hp": p.max_health,
+            })
+        # Ambient flavour: fires at most once per 30-turn bucket (cooldown still applies)
+        bucket = self.moves // 30
+        if bucket > 0:
+            self._queue_hint(f"ambient_{bucket}", {
+                "trigger": "a quiet moment in the dungeon between encounters",
+                "depth": self.depth, "background": p.background,
+                "hp": p.health, "max_hp": p.max_health,
+            })
+
+    def _queue_hint(self, trigger_id: str, ctx: dict) -> None:
+        if not self.llm.enabled:
+            return
+        if trigger_id in self._hinted_states:
+            return
+        if self.moves - self._last_hint_turn < 8:
+            return
+        self._hinted_states.add(trigger_id)
+        self._hint_future = self.llm.complete_async(self._build_hint_prompt(ctx))
+
+    def _build_hint_prompt(self, ctx: dict) -> list[dict]:
+        return [
+            {"role": "system", "content": (
+                "You are the narrator of a dark fantasy roguelike. "
+                "Output ONLY one short atmospheric sentence — no thinking, no explanation, "
+                "no quotation marks. Maximum 15 words. Pure flavor, no gameplay advice."
+            )},
+            {"role": "user", "content": (
+                f"Event: {ctx.get('trigger', 'something notable happened')}. "
+                f"Depth {ctx.get('depth', '?')}, "
+                f"{ctx.get('background', 'adventurer')}, "
+                f"HP {ctx.get('hp', '?')}/{ctx.get('max_hp', '?')}."
+            )},
+        ]
+
+    def _flush_hint(self) -> None:
+        if self._hint_future and self._hint_future.done():
+            text = self._hint_future.result()
+            if text:
+                self.message(f"[flavor]{text}[/flavor]")
+                self._last_hint_turn = self.moves
+            self._hint_future = None
+
+    # --- LLM: item lore ------------------------------------------------
+    def _build_lore_prompt(self, item) -> list[dict]:
+        kind = type(item).__name__.replace("Dungeon", "").lower()
+        return [
+            {"role": "system", "content": (
+                "You write item lore for a dark fantasy game. "
+                "Output ONLY one sentence of grim backstory — no thinking, no explanation, "
+                "no quotation marks. Specific and evocative."
+            )},
+            {"role": "user", "content": (
+                f"{item.name} ({kind}): {item.description}"
+            )},
+        ]
+
+    def _flush_lore(self) -> None:
+        done = [name for name, f in self._lore_futures.items() if f.done()]
+        for name in done:
+            text = self._lore_futures.pop(name).result()
+            self._lore_done.add(name)
+            if not text:
+                continue
+            if name in self.ident:
+                self.ident[name]["lore"] = text
+            self.message(f"[flavor]{text}[/flavor]")
+
+    def _maybe_queue_lore(self, item) -> None:
+        """Queue lore generation for any identified item that hasn't had lore generated yet."""
+        if not self.llm.enabled:
+            return
+        name = getattr(item, "name", None)
+        if not name or name in self._lore_futures or name in self._lore_done:
+            return
+        rec = self.ident.get(name)
+        if rec and not rec["identified"]:
+            return  # unidentified consumable — identify() will handle it when used
+        self._lore_futures[name] = self.llm.complete_async(self._build_lore_prompt(item))
 
     # --- item identification -------------------------------------------
     def _init_identification(self) -> None:
@@ -168,16 +316,105 @@ class Dungeon:
             rec["identified"] = True
             if announce:
                 self.message(f"[success]You identify it as {style_text(item.name, 'item')}![/success]")
+                if self.llm.enabled and item.name not in self._lore_futures:
+                    self._lore_futures[item.name] = self.llm.complete_async(
+                        self._build_lore_prompt(item)
+                    )
 
     # --- level generation & travel -------------------------------------
     def _new_level(self, depth: int) -> DungeonMap:
         is_last = depth >= config.depth.floors
-        layout = generate_level(is_last=is_last, depth=depth)
+        theme = self._generate_floor_theme(depth)
+        self._floor_themes[depth] = theme
+        layout = generate_level(
+            is_last=is_last,
+            depth=depth,
+            layout_hint=theme.layout_bias if theme else "any",
+            structures=theme.structures if theme else None,
+            terrain_features=theme.terrain_features if theme else None,
+        )
         level = DungeonMap(game=self, layout=layout)
-        self._populate(level, depth, is_last)
+        self._populate(level, depth, is_last, theme=theme)
         return level
 
-    def _populate(self, level: DungeonMap, depth: int, is_last: bool) -> None:
+    def _enemies_for_depth(self, depth: int) -> list[str]:
+        """Return names of non-boss enemies valid for the given depth."""
+        return [e.data.name for e in self.db.enemy_db.all_for_depth(depth)]
+
+    def _generate_floor_theme(self, depth: int) -> "FloorTheme | None":
+        if not self.llm.enabled:
+            return None
+        history_ctx = "\n".join(self._theme_history[-3:]) or "none yet"
+        valid_at_depth = self._enemies_for_depth(depth)
+        messages = [
+            {"role": "system", "content": (
+                "You are a dungeon theme generator for a dark fantasy roguelike. "
+                "Output ONLY a single valid JSON object with exactly these keys: "
+                "name (string), description (string), "
+                "layout_bias (exactly one of: cave rooms bsp any), "
+                f"enemy_bias (JSON array of 0-3 names chosen ONLY from: {', '.join(_VALID_BIAS_ENEMIES)}), "
+                "trap_type (exactly one of: dart poison teleport alarm any), "
+                "trap_density (exactly one of: low normal high), "
+                "loot_bias (exactly one of: potions scrolls weapons gold balanced), "
+                "ambient (one atmospheric sentence, max 15 words), "
+                "structures (JSON array of 0-2 names chosen ONLY from: "
+                "shrine mushroom_grove overgrown_room ruined_hall frozen_pond campsite poison_marsh standing_stones), "
+                "terrain_features (JSON array of 0-2 names chosen ONLY from: lava_pools chasms). "
+                "Choose structures and terrain_features that match the theme's name and description. "
+                "No markdown fences, no explanation, no thinking — pure JSON only."
+            )},
+            {"role": "user", "content": (
+                f"Depth {depth} of {config.depth.floors}. "
+                f"Previous floor themes for narrative continuity:\n{history_ctx}\n"
+                f"Enemies available at depth {depth}: {', '.join(valid_at_depth)}. "
+                "Generate the theme for this floor."
+            )},
+        ]
+        future = self.llm.complete_json_async(messages, max_tokens=2500, timeout=90.0)
+        clear_screen()
+        self.print(f"[stairs]Descending to Depth {depth}...[/stairs]", highlight=False)
+        from rich.live import Live
+        from rich.text import Text
+        with Live(console=self.rich_console, refresh_per_second=10) as live:
+            i = 0
+            while not future.done():
+                live.update(Text.from_markup(
+                    f"[flavor]{_THEME_SPINNER[i % len(_THEME_SPINNER)]} The dungeon stirs...[/flavor]"
+                ))
+                time.sleep(0.1)
+                i += 1
+        data = future.result()
+        if not isinstance(data, dict):
+            return None
+        _valid_layout = {"cave", "rooms", "bsp", "any"}
+        _valid_trap = {"dart", "poison", "teleport", "alarm", "any"}
+        _valid_density = {"low", "normal", "high"}
+        _valid_loot = {"potions", "scrolls", "weapons", "gold", "balanced"}
+        validated_structures = [
+            s for s in (data.get("structures") or [])
+            if isinstance(s, str) and s in _VALID_STRUCTURES
+        ][:2]
+        validated_terrain_features = [
+            t for t in (data.get("terrain_features") or [])
+            if isinstance(t, str) and t in _VALID_TERRAIN_FEATURES
+        ][:2]
+        theme = FloorTheme(
+            name=str(data.get("name", "")),
+            description=str(data.get("description", "")),
+            layout_bias=data.get("layout_bias", "any") if data.get("layout_bias") in _valid_layout else "any",
+            enemy_bias=[e for e in (data.get("enemy_bias") or []) if e in _VALID_BIAS_ENEMIES],
+            trap_type=data.get("trap_type", "any") if data.get("trap_type") in _valid_trap else "any",
+            trap_density=data.get("trap_density", "normal") if data.get("trap_density") in _valid_density else "normal",
+            loot_bias=data.get("loot_bias", "balanced") if data.get("loot_bias") in _valid_loot else "balanced",
+            ambient=str(data.get("ambient", "")),
+            structures=validated_structures,
+            terrain_features=validated_terrain_features,
+        )
+        if theme.name:
+            self._theme_history.append(f"{theme.name}: {theme.description}")
+        return theme
+
+    def _populate(self, level: DungeonMap, depth: int, is_last: bool, theme=None) -> None:
         pool = list(level.floor_cells)
         random.shuffle(pool)
         suy, sux = level.stairs_up
@@ -189,10 +426,13 @@ class Dungeon:
                     return (y, x)
             return None
 
-        # Monsters (count scales with depth).
+        # Monsters (count scales with depth); biased towards theme enemies when theme present.
         count = config.spawn.enemies_base + config.spawn.enemies_per_depth * (depth - 1)
         for _ in range(count):
-            loader = self.db.enemy_db.random_for_depth(depth)
+            if theme and theme.enemy_bias and random.random() < 0.6:
+                loader = self.db.enemy_db.random_biased(depth, theme.enemy_bias)
+            else:
+                loader = self.db.enemy_db.random_for_depth(depth)
             spot = far_cell()
             if loader and spot:
                 enemy = loader.load()
@@ -227,25 +467,37 @@ class Dungeon:
                 level.place_occupant(npc, *spot)
                 level.npcs.append(npc)
 
-        # Loose loot on the floor (placed on any open floor tile, never inside a vault).
-        for _ in range(config.spawn.floor_potions):
+        # Loose loot (counts biased by floor theme when present).
+        loot = theme.loot_bias if theme else "balanced"
+        if loot == "potions":    pot_n, scr_n, wpn_n, gold_mult = 5, 1, 1, 1.0
+        elif loot == "scrolls":  pot_n, scr_n, wpn_n, gold_mult = 1, 4, 1, 1.0
+        elif loot == "weapons":  pot_n, scr_n, wpn_n, gold_mult = 1, 1, 4, 1.0
+        elif loot == "gold":     pot_n, scr_n, wpn_n, gold_mult = 1, 1, 1, 2.5
+        else:                    pot_n, scr_n, wpn_n, gold_mult = config.spawn.floor_potions, config.spawn.floor_scrolls, config.spawn.floor_weapons, 1.0
+        for _ in range(pot_n):
             self._scatter(level, self._depth_potion(depth))
-        for _ in range(config.spawn.floor_scrolls):
+        for _ in range(scr_n):
             self._scatter(level, random.choice(self.db.item_db.scrolls))
-        for _ in range(config.spawn.floor_weapons):
+        for _ in range(wpn_n):
             self._scatter(level, random.choice(self.db.item_db.weapons[1:]))
         for _ in range(config.spawn.gold_piles):
             cell = self._floor_cell(level)
             if cell:
-                cell.gold += random.randint(2, 6 + depth * 2)
+                cell.gold += int(random.randint(2, 6 + depth * 2) * gold_mult)
 
-        # Hidden traps (depth-scaled), away from the entry stairs.
-        for _ in range(config.spawn.traps_base + depth // 2):
+        # Hidden traps (depth-scaled, density and type biased by theme).
+        _density_mult = {"low": 0.5, "normal": 1.0, "high": 1.8}
+        density = _density_mult.get(theme.trap_density if theme else "normal", 1.0)
+        trap_count = max(1, int((config.spawn.traps_base + depth // 2) * density))
+        trap_pool = ["dart", "poison", "teleport", "alarm"]
+        if theme and theme.trap_type != "any":
+            trap_pool = [theme.trap_type] * 3 + trap_pool
+        for _ in range(trap_count):
             y, x = random.choice(level.floor_cells)
             cell = level.matrix[y][x]
             if cell.trap is None and not cell.items and cell.gold == 0 \
                     and abs(y - suy) + abs(x - sux) > 4:
-                cell.trap = random.choice(["dart", "poison", "teleport", "alarm"])
+                cell.trap = random.choice(trap_pool)
 
         # Vault treasure (or the Orb chamber on the last floor), then any temple.
         self._fill_vault(level, depth, is_last)
@@ -272,20 +524,21 @@ class Dungeon:
             return
         cells = list(level.vault_cells)
         random.shuffle(cells)
-        if is_last:
-            oy, ox = cells.pop()
-            level.matrix[oy][ox].items.append(DungeonOrb())
-            level.matrix[oy][ox].gold += random.randint(40, 80)
-            loader = self.db.enemy_db.search_enemy(name="Orb Guardian")
+        if depth in _SHARD_FLOORS:
+            shard_name, guardian_name = _SHARD_FLOORS[depth]
+            sy, sx = cells.pop()
+            level.matrix[sy][sx].items.append(DungeonShard(shard_name))
+            level.matrix[sy][sx].gold += random.randint(30, 60)
+            loader = self.db.enemy_db.search_enemy(name=guardian_name)
             if loader and cells:
-                gy, gx = min(cells, key=lambda c: abs(c[0] - oy) + abs(c[1] - ox))
+                gy, gx = min(cells, key=lambda c: abs(c[0] - sy) + abs(c[1] - sx))
                 boss = loader.load()
                 boss.awake = True
                 level.place_occupant(boss, gy, gx)
                 level.enemies.append(boss)
-            if cells:  # the legendary blade rewards reaching the bottom, on its own tile
-                sy, sx = cells.pop()
-                level.matrix[sy][sx].items.append(self.db.item_db.search_item(name="Sword of Zot"))
+            if is_last and cells:  # legendary blade still rewards reaching the deepest floor
+                bsy, bsx = cells.pop()
+                level.matrix[bsy][bsx].items.append(self.db.item_db.search_item(name="Sword of Zot"))
         else:
             wy, wx = cells.pop()
             weapon_name = _VAULT_WEAPONS[min(depth - 1, len(_VAULT_WEAPONS) - 1)]
@@ -339,6 +592,23 @@ class Dungeon:
             self.message(f"[stairs]You arrive on Depth {depth}.[/stairs]")
         else:
             self.message(f"[stairs]You climb to Depth {depth}.[/stairs]")
+        theme = self._floor_themes.get(depth)
+        if theme and theme.name:
+            self.message(f"[flavor]{theme.name}[/flavor]")
+        if theme and theme.ambient:
+            self.message(f"[flavor]{theme.ambient}[/flavor]")
+        if depth >= 6:
+            self._queue_hint(f"deep_floor_{depth}", {
+                "trigger": f"player descends to depth {depth}, one of the deepest and most dangerous floors",
+                "depth": depth, "background": self.player.background,
+                "hp": self.player.health, "max_hp": self.player.max_health,
+            })
+        else:
+            self._queue_hint(f"floor_{depth}", {
+                "trigger": f"player descends to depth {depth} of the dungeon",
+                "depth": depth, "background": self.player.background,
+                "hp": self.player.health, "max_hp": self.player.max_health,
+            })
 
     # --- turn engine (energy scheduler) --------------------------------
     def spend_turn(self) -> None:
@@ -393,8 +663,19 @@ class Dungeon:
         ey, ex = enemy.location
         self.map.matrix[ey][ex].gold += enemy.coin_drop
         self.message(enemy.texts.death)
+        if enemy.tier != "boss":
+            self._queue_hint("first_kill", {
+                "trigger": f"player slew their first enemy, a {enemy.name}",
+                "depth": self.depth, "background": self.player.background,
+                "hp": self.player.health, "max_hp": self.player.max_health,
+            })
         if enemy.tier == "boss":
-            self.message("[success]The guardian shatters! The Orb of Zot lies unguarded.[/success]")
+            self.message("[success]The guardian falls! The shard lies unguarded — take it.[/success]")
+            self._queue_hint(f"boss_{enemy.name}", {
+                "trigger": f"player just slew the {enemy.name}, a powerful boss guardian",
+                "depth": self.depth, "background": self.player.background,
+                "hp": self.player.health, "max_hp": self.player.max_health,
+            })
 
     def awaken_floor(self) -> None:
         for enemy in self.map.enemies:
@@ -429,12 +710,28 @@ class Dungeon:
         cell = self.player.cell
         if item not in cell.items:
             return False
-        if isinstance(item, DungeonOrb):
+        if isinstance(item, DungeonShard):
             cell.items.remove(item)
-            self.player.has_orb = True
-            self.message("[orb]You hoist the Orb of Zot! Its light floods the chamber.[/orb]")
-            self.message("[warn]The dungeon shudders awake. Flee to the surface![/warn]")
-            self.awaken_floor()
+            self.player.shards.add(item.name)
+            count = len(self.player.shards)
+            self.message(f"[shard]You seize the {item.name}! ({count}/3 sigil shards)[/shard]")
+            if count == 3:
+                self.message("[warn]The Broken Sigil is whole. The dungeon shudders — flee to the surface![/warn]")
+                self.awaken_floor()
+                self._queue_hint("all_shards", {
+                    "trigger": "player assembled the complete Broken Sigil and must now flee to the surface",
+                    "depth": self.depth, "background": self.player.background,
+                    "hp": self.player.health, "max_hp": self.player.max_health,
+                })
+            else:
+                remaining = 3 - count
+                self.message(f"[flavor]{remaining} shard{'s' if remaining > 1 else ''} remain hidden in the depths.[/flavor]")
+                if count == 1:
+                    self._queue_hint("first_shard", {
+                        "trigger": "player collected the first shard of a broken sigil",
+                        "depth": self.depth, "background": self.player.background,
+                        "hp": self.player.health, "max_hp": self.player.max_health,
+                    })
             return True
         if len(self.player.inventory) >= self.player.max_inventory:
             self.message("Your pack is full.")
@@ -442,6 +739,7 @@ class Dungeon:
         cell.items.remove(item)
         self.player.inventory.append(item)
         self.message(f"You pick up the {style_text(self.display_name(item), 'item')}.")
+        self._maybe_queue_lore(item)
         return True
 
     def pickup(self) -> bool:
@@ -464,10 +762,14 @@ class Dungeon:
             self.message("There are no stairs up here.")
             return
         if self.depth == 1:
-            if self.player.has_orb:
+            if len(self.player.shards) == 3:
                 self.game_over("win")
             else:
-                self.message("[warn]You cannot abandon the dungeon without the Orb of Zot.[/warn]")
+                missing = 3 - len(self.player.shards)
+                self.message(
+                    f"[warn]You cannot leave — {missing} shard{'s' if missing > 1 else ''} "
+                    f"of the Broken Sigil still lie in the depths.[/warn]"
+                )
         else:
             self.enter_level(self.depth - 1, mode="up")
 
@@ -646,32 +948,35 @@ class Dungeon:
 
     # --- autoexplore ----------------------------------------------------
     def autoexplore(self) -> None:
+        def passable(y, x):
+            c = self.map.matrix[y][x]
+            if c.occupant is not None:
+                return False
+            if c.terrain in (T.WALL, T.SECRET_DOOR):
+                return False
+            if c.trap and not c.trap_hidden:
+                return False
+            if (y, x) in self.map.excluded_stairs:
+                return False
+            return True
+
+        def is_goal(cur):
+            y, x = cur
+            if not self.map.matrix[y][x].explored:
+                return False
+            for dy, dx in DIR_DELTA.values():
+                ny, nx = y + dy, x + dx
+                if self.map.in_bounds(ny, nx) and not self.map.matrix[ny][nx].explored:
+                    return True
+            return False
+
         for _ in range(1000):
             if self.over or self.map.visible_enemies():
                 if self.map.visible_enemies():
                     self.message("[warn]A monster comes into view.[/warn]")
                 break
 
-            def passable(y, x):
-                c = self.map.matrix[y][x]
-                if c.occupant is not None:
-                    return False
-                if c.terrain in (T.WALL, T.SECRET_DOOR):
-                    return False
-                if c.trap and not c.trap_hidden:
-                    return False
-                return True
-
-            def is_goal(cur):
-                y, x = cur
-                if not self.map.matrix[y][x].explored:
-                    return False
-                for dy, dx in DIR_DELTA.values():
-                    ny, nx = y + dy, x + dx
-                    if self.map.in_bounds(ny, nx) and not self.map.matrix[ny][nx].explored:
-                        return True
-                return False
-
+            visible_before = frozenset(self.map.visible)
             path = self.map.bfs_path(self.player.location, is_goal, passable)
             if not path:
                 self.message("[flavor]There is nothing left to explore here.[/flavor]")
@@ -685,10 +990,149 @@ class Dungeon:
             self.render()
             time.sleep(0.03)
 
+            # Pause if a staircase just entered view for the first time.
+            for cy, cx in self.map.visible - visible_before:
+                terrain = self.map.matrix[cy][cx].terrain
+                if terrain == T.STAIRS_DOWN:
+                    self.message("[stairs]Auto-explore paused: staircase down spotted.[/stairs]")
+                    return
+                if terrain == T.STAIRS_UP:
+                    self.message("[stairs]Auto-explore paused: staircase up spotted.[/stairs]")
+                    return
+
     def _dir_to(self, ny: int, nx: int) -> str | None:
         return {(-1, 0): "n", (1, 0): "s", (0, -1): "w", (0, 1): "e",
                 (-1, -1): "nw", (-1, 1): "ne", (1, -1): "sw", (1, 1): "se"}.get(
             (ny - self.player.y, nx - self.player.x))
+
+    # --- staircase navigation -------------------------------------------
+    def goto_stairs_menu(self) -> None:
+        """G key: prompt the player to navigate to nearest up or down stairs."""
+        self.message("[stairs]Go to: [controls]<[/controls] up-stairs  "
+                     "[controls]>[/controls] down-stairs  [controls]esc[/controls] cancel[/stairs]")
+        self.render()
+        key = keys.read_key()
+        if key == "<":
+            self.goto_stairs("up")
+        elif key == ">":
+            self.goto_stairs("down")
+
+    def goto_stairs(self, direction: str) -> None:
+        """Walk to the nearest known staircase of the given type ('up' or 'down')."""
+        coord = self.map.stairs_up if direction == "up" else self.map.stairs_down
+        name = "up-stairs" if direction == "up" else "down-stairs"
+        if coord is None:
+            self.message(f"There are no {name} on this floor.")
+            return
+        sy, sx = coord
+        if not self.map.matrix[sy][sx].explored:
+            self.message(f"You haven't found the {name} yet.")
+            return
+        if self.player.location == coord:
+            self.message(f"You are already at the {name}.")
+            return
+
+        def passable(y, x):
+            c = self.map.matrix[y][x]
+            return (c.occupant is None
+                    and c.terrain not in (T.WALL, T.SECRET_DOOR)
+                    and not (c.trap and not c.trap_hidden))
+
+        is_goal = lambda cur: cur == coord
+
+        path = self.map.bfs_path(self.player.location, is_goal, passable)
+        if not path:
+            self.message(f"No clear path to the {name}.")
+            return
+
+        self.message(f"[stairs]Travelling to {name}...[/stairs]")
+        for _ in range(1000):
+            if self.over or self.map.visible_enemies():
+                if self.map.visible_enemies():
+                    self.message("[warn]A monster comes into view.[/warn]")
+                break
+            if self.player.location == coord:
+                break
+            path = self.map.bfs_path(self.player.location, is_goal, passable)
+            if not path:
+                self.message(f"Path to {name} is blocked.")
+                break
+            ny, nx = path[0]
+            d = self._dir_to(ny, nx)
+            if d is None or not self.player.move(d):
+                break
+            self.spend_turn()
+            self.advance_world()
+            self.render()
+            time.sleep(0.03)
+
+    def view_stair(self, direction: str) -> None:
+        """[ / ] keys: pan the camera to a known staircase and highlight it."""
+        coord = self.map.stairs_up if direction == "up" else self.map.stairs_down
+        name = "up-stairs" if direction == "up" else "down-stairs"
+        if coord is None:
+            self.message(f"There are no {name} on this floor.")
+            return
+        sy, sx = coord
+        if not self.map.matrix[sy][sx].explored:
+            self.message(f"You haven't found the {name} yet.")
+            return
+        py, px = self.player.location
+        dist = abs(sy - py) + abs(sx - px)
+        excl = " [warn](excluded)[/warn]" if coord in self.map.excluded_stairs else ""
+        self.camera_override = coord
+        self.stair_cursor = coord
+        self.message(
+            f"[stairs]{name.capitalize()} is ~{dist} steps away{excl}. "
+            f"[controls]G[/controls]+[controls]{'<' if direction == 'up' else '>'}[/controls] "
+            f"to travel · any key to return view[/stairs]"
+        )
+
+    def exclude_stair(self) -> None:
+        """X key: toggle the staircase under the player in/out of the auto-explore exclusion set."""
+        terrain = self.player.cell.terrain
+        if terrain not in (T.STAIRS_UP, T.STAIRS_DOWN):
+            self.message("Stand on a staircase to exclude it from auto-explore.")
+            return
+        coord = self.player.location
+        kind = "Up-stairs" if terrain == T.STAIRS_UP else "Down-stairs"
+        if coord in self.map.excluded_stairs:
+            self.map.excluded_stairs.discard(coord)
+            self.message(f"[stairs]{kind} exclusion removed.[/stairs]")
+        else:
+            self.map.excluded_stairs.add(coord)
+            self.message(f"[warn]{kind} excluded from auto-explore.[/warn]")
+
+    def auto_pickup_menu(self) -> None:
+        """Backslash key: toggle which item types are automatically picked up on contact."""
+        OPTIONS = [
+            ("potion", "Potions",  "potions", "!"),
+            ("scroll", "Scrolls",  "scroll",  "?"),
+            ("weapon", "Weapons",  "weapons", ")"),
+            ("bag",    "Bags",     "bag",     "("),
+        ]
+        while True:
+            clear_screen()
+            self.print(
+                "[menu_header]Auto-pickup settings[/menu_header] "
+                "(number to toggle, [controls]esc[/controls] to close)\n"
+            )
+            for i, (key, label, style, sym) in enumerate(OPTIONS, 1):
+                state = "[success]ON [/success]" if key in self.auto_pickup_types else "[warn]OFF[/warn]"
+                self.print(
+                    f"  [controls]{i}[/controls]  [{style}]{sym} {label}[/{style}]  {state}",
+                    highlight=False,
+                )
+            k = keys.read_key()
+            if k == keys.ESC:
+                break
+            if k.isdigit() and 1 <= int(k) <= len(OPTIONS):
+                typ = OPTIONS[int(k) - 1][0]
+                if typ in self.auto_pickup_types:
+                    self.auto_pickup_types.discard(typ)
+                else:
+                    self.auto_pickup_types.add(typ)
+        self.render()
 
     # --- main loop ------------------------------------------------------
     def gameloop(self) -> None:
@@ -706,6 +1150,11 @@ class Dungeon:
 
     def handle(self, key: str) -> bool:
         """Dispatch one keypress. Returns True if the action spent a game turn."""
+        # Clear stair-view overlay on any key that isn't cycling stair views.
+        if key not in ("[", "]") and self.camera_override is not None:
+            self.camera_override = None
+            self.stair_cursor = None
+
         direction = keys.read_direction(key)
         if direction:
             if self.player.status.has("confusion") and random.random() < 0.5:
@@ -727,6 +1176,21 @@ class Dungeon:
         if key == "<":
             self.ascend()
             return False
+        if key == "G":
+            self.goto_stairs_menu()
+            return False
+        if key == "[":
+            self.view_stair("up")
+            return False
+        if key == "]":
+            self.view_stair("down")
+            return False
+        if key == "X":
+            self.exclude_stair()
+            return False
+        if key == "\\":
+            self.auto_pickup_menu()
+            return False
         if key == "s":
             self.search()
             return True
@@ -746,11 +1210,22 @@ class Dungeon:
             self.help_screen()
             return False
         if key == keys.ESC:
-            self.over = True
-            self.log.info("game exited by player")
             clear_screen()
-            print("Exiting [Dungeon]...")
-            sys.exit()
+            self.print(
+                f"Quit the game? "
+                f"{style_text('y', 'controls')} yes   "
+                f"{style_text('n', 'controls')} / {style_text('esc', 'controls')} no",
+                highlight=False,
+            )
+            confirm = keys.read_key()
+            if confirm == "y":
+                self.over = True
+                self.log.info("game exited by player")
+                clear_screen()
+                print("Exiting [Dungeon]...")
+                sys.exit()
+            self.render()
+            return False
         return False
 
     def help_screen(self) -> None:
@@ -760,16 +1235,20 @@ class Dungeon:
             "[controls]arrows[/controls] or [controls]hjkl[/controls]  move / attack (walk into a monster)\n"
             "[controls]yubn[/controls]  diagonal movement (nw / ne / sw / se)\n"
             "[controls]f[/controls]  fire a ranged weapon (aim, then [controls]f[/controls]/[controls]enter[/controls]; [controls]tab[/controls] next target)\n"
-            "[controls]o[/controls]  autoexplore the floor (stops when a monster appears)\n"
+            "[controls]o[/controls]  autoexplore the floor (pauses on enemy or new staircase)\n"
             "[controls]g[/controls]  pick up items on your tile (choose which, or take all)\n"
             "[controls]i[/controls] / [controls]d[/controls]  open pack — use, equip, unequip, drop\n"
             "[controls]>[/controls] / [controls]<[/controls]  descend / ascend stairs\n"
+            "[controls]G[/controls]  goto stairs — then [controls]<[/controls] or [controls]>[/controls] to walk to nearest up/down staircase\n"
+            "[controls][[/controls] / [controls]][/controls]  pan view to known up-stairs / down-stairs (any key returns)\n"
+            "[controls]X[/controls]  exclude staircase under you from auto-explore (toggle)\n"
+            "[controls]\\\\[/controls]  auto-pickup settings — toggle which item types are grabbed on contact\n"
             "[controls]s[/controls]  search adjacent tiles for secret doors and traps\n"
             "[controls].[/controls] or [controls]space[/controls]  wait one turn\n"
             "[controls]p[/controls]  pause    [controls]esc[/controls]  quit\n\n"
             "[flavor]At a trader/healer, press [controls]space[/controls] to step past them.[/flavor]\n"
             "[flavor]Developer: [controls]~[/controls] toggles god mode (or set DUNGEON_GODMODE=1).[/flavor]\n\n"
-            "[flavor]Descend to the bottom, seize the Orb of Zot, and escape to the surface.[/flavor]\n\n"
+            "[flavor]Find all three shards of the Broken Sigil (depths 6–8) and escape to the surface.[/flavor]\n\n"
             f"Press {style_text('any key', 'controls')} to return.",
             border_style="grey37"))
         keys.read_key()
@@ -780,7 +1259,7 @@ class Dungeon:
             "name": self.player.name,
             "outcome": outcome,
             "depth": self.depth,
-            "orb": self.player.has_orb,
+            "shards": len(self.player.shards),
             "time": round(self.time.elapsed, 3),
             "moves": self.moves,
             "xp": self.player.xp,
@@ -802,7 +1281,7 @@ class Dungeon:
         clear_screen()
         if how == "win":
             self.print(Panel(
-                f"[success]You escape the dungeon clutching the Orb of Zot![/success]\n"
+                f"[success]You escape the dungeon with the Broken Sigil made whole![/success]\n"
                 f"[name]{self.player.name}[/name], you are victorious.\n"
                 f"Turns: {self.moves}   Time: {self.time.elapsed:.1f}s   XP: {self.player.xp}",
                 title="[success]VICTORY[/success]", border_style="green"))

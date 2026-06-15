@@ -77,31 +77,43 @@ class LevelLayout:
         self.temple_cells: list[tuple[int, int]] = []
         self.altar: tuple[int, int] | None = None
         self.floor_cells: list[tuple[int, int]] = []
+        self.scenery_features: list[tuple[int, int, str]] = []
 
 
 # ------------------------------------------------------------------ dispatcher
 
-def generate_level(is_last: bool = False, depth: int = 1) -> LevelLayout:
+def generate_level(
+    is_last: bool = False,
+    depth: int = 1,
+    layout_hint: str = "any",
+    structures: list | None = None,
+    terrain_features: list | None = None,
+) -> LevelLayout:
     """Pick a random generator and produce one floor.
 
     Deeper floors are more likely to use complex layouts and are slightly larger.
+    layout_hint biases algorithm selection: "cave" | "rooms" | "bsp" | "any".
+    structures / terrain_features are LLM-supplied biome hints passed to scenery generation.
     """
     w = random.randint(config.map.min_width, config.map.max_width)
     h = random.randint(config.map.min_height, config.map.max_height)
 
     weights = {"rooms": 40, "cave": 30, "bsp": 30}
+    if layout_hint in ("cave", "rooms", "bsp"):
+        weights = {k: (100 if k == layout_hint else 5) for k in weights}
     choice = random.choices(list(weights.keys()), weights=list(weights.values()), k=1)[0]
 
     if choice == "cave":
-        return _generate_cave(w, h, is_last)
+        return _generate_cave(w, h, is_last, structures=structures, terrain_features=terrain_features)
     if choice == "bsp":
-        return _generate_bsp(w, h, is_last)
-    return _generate_rooms(w, h, is_last)
+        return _generate_bsp(w, h, is_last, structures=structures, terrain_features=terrain_features)
+    return _generate_rooms(w, h, is_last, structures=structures, terrain_features=terrain_features)
 
 
 # ------------------------------------------------------------ rooms & corridors
 
-def _generate_rooms(w: int, h: int, is_last: bool) -> LevelLayout:
+def _generate_rooms(w: int, h: int, is_last: bool,
+                    structures=None, terrain_features=None) -> LevelLayout:
     """Classic rooms-and-corridors with a mix of rectangular and oval rooms."""
     grid = [[T.WALL for _ in range(w)] for _ in range(h)]
     layout = LevelLayout(w, h)
@@ -129,13 +141,15 @@ def _generate_rooms(w: int, h: int, is_last: bool) -> LevelLayout:
 
     layout.terrain = grid
     layout.rooms = rooms
-    _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h)
+    _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h,
+                            structures=structures, terrain_features=terrain_features)
     return layout
 
 
 # ---------------------------------------------------------- cellular automata
 
-def _generate_cave(w: int, h: int, is_last: bool) -> LevelLayout:
+def _generate_cave(w: int, h: int, is_last: bool,
+                   structures=None, terrain_features=None) -> LevelLayout:
     """Organic cave system via cellular automata with noise caverns."""
     grid = [[T.WALL for _ in range(w)] for _ in range(h)]
     layout = LevelLayout(w, h)
@@ -200,6 +214,8 @@ def _generate_cave(w: int, h: int, is_last: bool) -> LevelLayout:
             grid[gy][gx] = T.STAIRS_DOWN
 
     _place_cave_vault(layout, grid, interior_floor, is_last, w, h)
+    _scatter_scenery(layout, grid, w, h,
+                     structures=structures, terrain_features=terrain_features)
     _build_floor_cells(layout, grid, w, h)
     return layout
 
@@ -214,7 +230,8 @@ class _BSPNode:
         self.room: Room | None = None
 
 
-def _generate_bsp(w: int, h: int, is_last: bool) -> LevelLayout:
+def _generate_bsp(w: int, h: int, is_last: bool,
+                  structures=None, terrain_features=None) -> LevelLayout:
     """BSP-based layout: tree of partitions generates varied, interlocking rooms."""
     grid = [[T.WALL for _ in range(w)] for _ in range(h)]
     layout = LevelLayout(w, h)
@@ -235,7 +252,8 @@ def _generate_bsp(w: int, h: int, is_last: bool) -> LevelLayout:
 
     layout.terrain = grid
     layout.rooms = rooms
-    _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h)
+    _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h,
+                            structures=structures, terrain_features=terrain_features)
     return layout
 
 
@@ -304,7 +322,8 @@ def _bsp_leaf_center(node: _BSPNode) -> tuple[int, int] | None:
 
 # ------------------------------------------------------------ shared utilities
 
-def _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h) -> None:
+def _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h,
+                            structures=None, terrain_features=None) -> None:
     if not rooms:
         return
     layout.stairs_up = rooms[0].center
@@ -339,6 +358,8 @@ def _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h) 
         if candidates:
             _carve_temple(layout, grid, random.choice(candidates))
 
+    _scatter_scenery(layout, grid, w, h,
+                     structures=structures, terrain_features=terrain_features)
     _build_floor_cells(layout, grid, w, h)
 
 
@@ -386,6 +407,9 @@ def _place_cave_vault(layout, grid, interior_floor, is_last, w, h) -> None:
                     break
 
 
+_SPAWNABLE = {T.FLOOR, T.GRASS, T.MUD}
+
+
 def _build_floor_cells(layout, grid, w, h) -> None:
     reserved = set(layout.vault_cells) | set(layout.temple_cells)
     if layout.altar:
@@ -393,7 +417,7 @@ def _build_floor_cells(layout, grid, w, h) -> None:
     occupied = {layout.stairs_up, layout.stairs_down}
     for y in range(h):
         for x in range(w):
-            if grid[y][x] == T.FLOOR and (y, x) not in reserved and (y, x) not in occupied:
+            if grid[y][x] in _SPAWNABLE and (y, x) not in reserved and (y, x) not in occupied:
                 layout.floor_cells.append((y, x))
 
 
@@ -460,6 +484,508 @@ def _between(a: int, b: int) -> range:
 def _borders_interior(interior_floor, y: int, x: int) -> bool:
     return any((y + dy, x + dx) in interior_floor for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)))
 
+
+# ------------------------------------------------------------ scenery generation
+
+_SPECIAL_TERRAIN = {T.STAIRS_UP, T.STAIRS_DOWN, T.DOOR_CLOSED, T.DOOR_OPEN, T.SECRET_DOOR}
+
+
+def _scatter_scenery(
+    layout: LevelLayout,
+    grid: list,
+    w: int,
+    h: int,
+    structures: list | None = None,
+    terrain_features: list | None = None,
+) -> None:
+    """Post-process the grid: add ponds, trees, grass/mud, floor features, then structures."""
+    protected: set[tuple[int, int]] = set()
+    for pos in (layout.stairs_up, layout.stairs_down):
+        if pos:
+            protected.update(_near(pos[0], pos[1], 2, w, h))
+    protected.update(layout.vault_cells)
+    protected.update(layout.temple_cells)
+    if layout.altar:
+        protected.update(_near(layout.altar[0], layout.altar[1], 2, w, h))
+
+    _place_ponds(layout, grid, protected, w, h)
+    _place_trees(layout, grid, protected, w, h)
+    _place_grass_and_mud(layout, grid, protected, w, h)
+    _place_floor_features(layout, grid, protected, w, h)
+
+    if terrain_features:
+        _apply_terrain_features(layout, grid, protected, w, h, terrain_features)
+    if structures:
+        _place_structures(layout, grid, protected, w, h, structures)
+
+
+def _near(cy: int, cx: int, r: int, w: int, h: int) -> set[tuple[int, int]]:
+    """Chebyshev-r neighbourhood of (cy, cx), clamped to map bounds."""
+    return {
+        (cy + dy, cx + dx)
+        for dy in range(-r, r + 1) for dx in range(-r, r + 1)
+        if 0 <= cy + dy < h and 0 <= cx + dx < w
+    }
+
+
+def _place_ponds(layout: LevelLayout, grid, protected: set, w: int, h: int) -> None:
+    """Carve small ponds inside qualifying rooms (never in corridors)."""
+    if not layout.rooms:
+        return  # Cave maps have no rooms; corridors are irregular — skip ponds
+
+    eligible = [
+        r for r in layout.rooms
+        if r.w >= 9 and r.h >= 7 and (r.cy, r.cx) not in protected
+    ]
+    if not eligible:
+        return
+
+    random.shuffle(eligible)
+    num_ponds = random.randint(0, min(2, len(eligible)))
+
+    for room in eligible[:num_ponds]:
+        # Inner area with 2-cell margin from room walls — pond stays fully interior
+        inner = {
+            (y, x)
+            for y in range(room.y + 2, room.y + room.h - 2)
+            for x in range(room.x + 2, room.x + room.w - 2)
+            if (y, x) not in protected and grid[y][x] == T.FLOOR
+        }
+        _carve_room_pond(grid, room.cy, room.cx, inner)
+
+
+def _carve_room_pond(grid, cy: int, cx: int, inner: set) -> None:
+    """Replace cells in *inner* near (cy, cx) with deep/shallow water."""
+    for (ny, nx) in inner:
+        dy, dx = ny - cy, nx - cx
+        dist = math.sqrt(dy * dy + dx * dx)
+        if dist <= 0.5:
+            grid[ny][nx] = T.DEEP_WATER
+        elif dist <= 1.5:
+            grid[ny][nx] = T.SHALLOW_WATER
+
+
+def _place_trees(layout: LevelLayout, grid, protected: set, w: int, h: int) -> None:
+    """Scatter isolated trees in open floor areas (never in corridors, never adjacent)."""
+    num_trees = random.randint(5, 15)
+    placed: set[tuple[int, int]] = set()
+
+    candidates = [
+        (y, x) for y in range(1, h - 1) for x in range(1, w - 1)
+        if grid[y][x] == T.FLOOR and (y, x) not in protected
+    ]
+    random.shuffle(candidates)
+
+    for cy, cx in candidates:
+        if len(placed) >= num_trees:
+            break
+        # All 4 cardinal neighbours must be floor — eliminates corridors and junctions
+        if not all(
+            0 <= cy + dy < h and 0 <= cx + dx < w
+            and grid[cy + dy][cx + dx] == T.FLOOR
+            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+        ):
+            continue
+        # No other trees adjacent
+        if any((cy + dy, cx + dx) in placed
+               for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1),
+                               (-1, -1), (-1, 1), (1, -1), (1, 1))):
+            continue
+        # No special terrain adjacent (doors, stairs)
+        if any(
+            grid[cy + dy][cx + dx] in _SPECIAL_TERRAIN
+            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+            if 0 <= cy + dy < h and 0 <= cx + dx < w
+        ):
+            continue
+        grid[cy][cx] = T.TREE
+        placed.add((cy, cx))
+
+
+def _place_grass_and_mud(layout: LevelLayout, grid, protected: set, w: int, h: int) -> None:
+    """Paint organic blobs of grass or mud over floor cells."""
+    num_patches = random.randint(2, 5)
+    candidates = [
+        (y, x) for y in range(1, h - 1) for x in range(1, w - 1)
+        if grid[y][x] == T.FLOOR and (y, x) not in protected
+    ]
+    if not candidates:
+        return
+
+    for _ in range(num_patches):
+        if not candidates:
+            break
+        sy, sx = random.choice(candidates)
+        variant = T.GRASS if random.random() < 0.70 else T.MUD
+        radius = random.randint(2, 4)
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                ny, nx = sy + dy, sx + dx
+                if not (0 < ny < h - 1 and 0 < nx < w - 1):
+                    continue
+                if (ny, nx) in protected or grid[ny][nx] != T.FLOOR:
+                    continue
+                if math.sqrt(dy * dy + dx * dx) <= radius * random.uniform(0.6, 1.0):
+                    grid[ny][nx] = variant
+        candidates = [(y, x) for (y, x) in candidates if grid[y][x] == T.FLOOR]
+
+
+def _place_floor_features(layout: LevelLayout, grid, protected: set, w: int, h: int) -> None:
+    """Scatter shrubs, mushrooms, and rubble on open floor/grass/mud cells."""
+    spawnable = (T.FLOOR, T.GRASS, T.MUD)
+    candidates = [
+        (y, x) for y in range(1, h - 1) for x in range(1, w - 1)
+        if grid[y][x] in spawnable and (y, x) not in protected
+    ]
+    random.shuffle(candidates)
+    taken: set[tuple[int, int]] = set()
+
+    # Shrubs — prefer cells with open neighbours
+    for cy, cx in candidates:
+        if len([f for f in layout.scenery_features if f[2] == "shrub"]) >= random.randint(3, 8):
+            break
+        if (cy, cx) in taken:
+            continue
+        open_n = sum(
+            1 for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+            if 0 <= cy + dy < h and 0 <= cx + dx < w
+            and grid[cy + dy][cx + dx] in spawnable
+        )
+        if open_n >= 3:
+            layout.scenery_features.append((cy, cx, "shrub"))
+            taken.add((cy, cx))
+
+    # Mushrooms — prefer corners with few open neighbours
+    for cy, cx in candidates:
+        if len([f for f in layout.scenery_features if f[2] == "mushroom"]) >= random.randint(2, 5):
+            break
+        if (cy, cx) in taken:
+            continue
+        open_n = sum(
+            1 for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+            if 0 <= cy + dy < h and 0 <= cx + dx < w
+            and grid[cy + dy][cx + dx] in spawnable
+        )
+        if open_n <= 2:
+            layout.scenery_features.append((cy, cx, "mushroom"))
+            taken.add((cy, cx))
+
+    # Rubble — rare, scattered anywhere
+    remaining = [(y, x) for (y, x) in candidates if (y, x) not in taken]
+    random.shuffle(remaining)
+    for cy, cx in remaining[:random.randint(1, 3)]:
+        layout.scenery_features.append((cy, cx, "rubble"))
+
+
+# ---------------------------------------------------------- structure blueprints
+
+from dataclasses import dataclass as _dc
+from typing import Callable as _Callable
+
+
+@_dc
+class Structure:
+    """Blueprint for a Minecraft-style room structure placed by LLM biome themes."""
+    name: str
+    min_room_w: int
+    min_room_h: int
+    placer: _Callable
+    max_per_floor: int = 1
+
+
+def _room_inner(room: Room, margin: int = 1) -> list[tuple[int, int]]:
+    return [
+        (y, x)
+        for y in range(room.y + margin, room.y + room.h - margin)
+        for x in range(room.x + margin, room.x + room.w - margin)
+    ]
+
+
+def _place_shrine(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """Altar on a floor pad flanked by four diagonal pillar-walls."""
+    cy, cx = room.cy, room.cx
+    if (cy - room.y < 2 or room.y + room.h - 1 - cy < 2 or
+            cx - room.x < 2 or room.x + room.w - 1 - cx < 2):
+        return False
+    if (cy, cx) in protected or grid[cy][cx] in _SPECIAL_TERRAIN:
+        return False
+    pillar_pos = [(cy - 1, cx - 1), (cy - 1, cx + 1), (cy + 1, cx - 1), (cy + 1, cx + 1)]
+    for (py, px) in pillar_pos:
+        if (py, px) in protected or grid[py][px] in _SPECIAL_TERRAIN:
+            return False
+    for (py, px) in pillar_pos:
+        grid[py][px] = T.WALL
+    grid[cy][cx] = T.FLOOR
+    layout.scenery_features.append((cy, cx, "altar"))
+    if layout.altar is None:
+        layout.altar = (cy, cx)
+    return True
+
+
+def _place_mushroom_grove(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """Mud-floored room thick with mushrooms in the darker corners."""
+    inner = [(y, x) for (y, x) in _room_inner(room, 1)
+             if (y, x) not in protected and grid[y][x] == T.FLOOR]
+    if len(inner) < 8:
+        return False
+    for (y, x) in inner:
+        grid[y][x] = T.MUD
+    spawnable = {T.MUD, T.FLOOR, T.GRASS}
+    placed = 0
+    for (y, x) in inner:
+        open_n = sum(
+            1 for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+            if 0 <= y + dy < h and 0 <= x + dx < w
+            and grid[y + dy][x + dx] in spawnable
+        )
+        if open_n <= 2 and random.random() < 0.65:
+            layout.scenery_features.append((y, x, "mushroom"))
+            placed += 1
+    if placed < 2:
+        for (y, x) in random.sample(inner, min(3, len(inner))):
+            layout.scenery_features.append((y, x, "mushroom"))
+    return True
+
+
+def _place_overgrown_room(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """Grass-covered room with isolated trees and scattered shrubs."""
+    inner = [(y, x) for (y, x) in _room_inner(room, 1)
+             if (y, x) not in protected and grid[y][x] == T.FLOOR]
+    if len(inner) < 8:
+        return False
+    for (y, x) in inner:
+        grid[y][x] = T.GRASS
+    walkable = {T.GRASS, T.FLOOR, T.MUD}
+    tree_set: set[tuple[int, int]] = set()
+    shuffled = list(inner)
+    random.shuffle(shuffled)
+    for (y, x) in shuffled:
+        if len(tree_set) >= max(1, len(inner) // 8):
+            break
+        if not all(
+            0 <= y + dy < h and 0 <= x + dx < w
+            and grid[y + dy][x + dx] in walkable
+            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+        ):
+            continue
+        if any((y + dy, x + dx) in tree_set
+               for dy, dx in ((-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1))):
+            continue
+        if any(grid[y + dy][x + dx] in _SPECIAL_TERRAIN
+               for dy, dx in ((-1,0),(1,0),(0,-1),(0,1))
+               if 0 <= y + dy < h and 0 <= x + dx < w):
+            continue
+        grid[y][x] = T.TREE
+        tree_set.add((y, x))
+    for (y, x) in inner:
+        if grid[y][x] == T.GRASS and (y, x) not in protected and random.random() < 0.25:
+            layout.scenery_features.append((y, x, "shrub"))
+    return True
+
+
+def _place_ruined_hall(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """A row of evenly-spaced wall pillars across the room with rubble debris."""
+    if room.w < 7:
+        return False
+    pillar_row = room.cy
+    pillar_cols = list(range(room.x + 2, room.x + room.w - 2, 2))
+    for px in pillar_cols:
+        if (pillar_row, px) not in protected and grid[pillar_row][px] not in _SPECIAL_TERRAIN:
+            if grid[pillar_row][px] == T.FLOOR:
+                grid[pillar_row][px] = T.WALL
+    above_ok = any(
+        grid[pillar_row - 1][x] == T.FLOOR
+        for x in range(room.x + 1, room.x + room.w - 1)
+        if 0 < pillar_row - 1 < h - 1
+    )
+    below_ok = any(
+        grid[pillar_row + 1][x] == T.FLOOR
+        for x in range(room.x + 1, room.x + room.w - 1)
+        if 0 < pillar_row + 1 < h - 1
+    )
+    if not above_ok or not below_ok:
+        for px in pillar_cols:
+            if grid[pillar_row][px] == T.WALL and (pillar_row, px) not in protected:
+                grid[pillar_row][px] = T.FLOOR
+        return False
+    inner = [(y, x) for (y, x) in _room_inner(room, 1)
+             if grid[y][x] == T.FLOOR and (y, x) not in protected]
+    for (y, x) in random.sample(inner, min(4, len(inner))):
+        layout.scenery_features.append((y, x, "rubble"))
+    return True
+
+
+def _place_frozen_pond(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """A shallow-water 'frozen' pool with rubble crackle around the rim."""
+    inner = {
+        (y, x)
+        for y in range(room.y + 2, room.y + room.h - 2)
+        for x in range(room.x + 2, room.x + room.w - 2)
+        if (y, x) not in protected and grid[y][x] == T.FLOOR
+    }
+    if len(inner) < 4:
+        return False
+    cy, cx = room.cy, room.cx
+    pond: set[tuple[int, int]] = set()
+    for (ny, nx) in inner:
+        if math.sqrt((ny - cy) ** 2 + (nx - cx) ** 2) <= 1.5:
+            grid[ny][nx] = T.SHALLOW_WATER
+            pond.add((ny, nx))
+    if not pond:
+        return False
+    for (py, px) in pond:
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ny, nx = py + dy, px + dx
+            if ((ny, nx) not in pond and (ny, nx) not in protected
+                    and 0 < ny < h - 1 and 0 < nx < w - 1
+                    and grid[ny][nx] == T.FLOOR):
+                layout.scenery_features.append((ny, nx, "rubble"))
+    return True
+
+
+def _place_campsite(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """A grass clearing with a rubble campfire and shrub bedrolls."""
+    cy, cx = room.cy, room.cx
+    if (cy - room.y < 2 or room.y + room.h - 1 - cy < 2 or
+            cx - room.x < 2 or room.x + room.w - 1 - cx < 2):
+        return False
+    if (cy, cx) in protected or grid[cy][cx] in _SPECIAL_TERRAIN:
+        return False
+    patch = [(cy + dy, cx + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1)]
+    for (py, px) in patch:
+        if ((py, px) not in protected and 0 < py < h - 1 and 0 < px < w - 1
+                and grid[py][px] == T.FLOOR):
+            grid[py][px] = T.GRASS
+    if grid[cy][cx] not in _SPECIAL_TERRAIN and (cy, cx) not in protected:
+        grid[cy][cx] = T.FLOOR
+        layout.scenery_features.append((cy, cx, "rubble"))
+    for (py, px) in patch:
+        if grid[py][px] == T.GRASS and (py, px) != (cy, cx):
+            layout.scenery_features.append((py, px, "shrub"))
+    return True
+
+
+def _place_poison_marsh(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """Stagnant mud and shallow water with shrubs marking the hazardous ground."""
+    inner = [(y, x) for (y, x) in _room_inner(room, 1)
+             if (y, x) not in protected and grid[y][x] == T.FLOOR]
+    if len(inner) < 8:
+        return False
+    target = int(len(inner) * random.uniform(0.6, 0.8))
+    random.shuffle(inner)
+    marsh = inner[:target]
+    for (y, x) in marsh:
+        grid[y][x] = T.SHALLOW_WATER if random.random() < 0.30 else T.MUD
+    for (y, x) in marsh:
+        if grid[y][x] == T.MUD and random.random() < 0.40:
+            layout.scenery_features.append((y, x, "shrub"))
+    return True
+
+
+def _place_standing_stones(layout: LevelLayout, grid, room: Room, protected: set, w: int, h: int) -> bool:
+    """Eight wall pillars in an octagonal ring around a central grass clearing."""
+    if room.w < 7 or room.h < 7:
+        return False
+    cy, cx = room.cy, room.cx
+    stone_offsets = [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (-2, 2), (2, -2), (2, 2)]
+    stones = [(cy + dy, cx + dx) for (dy, dx) in stone_offsets]
+    for (sy, sx) in stones:
+        if not (room.y + 1 <= sy <= room.y + room.h - 2 and
+                room.x + 1 <= sx <= room.x + room.w - 2):
+            return False
+        if (sy, sx) in protected or grid[sy][sx] in _SPECIAL_TERRAIN:
+            return False
+    for (sy, sx) in stones:
+        if grid[sy][sx] == T.FLOOR:
+            grid[sy][sx] = T.WALL
+    if (cy, cx) not in protected and grid[cy][cx] not in _SPECIAL_TERRAIN:
+        grid[cy][cx] = T.GRASS
+    passable = sum(
+        1 for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1))
+        if (0 <= cy + dy < h and 0 <= cx + dx < w
+            and grid[cy + dy][cx + dx] in (T.FLOOR, T.GRASS, T.MUD, T.SHALLOW_WATER))
+    )
+    if passable < 2:
+        for (sy, sx) in stones:
+            if grid[sy][sx] == T.WALL and (sy, sx) not in protected:
+                grid[sy][sx] = T.FLOOR
+        return False
+    return True
+
+
+def _place_structures(layout: LevelLayout, grid, protected: set, w: int, h: int,
+                      structures: list) -> None:
+    """Stamp LLM-requested structure blueprints into qualifying rooms."""
+    if not layout.rooms:
+        return
+    counts: dict[str, int] = {}
+    room_pool = list(layout.rooms)
+    random.shuffle(room_pool)
+    for name in structures:
+        spec = STRUCTURE_CATALOG.get(name)
+        if spec is None or counts.get(name, 0) >= spec.max_per_floor:
+            continue
+        for room in room_pool:
+            if room.w < spec.min_room_w or room.h < spec.min_room_h:
+                continue
+            if (room.cy, room.cx) in protected:
+                continue
+            if spec.placer(layout, grid, room, protected, w, h):
+                protected.update(_near(room.cy, room.cx, 2, w, h))
+                counts[name] = counts.get(name, 0) + 1
+                room_pool.remove(room)
+                break
+
+
+_TERRAIN_FEATURE_MAP: dict[str, str] = {
+    "lava_pools": T.LAVA,
+    "chasms": T.CHASM,
+}
+
+
+def _apply_terrain_features(layout: LevelLayout, grid, protected: set, w: int, h: int,
+                             terrain_features: list) -> None:
+    """Place lava pools or chasms in qualifying rooms per LLM terrain hints."""
+    if not layout.rooms:
+        return
+    for feat in terrain_features:
+        terrain_type = _TERRAIN_FEATURE_MAP.get(feat)
+        if not terrain_type:
+            continue
+        candidates = [
+            r for r in layout.rooms
+            if r.w >= 7 and r.h >= 6 and (r.cy, r.cx) not in protected
+        ]
+        if not candidates:
+            continue
+        room = random.choice(candidates)
+        cy, cx = room.cy, room.cx
+        inner = {
+            (y, x)
+            for y in range(room.y + 2, room.y + room.h - 2)
+            for x in range(room.x + 2, room.x + room.w - 2)
+            if (y, x) not in protected and grid[y][x] == T.FLOOR
+        }
+        for (ny, nx) in inner:
+            if math.sqrt((ny - cy) ** 2 + (nx - cx) ** 2) <= 1.5:
+                grid[ny][nx] = terrain_type
+                protected.add((ny, nx))
+
+
+# Populated after placement function definitions so forward-refs resolve correctly.
+STRUCTURE_CATALOG: dict[str, Structure] = {
+    "shrine":          Structure("shrine",          5, 5, _place_shrine,          1),
+    "mushroom_grove":  Structure("mushroom_grove",  6, 5, _place_mushroom_grove,  2),
+    "overgrown_room":  Structure("overgrown_room",  5, 5, _place_overgrown_room,  2),
+    "ruined_hall":     Structure("ruined_hall",     7, 5, _place_ruined_hall,     1),
+    "frozen_pond":     Structure("frozen_pond",     7, 6, _place_frozen_pond,     1),
+    "campsite":        Structure("campsite",        5, 5, _place_campsite,        1),
+    "poison_marsh":    Structure("poison_marsh",    6, 5, _place_poison_marsh,    2),
+    "standing_stones": Structure("standing_stones", 7, 7, _place_standing_stones, 1),
+}
+
+
+# --------------------------------------------------------- corridor / door helpers
 
 def _mouths_of(grid, room: Room, w: int, h: int) -> list[tuple[int, int]]:
     mouths = []

@@ -31,12 +31,16 @@ class DungeonUI:
         size = self.console.size
         H, W = size.height, size.width
 
+        controls_groups = self._controls()
+        wrapped_controls = self._wrap_controls(controls_groups, W - 2)
+        controls_h = max(1, len(wrapped_controls))
+
         # Size the whole frame to fit the current window so nothing scrolls the header
         # off the top. The map keeps its configured size (view_width x view_height)
         # whenever it fits; the message log absorbs the leftover space and only the log
-        # shrinks on short windows. Layout: header(1) + map/sidebar row + log + controls(1),
+        # shrinks on short windows. Layout: header(1) + map/sidebar row + log + controls(N),
         # plus borders and a one-line safety margin.
-        chrome = 1 + 2 + 2 + 1 + 1            # header, map borders, log borders, controls, margin
+        chrome = 1 + 2 + 2 + controls_h + 1    # header, map borders, log borders, controls, margin
         view_h = max(4, min(config.map.view_height, H - chrome - 2))
         log_view = max(1, min(self.LOG_VIEW, H - chrome - view_h))
         view_w = max(12, min(config.map.view_width, W - 40))
@@ -50,7 +54,8 @@ class DungeonUI:
         self.console.print(self._header(), highlight=False, no_wrap=True, crop=True)
         self.console.print(grid)
         self.console.print(self._log_panel(log_view))
-        self.console.print(self._controls(), highlight=False, no_wrap=True, crop=True)
+        for line in wrapped_controls:
+            self.console.print(line, highlight=False)
 
     def _header(self) -> Text:
         g = self.game
@@ -58,7 +63,9 @@ class DungeonUI:
         god = "   [warn]<< GOD MODE >>[/warn]" if getattr(g, "godmode", False) else ""
         return Text.from_markup(
             f"[game_header]DUNGEON.PY[/game_header]   "
-            f"[depth]Depth {g.depth}/{config.depth.floors}[/depth]   "
+            f"[depth]Depth {g.depth}/{config.depth.floors}[/depth]"
+            + (f" [flavor]— {_t.name}[/flavor]" if (_t := getattr(g, '_floor_themes', {}).get(g.depth)) and _t.name else "")
+            + "   "
             f"[move_count]Turn {g.moves}[/move_count]   "
             f"[time_count]{elapsed:.1f}s[/time_count]{god}"
         )
@@ -81,16 +88,24 @@ class DungeonUI:
         bar_color = "hp_bar" if ratio > 0.33 else "hp_bar_low"
         bar = f"[{bar_color}]{'█' * filled}[/{bar_color}][grey23]{'░' * (bar_w - filled)}[/grey23]"
 
-        if p.has_orb:
-            objective = "[orb]Carry the Orb to the surface![/orb]\n[warn]Find up-stairs (<) on Depth 1.[/warn]"
+        shard_count = len(p.shards)
+        if shard_count == 3:
+            objective = "[shard]Sigil complete! Escape to the surface.[/shard]\n[warn]Find up-stairs (<) on Depth 1.[/warn]"
+        elif shard_count > 0:
+            objective = (
+                f"[shard]Sigil: {shard_count}/3 shards[/shard]\n"
+                f"[flavor]{', '.join(p.shards)}[/flavor]\n"
+                f"[stairs]More shards wait deeper.[/stairs]"
+            )
         else:
-            objective = "[item]Descend to find the Orb of Zot.[/item]\n[stairs]Take down-stairs (>) ever deeper.[/stairs]"
+            objective = "[item]Find 3 sigil shards on depths 6–8.[/item]\n[stairs]Take down-stairs (>) to descend.[/stairs]"
 
         full = len(p.inventory) >= p.max_inventory
+        shard_tag = f"  [shard]+{shard_count}★[/shard]" if shard_count > 0 else ""
         pack_line = (
             f"[inventory]Pack[/inventory]: {len(p.inventory)}/{p.max_inventory}"
             + ("  [warn]FULL[/warn]" if full else "")
-            + ("  [orb]+Orb[/orb]" if p.has_orb else "")
+            + shard_tag
         )
         background = f" [flavor]{p.background}[/flavor]" if getattr(p, "background", None) else ""
         lines = [
@@ -135,12 +150,36 @@ class DungeonUI:
         return Panel(text, title="[menu_header]Messages[/menu_header]",
                      border_style="grey37", height=log_view + 2)
 
-    def _controls(self) -> Text:
-        return Text.from_markup(
-            "[controls]move[/controls] arrows/hjkl/yubn   "
-            "[controls]f[/controls] aim/fire ranged   [controls]g[/controls] pick up   "
-            "[controls]i[/controls] pack   [controls]o[/controls] explore   "
-            "[controls]>[/controls]/[controls]<[/controls] stairs   "
-            "[controls]s[/controls] search   [controls].[/controls] wait   "
-            "[controls]p[/controls] pause   [controls]?[/controls] help   [controls]esc[/controls] quit"
-        )
+    def _controls(self) -> list[str]:
+        return [
+            "[controls]move[/controls] arrows/hjkl/yubn",
+            "[controls]f[/controls] fire",
+            "[controls]g[/controls] pick up",
+            "[controls]i[/controls] pack",
+            "[controls]o[/controls] explore",
+            "[controls]>[/controls]/[controls]<[/controls] stairs",
+            "[controls]G[/controls] goto-stairs",
+            "[controls][[/controls]/[controls]][/controls] view stairs",
+            "[controls]X[/controls] exclude",
+            "[controls]\\\\[/controls] pickup-cfg",
+            "[controls]s[/controls] search",
+            "[controls].[/controls] wait",
+            "[controls]?[/controls] help",
+            "[controls]esc[/controls] quit",
+        ]
+
+    @staticmethod
+    def _wrap_controls(groups: list[str], width: int) -> list[str]:
+        lines: list[str] = []
+        current = ""
+        for group in groups:
+            candidate = (current + "   " + group) if current else group
+            if Text.from_markup(candidate).cell_len > width:
+                if current:
+                    lines.append(current)
+                current = group
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+        return lines

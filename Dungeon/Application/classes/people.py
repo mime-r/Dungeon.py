@@ -21,9 +21,10 @@ def _name_pool() -> dict:
 class DungeonPeople:
     """Base NPC class with a randomly generated name."""
 
-    def __init__(self, occupation: str) -> None:
+    def __init__(self, occupation: str, personality: str = "") -> None:
         self.name = DungeonPeople.generate_name()
         self.occupation = occupation
+        self.personality = personality
 
     @staticmethod
     def generate_name() -> str:
@@ -38,16 +39,16 @@ class DungeonPeople:
 class DungeonTrader(DungeonPeople):
     """A trader NPC with a randomized inventory of items for sale."""
 
-    def __init__(self, potential_sales, occupation: str = "trader") -> None:
-        super().__init__(occupation=occupation)
+    def __init__(self, potential_sales, occupation: str = "trader", personality: str = "") -> None:
+        super().__init__(occupation=occupation, personality=personality)
         self.stuff = [sale.item for sale in potential_sales if random.randint(1, 100) <= sale.chance]
 
 
 class DungeonHealer(DungeonPeople):
     """A healer NPC who restores HP in exchange for coins."""
 
-    def __init__(self, heal_cost_per_hp: int = 1, occupation: str = "Healer") -> None:
-        super().__init__(occupation=occupation)
+    def __init__(self, heal_cost_per_hp: int = 1, occupation: str = "Healer", personality: str = "") -> None:
+        super().__init__(occupation=occupation, personality=personality)
         self.heal_cost_per_hp = heal_cost_per_hp
 
 
@@ -69,11 +70,16 @@ class DungeonPeopleLoader:
                 )
                 for sale_dict in people_data.potential_sales
             )
-            return DungeonTrader(potential_sales=potential_sales, occupation=people_data.occupation)
+            return DungeonTrader(
+                potential_sales=potential_sales,
+                occupation=people_data.occupation,
+                personality=getattr(people_data, "personality", ""),
+            )
         if self.type == DungeonHealer:
             return DungeonHealer(
                 heal_cost_per_hp=getattr(people_data, "heal_cost_per_hp", 1),
                 occupation=people_data.occupation,
+                personality=getattr(people_data, "personality", ""),
             )
 
 

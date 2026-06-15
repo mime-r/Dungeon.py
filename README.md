@@ -1,16 +1,17 @@
 # Dungeon.py
 Welcome to the Dungeon: a turn-based roguelike inspired by **Dungeon Crawl Stone Soup**.
 Descend through eight floors of an ever-shifting dungeon, fight monsters that hunt you in
-real positions on the map, seize the **Orb of Zot** from the depths, and escape back to
-the surface alive.
+real positions on the map, collect the **three shards of the Broken Sigil** from the deep
+floors, and escape back to the surface alive.
 
 <p align="center"><img src="/resources/Dungeon.gif?raw=true"/></p>
 <br />
 
 ## How to play
 
-Your goal: **descend to the bottom (Depth 8), pick up the Orb of Zot, then climb all the
-way back to the surface up-stairs.** Monsters get tougher the deeper you go.
+Your goal: **collect all three shards of the Broken Sigil** — one on each of depths 6, 7,
+and 8 — then **climb back to the surface**. Each shard is guarded by a boss. The exit only
+unlocks once you carry the complete sigil. Monsters get tougher the deeper you go.
 
 At the start you choose a **class** (Fighter, Hunter, Acolyte or Wanderer), each with
 its own starting kit and health. Killing monsters grants **XP and levels** (more HP and
@@ -40,6 +41,40 @@ log as you bump into foes; keep an eye on your HP bar and the status line.
 Instructions to download can be found [here](INSTRUCTIONS.md)
 
 ## Changelog:
+15/6/26 v2.3 - "The Terrain Update"
+
+**Terrain & Scenery**
+- 7 new terrain types: shallow water (`~`), deep water (`≈`), lava (`▒`), trees (`♣`), chasms (`░`), grass (`,`), mud (`;`) — each with distinct walkability, sight-blocking, and visual style
+- 3 new floor features rendered on top of terrain: shrubs (`%`), mushrooms (`"`), rubble (`:`)
+- Organic scenery pass runs on every floor: ponds grow inside large rooms with a 2-cell safety margin, trees scatter only in fully open room interiors, grass and mud patches blend with corridors, mushrooms and shrubs dot qualifying cells
+
+**Dynamic Floor Biomes**
+
+<p align="center"><img src="/resources/Dungeon_Biome_Example.png?raw=true"/></p>
+
+- Each floor generates a unique biome theme (AI-assisted) that shapes its enemy composition, loot, traps, terrain, and structures into a coherent setting - volcanic rift, ancient fungal depths, sacred shrine, and more
+- 8 hand-crafted structure blueprints placed according to the floor's theme:
+
+  | Structure | Effect |
+  | --- | --- |
+  | `shrine` | 4 diagonal wall pillars + altar at center |
+  | `mushroom_grove` | Mud floor flooded with dense mushroom features |
+  | `overgrown_room` | Grass flood, isolated trees, scattered shrubs |
+  | `ruined_hall` | Pillar row across room center + rubble debris |
+  | `frozen_pond` | Shallow-water ice pool with a rubble rim |
+  | `campsite` | Grass patch, rubble campfire, shrub bedrolls |
+  | `poison_marsh` | Mud/shallow-water mix with shrubs |
+  | `standing_stones` | 8-pillar octagonal ring on a grass center |
+
+- 2 special terrain feature overlays: `lava_pools` (impassable lava oval) and `chasms` (impassable void oval)
+- Every biome combination produces a different dungeon feel without breaking navigation or connectivity
+
+**Win Condition**
+- Collect three sigil shards (`*`) hidden on depths 6, 7, and 8; the exit only unlocks when you carry all three
+- Each shard is guarded by a depth-specific boss: Flame Guardian (depth 6), Stone Guardian (depth 7), Shadow Guardian (depth 8)
+- Shard progress tracked in the sidebar (`Sigil: N/3 shards`)
+- The dungeon awakens (all monsters wake) when the final shard is collected
+
 15/6/26 v2.2 - "Depths & Disciplines"
 - Character progression: choose a class (Fighter/Hunter/Acolyte/Wanderer); gain XP, levels, max HP and combat bonuses
 - Status effects for player and monsters: poison, regeneration, might, haste, slow, confusion (with a small energy/speed scheduler)
@@ -59,7 +94,7 @@ Instructions to download can be found [here](INSTRUCTIONS.md)
 - Expanded name generator: 73 first names, 40 surnames, 26 epithets (was 48/24/11)
 
 15/6/26 v2.0 - "Stone Soup" overhaul
-- Multi-floor descent with up/down stairs and the Orb of Zot win condition (find it, escape)
+- Multi-floor descent with up/down stairs and a three-shard win condition (find all shards, escape)
 - Rooms-and-corridors level generation with doors, secret doors and hidden vault rooms
 - Rebuilt rich UI: map panel + hero sidebar (HP bar, depth, objective) + scrolling message log
 - Bump-to-attack combat with persistent monsters that wake and chase you

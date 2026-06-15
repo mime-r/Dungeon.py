@@ -213,22 +213,63 @@
         }
     },
     {
-        "name": "Orb Guardian",
+        "name": "Flame Guardian",
+        "symbol": "&",
+        "tier": "boss",
+        "depth": [6, 6],
+        "spawn_weight": 0,
+        "health_range": [38, 50],
+        "coin_drop_range": [20, 35],
+        "xp_drop": 18,
+        "attack_base": 6,
+        "attack_range": [1, 5],
+        "accuracy": 65,
+        "on_hit": { "effect": "poison", "chance": 35, "duration": 5, "potency": 2 },
+        "texts": {
+            "critical_hit": "The {} vomits a jet of searing flame! Your skin blisters.",
+            "hit": "The {} lashes you with a tendril of living fire.",
+            "missed_hit": "The {} scorches the floor where you stood.",
+            "death": "The {} collapses into smouldering cinders. The Shard of Flame glows red."
+        }
+    },
+    {
+        "name": "Stone Guardian",
+        "symbol": "&",
+        "tier": "boss",
+        "depth": [7, 7],
+        "spawn_weight": 0,
+        "health_range": [48, 62],
+        "coin_drop_range": [22, 40],
+        "xp_drop": 24,
+        "attack_base": 7,
+        "attack_range": [1, 6],
+        "accuracy": 60,
+        "on_hit": { "effect": "slow", "chance": 45, "duration": 6 },
+        "texts": {
+            "critical_hit": "The {} drives a fist of solid granite into you with bone-crushing force!",
+            "hit": "The {} smashes you with a limb of living stone.",
+            "missed_hit": "The {} pounds the flagstones where you stood, splitting them.",
+            "death": "The {} cracks apart with a thunderous groan. The Shard of Stone lies exposed."
+        }
+    },
+    {
+        "name": "Shadow Guardian",
         "symbol": "&",
         "tier": "boss",
         "depth": [8, 8],
         "spawn_weight": 0,
-        "health_range": [55, 70],
+        "health_range": [55, 72],
         "coin_drop_range": [25, 45],
         "xp_drop": 30,
         "attack_base": 8,
-        "attack_range": [2, 8],
+        "attack_range": [2, 7],
         "accuracy": 70,
+        "on_hit": { "effect": "confusion", "chance": 30, "duration": 4 },
         "texts": {
-            "critical_hit": "The {} unleashes a torrent of searing energy! The chamber blazes white.",
-            "hit": "The {} strikes you with a limb of living stone.",
-            "missed_hit": "The {} slams the floor where you stood, cracking the flagstones.",
-            "death": "The {} shatters, and the Orb's light is finally yours to take."
+            "critical_hit": "The {} tears through your mind as much as your flesh — reality swims!",
+            "hit": "The {} reaches through the dark and rakes cold fingers across you.",
+            "missed_hit": "The {} dissolves into shadow where you strike, reforming behind you.",
+            "death": "The {} unravels with a hollow shriek. The Shard of Shadow is yours."
         }
     }
 ]

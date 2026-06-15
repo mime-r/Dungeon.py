@@ -20,6 +20,7 @@ class StyleConfig:
     bag: str = "#c9a06b"
     gold: str = "#FFD900"
     orb: str = "bold #fffb00"
+    shard: str = "bold #ff9e2c"
 
     # --- npcs ---
     chemist: str = "bold #FFD900"
@@ -68,11 +69,26 @@ class StyleConfig:
     slow: str = "#9aa0b0"
     confusion: str = "#C77DFF"
 
+    # --- terrain scenery ---
+    shallow_water: str = "#4fc3f7"
+    deep_water: str = "bold #0d47a1"
+    lava: str = "bold #ff5722"
+    tree: str = "bold #33691e"
+    chasm: str = "#1a237e"
+    grass: str = "#66bb6a"
+    mud: str = "#795548"
+
+    # --- floor features ---
+    shrub: str = "#43a047"
+    mushroom: str = "#ab47bc"
+    rubble: str = "#757575"
+
     # --- traps / targeting / features ---
     trap: str = "bold #FF5C5C"
     altar: str = "bold #E6D8A0"
     target: str = "bold #FFE066"
     target_path: str = "#8a7d3a"
+    stair_cursor: str = "bold reverse #ffe066"
 
 
 class TerrainConfig:
@@ -86,8 +102,17 @@ class TerrainConfig:
     STAIRS_DOWN = "stairs_down"
     STAIRS_UP = "stairs_up"
 
-    walkable = {FLOOR, DOOR_OPEN, STAIRS_DOWN, STAIRS_UP}
-    blocks_sight = {WALL, DOOR_CLOSED, SECRET_DOOR}
+    # --- scenery terrain ---
+    SHALLOW_WATER = "shallow_water"     # wadeable, slows slightly
+    DEEP_WATER = "deep_water"           # impassable, transparent
+    LAVA = "lava"                       # impassable, transparent (future: burn damage)
+    TREE = "tree"                       # impassable, opaque
+    CHASM = "chasm"                     # impassable void, transparent
+    GRASS = "grass"                     # walkable floor variant
+    MUD = "mud"                         # walkable floor variant
+
+    walkable = {FLOOR, DOOR_OPEN, STAIRS_DOWN, STAIRS_UP, SHALLOW_WATER, GRASS, MUD}
+    blocks_sight = {WALL, DOOR_CLOSED, SECRET_DOOR, TREE}
 
 
 class SymbolConfig:
@@ -108,8 +133,23 @@ class SymbolConfig:
     weapons: str = ")"
     bag: str = "("
     orb: str = "0"
+    shard: str = "*"
     trap: str = "^"          # a revealed trap
     altar: str = "_"         # a temple altar
+
+    # scenery terrain
+    shallow_water: str = "~"
+    deep_water: str = "≈"
+    lava: str = "▒"
+    tree: str = "♣"
+    chasm: str = "░"
+    grass: str = ","
+    mud: str = ";"
+
+    # floor features
+    shrub: str = "%"
+    mushroom: str = '"'
+    rubble: str = ":"
 
     # npcs
     chemist: str = "C"
@@ -131,6 +171,13 @@ class SymbolConfig:
         TerrainConfig.SECRET_DOOR: wall,        # disguised as wall until found
         TerrainConfig.STAIRS_DOWN: stairs_down,
         TerrainConfig.STAIRS_UP: stairs_up,
+        TerrainConfig.SHALLOW_WATER: shallow_water,
+        TerrainConfig.DEEP_WATER: deep_water,
+        TerrainConfig.LAVA: lava,
+        TerrainConfig.TREE: tree,
+        TerrainConfig.CHASM: chasm,
+        TerrainConfig.GRASS: grass,
+        TerrainConfig.MUD: mud,
     }
 
     # glyph -> style name (for terrain & static features)
@@ -148,12 +195,25 @@ class SymbolConfig:
         weapons: "weapons",
         bag: "bag",
         orb: "orb",
+        "*": "shard",
         trap: "trap",
         altar: "altar",
         chemist: "chemist",
         blacksmith: "blacksmith",
         healer: "healer",
         merchant: "merchant",
+        # scenery terrain
+        shallow_water: "shallow_water",
+        deep_water: "deep_water",
+        lava: "lava",
+        tree: "tree",
+        chasm: "chasm",
+        grass: "grass",
+        mud: "mud",
+        # floor features
+        shrub: "shrub",
+        mushroom: "mushroom",
+        rubble: "rubble",
     }
 
 
@@ -171,7 +231,7 @@ class MapConfig:
     # On-screen viewport (the map scrolls to follow the player, DCSS-style). Kept below
     # the minimum map size so the view always scrolls on BOTH axes. Odd values centre
     # the player exactly.
-    view_width: int = 33
+    view_width: int = 43
     view_height: int = 25
 
 
