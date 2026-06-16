@@ -85,27 +85,50 @@
 
 ## Traceability
 
-Filled in during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HAND-01 | TBD | Pending |
-| HAND-02 | TBD | Pending |
-| HAND-03 | TBD | Pending |
-| MACE-01..07 | TBD | Pending |
-| BLADE-01..05 | TBD | Pending |
-| POLE-01..04 | TBD | Pending |
-| RANG-01..04 | TBD | Pending |
-| SHORT-01 | TBD | Pending |
-| STAFF-01..02 | TBD | Pending |
-| THROW-01..07 | TBD | Pending |
-| INT-01..02 | TBD | Pending |
+| HAND-01 | Phase 1 | Pending |
+| HAND-02 | Phase 1 | Pending |
+| HAND-03 | Phase 1 | Pending |
+| MACE-01 | Phase 2 | Pending |
+| MACE-02 | Phase 2 | Pending |
+| MACE-03 | Phase 2 | Pending |
+| MACE-04 | Phase 2 | Pending |
+| MACE-05 | Phase 2 | Pending |
+| MACE-06 | Phase 2 | Pending |
+| MACE-07 | Phase 2 | Pending |
+| BLADE-01 | Phase 2 | Pending |
+| BLADE-02 | Phase 2 | Pending |
+| BLADE-03 | Phase 2 | Pending |
+| BLADE-04 | Phase 2 | Pending |
+| BLADE-05 | Phase 2 | Pending |
+| POLE-01 | Phase 2 | Pending |
+| POLE-02 | Phase 2 | Pending |
+| POLE-03 | Phase 2 | Pending |
+| POLE-04 | Phase 2 | Pending |
+| SHORT-01 | Phase 2 | Pending |
+| STAFF-01 | Phase 2 | Pending |
+| STAFF-02 | Phase 2 | Pending |
+| RANG-01 | Phase 3 | Pending |
+| RANG-02 | Phase 3 | Pending |
+| RANG-03 | Phase 3 | Pending |
+| RANG-04 | Phase 3 | Pending |
+| THROW-01 | Phase 4 | Pending |
+| THROW-02 | Phase 4 | Pending |
+| THROW-03 | Phase 4 | Pending |
+| THROW-04 | Phase 4 | Pending |
+| THROW-05 | Phase 4 | Pending |
+| THROW-06 | Phase 4 | Pending |
+| THROW-07 | Phase 4 | Pending |
+| INT-01 | Phase 4 | Pending |
+| INT-02 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 36 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 36 ⚠️
+- v1 requirements: 35 total
+- Mapped to phases: 35/35 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-16*
-*Last updated: 2026-06-16 after initial definition*
+*Last updated: 2026-06-16 after roadmap creation*
+</content>
