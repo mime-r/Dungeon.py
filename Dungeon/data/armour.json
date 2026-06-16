@@ -1,0 +1,220 @@
+[
+    {
+        "name": "Robe",
+        "description": "Simple cloth robes. Barely protective, but never slow you down.",
+        "cost": 12,
+        "slot": "body",
+        "ac": 2,
+        "encumbrance": 0
+    },
+    {
+        "name": "Animal Skin",
+        "description": "A crudely cured hide, worn as a cloak around the torso.",
+        "cost": 14,
+        "slot": "body",
+        "ac": 2,
+        "encumbrance": 0
+    },
+    {
+        "name": "Leather Armour",
+        "description": "Boiled leather plates stitched over a padded jerkin.",
+        "cost": 24,
+        "slot": "body",
+        "ac": 3,
+        "encumbrance": 4
+    },
+    {
+        "name": "Troll Leather Armour",
+        "description": "Tough, knotted hide from a troll's hide. Lighter than it looks.",
+        "cost": 30,
+        "slot": "body",
+        "ac": 3,
+        "encumbrance": 4
+    },
+    {
+        "name": "Ring Mail",
+        "description": "Overlapping metal rings sewn onto a leather backing.",
+        "cost": 42,
+        "slot": "body",
+        "ac": 5,
+        "encumbrance": 7
+    },
+    {
+        "name": "Steam Dragon Scales",
+        "description": "Scales from a steam dragon, light as cloth but surprisingly tough.",
+        "cost": 50,
+        "slot": "body",
+        "ac": 5,
+        "encumbrance": 0
+    },
+    {
+        "name": "Scale Mail",
+        "description": "Small metal scales riveted into overlapping rows.",
+        "cost": 56,
+        "slot": "body",
+        "ac": 6,
+        "encumbrance": 10
+    },
+    {
+        "name": "Acid Dragon Scales",
+        "description": "Scales that shrug off corrosive splashes without pitting.",
+        "cost": 60,
+        "slot": "body",
+        "ac": 6,
+        "encumbrance": 5
+    },
+    {
+        "name": "Swamp Dragon Scales",
+        "description": "Slick, mottled scales harvested from a swamp dragon.",
+        "cost": 68,
+        "slot": "body",
+        "ac": 7,
+        "encumbrance": 7
+    },
+    {
+        "name": "Chain Mail",
+        "description": "Thousands of interlocking iron rings, heavy but dependable.",
+        "cost": 74,
+        "slot": "body",
+        "ac": 8,
+        "encumbrance": 14
+    },
+    {
+        "name": "Quicksilver Dragon Scales",
+        "description": "Scales that shimmer like liquid metal, oddly light for their strength.",
+        "cost": 80,
+        "slot": "body",
+        "ac": 9,
+        "encumbrance": 7
+    },
+    {
+        "name": "Fire Dragon Scales",
+        "description": "Scales still warm to the touch, fused from a fire dragon's hide.",
+        "cost": 78,
+        "slot": "body",
+        "ac": 8,
+        "encumbrance": 9
+    },
+    {
+        "name": "Ice Dragon Scales",
+        "description": "Pale, frost-rimed scales that never quite warm up.",
+        "cost": 84,
+        "slot": "body",
+        "ac": 9,
+        "encumbrance": 11
+    },
+    {
+        "name": "Plate Armour",
+        "description": "Heavy, fitted steel plate covering the whole torso.",
+        "cost": 92,
+        "slot": "body",
+        "ac": 10,
+        "encumbrance": 18
+    },
+    {
+        "name": "Pearl Dragon Scales",
+        "description": "Lustrous, opalescent scales prized as much for beauty as protection.",
+        "cost": 88,
+        "slot": "body",
+        "ac": 10,
+        "encumbrance": 11
+    },
+    {
+        "name": "Storm Dragon Scales",
+        "description": "Scales that crackle faintly with static when struck.",
+        "cost": 90,
+        "slot": "body",
+        "ac": 10,
+        "encumbrance": 15
+    },
+    {
+        "name": "Shadow Dragon Scales",
+        "description": "Scales so dark they seem to swallow torchlight.",
+        "cost": 95,
+        "slot": "body",
+        "ac": 11,
+        "encumbrance": 15
+    },
+    {
+        "name": "Golden Dragon Scales",
+        "description": "Gleaming scales, dense and immensely heavy.",
+        "cost": 100,
+        "slot": "body",
+        "ac": 12,
+        "encumbrance": 23
+    },
+    {
+        "name": "Crystal Plate Armour",
+        "description": "Plate forged from enchanted crystal, the pinnacle of body armour.",
+        "cost": 110,
+        "slot": "body",
+        "ac": 14,
+        "encumbrance": 23
+    },
+    {
+        "name": "Buckler",
+        "description": "A small round shield, light enough to barely slow a swing.",
+        "cost": 20,
+        "slot": "shield",
+        "sh": 3,
+        "encumbrance": 5
+    },
+    {
+        "name": "Kite Shield",
+        "description": "A tall, teardrop-shaped shield favoured by foot soldiers.",
+        "cost": 50,
+        "slot": "shield",
+        "sh": 8,
+        "encumbrance": 10
+    },
+    {
+        "name": "Tower Shield",
+        "description": "A massive wall of a shield. Excellent cover, terrible for agility.",
+        "cost": 80,
+        "slot": "shield",
+        "sh": 13,
+        "encumbrance": 15
+    },
+    {
+        "name": "Hat",
+        "description": "A floppy, unremarkable hat. Keeps the rain off, mostly.",
+        "cost": 4,
+        "slot": "helmet",
+        "ac": 0
+    },
+    {
+        "name": "Helmet",
+        "description": "A simple steel cap.",
+        "cost": 10,
+        "slot": "helmet",
+        "ac": 1
+    },
+    {
+        "name": "Scarf",
+        "description": "A length of fine cloth worn at the shoulders for show.",
+        "cost": 4,
+        "slot": "cloak",
+        "ac": 0
+    },
+    {
+        "name": "Cloak",
+        "description": "A traveller's cloak, clasped at the shoulder.",
+        "cost": 10,
+        "slot": "cloak",
+        "ac": 1
+    },
+    {
+        "name": "Gloves",
+        "description": "Supple leather gloves that protect the knuckles without dulling grip.",
+        "cost": 10,
+        "slot": "gloves",
+        "ac": 1
+    },
+    {
+        "name": "Boots",
+        "description": "Sturdy leather boots with a reinforced toe.",
+        "cost": 10,
+        "slot": "boots",
+        "ac": 1
+    }
+]

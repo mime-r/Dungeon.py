@@ -11,6 +11,8 @@ import random
 from ..utils import style_text
 from ..config import config
 from .status import StatusSet
+from .skills import SkillSet, skill_for_weapon
+from .items import DungeonSpell
 
 T = config.terrain
 
@@ -57,6 +59,10 @@ class DungeonPlayer:
         self.inventory: list = []
         self.max_inventory = max_inventory
         self.equipped = equipped
+        self.armour: dict[str, object | None] = {
+            "body": None, "shield": None, "helmet": None,
+            "cloak": None, "gloves": None, "boots": None,
+        }
         self.location: tuple[int, int] = (0, 0)
         self.name: str | None = None
         self.background: str | None = None
@@ -70,6 +76,13 @@ class DungeonPlayer:
         self.status = StatusSet()
         self.energy = 0
         self.speed = 10
+        self.skills = None
+        # magic
+        self.mp = 0
+        self.max_mp = 0
+        self.intelligence = 8
+        self.known_spells: list[DungeonSpell] = []
+        self._channeling: dict = {}  # spell_name -> remaining_turns
 
     def effective_speed(self) -> int:
         s = self.speed
@@ -80,11 +93,56 @@ class DungeonPlayer:
         return max(1, s)
 
     def combat_bonus(self) -> tuple[int, int]:
-        """Return (damage_bonus, accuracy_bonus) from level and Might."""
+        """Return (damage_bonus, accuracy_bonus) from level, skills, and Might."""
         prog = config.progression
         dmg = self.level // prog.damage_every + self.status.potency("might")
         acc = self.level * prog.accuracy_per_level
+        if self.skills:
+            dmg += int(self.skills.get_level("Fighting") * 0.5)
+            weapon = self.equipped
+            if weapon:
+                wskill = skill_for_weapon(weapon.name)
+                if wskill:
+                    dmg += int(self.skills.get_level(wskill) * 0.3)
+                    acc += int(self.skills.get_level(wskill) * 1.5)
         return dmg, acc
+
+    def armor_class(self) -> int:
+        """Total AC from all worn armour and Armour skill."""
+        base = sum(piece.ac for piece in self.armour.values() if piece)
+        if self.skills:
+            base += int(self.skills.get_level("Armour") * 0.2)
+        return base
+
+    def total_encumbrance(self) -> int:
+        """Combined encumbrance rating of worn body armour and shield, eased by level
+        and Armour skill."""
+        body, shield = self.armour.get("body"), self.armour.get("shield")
+        raw = (body.encumbrance if body else 0) + (shield.encumbrance if shield else 0)
+        reduction = self.level // 4
+        if self.skills:
+            reduction += int(self.skills.get_level("Armour") * 0.3)
+        return max(0, raw - reduction)
+
+    def evasion(self) -> int:
+        """Shield SH plus Dodging skill, minus encumbrance."""
+        shield = self.armour.get("shield")
+        sh = shield.sh if shield else 0
+        if self.skills:
+            sh += int(self.skills.get_level("Shields") * 0.5)
+            sh += int(self.skills.get_level("Dodging") * 0.3)
+        return max(0, sh - self.total_encumbrance())
+
+    def stealth_penalty(self) -> int:
+        """How much further away encumbered armour lets sleeping enemies notice you."""
+        base = self.total_encumbrance() // 4
+        if self.skills:
+            base = max(0, base - int(self.skills.get_level("Stealth") * 0.25))
+        return base
+
+    def ranged_encumbrance_delay(self) -> int:
+        """Extra energy cost applied after firing a ranged weapon while encumbered."""
+        return self.total_encumbrance() // 2
 
     def gain_xp(self, amount: int) -> None:
         self.xp += amount
@@ -97,6 +155,12 @@ class DungeonPlayer:
             self.health += gain
             self.game.message(
                 f"[level]Welcome to level {self.level}![/level] [health](+{gain} max HP)[/health]")
+            # MP level up
+            if self.max_mp > 0:
+                mp_gain = max(1, int(self.intelligence * 0.3))
+                self.max_mp += mp_gain
+                self.mp = min(self.max_mp, self.mp + mp_gain)
+                self.game.message(f"[haste](+{mp_gain} max MP)[/haste]")
 
     @property
     def x(self) -> int:
@@ -123,6 +187,15 @@ class DungeonPlayer:
             if getattr(cell.occupant, "is_enemy", False):
                 self.attack(cell.occupant)
                 return True
+            if getattr(cell.occupant, "is_summon", False):
+                game.message(f"[action]Swapped places with {style_text(cell.occupant.name, 'item')}.[/action]")
+                game.map.move_occupant(cell.occupant, self.y, self.x)
+                self.location = (ny, nx)
+                if self.skills:
+                    self.skills.record("Dodging")
+                    self.skills.record("Stealth")
+                self._on_enter(cell)
+                return True
             return game.interact_npc(cell.occupant)  # bump an NPC to trade/heal or step past
 
         if cell.terrain == T.DOOR_CLOSED:
@@ -135,6 +208,9 @@ class DungeonPlayer:
             return False
 
         self.location = (ny, nx)
+        if self.skills:
+            self.skills.record("Dodging")
+            self.skills.record("Stealth")
         self._on_enter(cell)
         return True
 
@@ -144,22 +220,23 @@ class DungeonPlayer:
             game.trigger_trap(cell)
         if cell.feature == "altar":
             game.bless_at_altar(cell)
-        if cell.gold > 0:
+        if cell.gold > 0 and "gold" in getattr(game, "auto_pickup_types", set()):
             game.player.coins += cell.gold
             game.message(f"You pick up {style_text(str(cell.gold) + ' gold', 'gold')}.")
             cell.gold = 0
         if cell.items:
             _AUTO_KIND = {
                 "DungeonPotion": "potion", "DungeonScroll": "scroll",
-                "DungeonWeapon": "weapon", "DungeonInventory": "bag",
+                "DungeonWeapon": "weapon", "DungeonThrowable": "throwable",
+                "DungeonInventory": "bag", "DungeonArmour": "armour",
+                "DungeonSpellBook": "spellbook",
             }
             auto_types = getattr(game, "auto_pickup_types", set())
             for item in list(cell.items):
                 kind = _AUTO_KIND.get(type(item).__name__)
-                if kind in auto_types and len(self.inventory) < self.max_inventory:
-                    cell.items.remove(item)
-                    self.inventory.append(item)
-                    game.message(f"You pick up the {style_text(game.display_name(item), 'item')}.")
+                if kind in auto_types and (kind == "throwable" or len(self.inventory) < self.max_inventory):
+                    if game.collect_item(item):
+                        pass
         if cell.items:
             game.map.announce_items(cell)
         if cell.terrain == T.STAIRS_DOWN:
@@ -171,6 +248,11 @@ class DungeonPlayer:
         weapon = self.equipped
         enemy_name = style_text(enemy.name, "enemy")
         weapon_name = style_text(weapon.name, "weapons")
+        if self.skills:
+            wskill = skill_for_weapon(weapon.name)
+            if wskill:
+                self.skills.record(wskill)
+            self.skills.record("Fighting")
         if self.game.godmode:
             self.game.message(f"[warn][GOD][/warn] You annihilate the {enemy_name}.")
             enemy.health = 0
@@ -186,8 +268,24 @@ class DungeonPlayer:
             enemy.health -= damage
             if enemy.health <= 0:
                 self.game.on_enemy_death(enemy)
+            else:
+                self.apply_weapon_on_hit(weapon, enemy)
         else:
             self.game.message(weapon.texts.missed_hit.format(enemy_name, weapon_name))
+
+    def apply_weapon_on_hit(self, weapon, enemy) -> None:
+        """Apply a magical weapon's on-hit status effect (staves) to a surviving enemy."""
+        on_hit = getattr(weapon, "on_hit", None)
+        if not on_hit:
+            return
+        if random.randint(1, 100) > on_hit.get("chance", 100):
+            return
+        effect = on_hit["effect"]
+        enemy.status.add(effect, on_hit.get("duration", 4), on_hit.get("potency", 1))
+        verb = {"poison": "is poisoned", "burn": "catches fire", "slow": "is chilled to the bone",
+                "confusion": "reels in confusion"}.get(effect, f"is afflicted with {effect}")
+        enemy_name = style_text(enemy.name, "enemy")
+        self.game.message(f"[{effect}]The {enemy_name} {verb}![/{effect}]")
 
     def print_inventory(self) -> None:
         p = self.game.print
@@ -222,6 +320,7 @@ class DungeonMap:
         self.altar = layout.altar
         self.floor_cells = layout.floor_cells
         self.enemies: list = []
+        self.summon: list = []
         self.npcs: list = []
         self.visible: set[tuple[int, int]] = set()
         self.excluded_stairs: set[tuple[int, int]] = set()
@@ -305,7 +404,11 @@ class DungeonMap:
 
     def visible_enemies(self) -> list:
         god = getattr(self.game, "godmode", False)
-        return [e for e in self.enemies if god or (e.y, e.x) in self.visible]
+        return [e for e in self.enemies if not getattr(e, "is_summon", False) and (god or (e.y, e.x) in self.visible)]
+
+    def visible_summons(self) -> list:
+        god = getattr(self.game, "godmode", False)
+        return [s for s in self.summon if s.health > 0 and (god or (s.y, s.x) in self.visible)]
 
     def visible_npcs(self) -> list:
         god = getattr(self.game, "godmode", False)
@@ -365,6 +468,7 @@ class DungeonMap:
         path = getattr(self.game, "target_path", None) or ()
         path_set = set(path)
         stair_cursor = getattr(self.game, "stair_cursor", None)
+        examine_cursor = getattr(self.game, "examine_cursor", None)
         top, left, vh, vw = self.viewport(
             view_w or config.map.view_width, view_h or config.map.view_height)
         rows = []
@@ -387,6 +491,8 @@ class DungeonMap:
                         style = styles["target_path"]
                 if stair_cursor is not None and (y, x) == stair_cursor:
                     style = styles.get("stair_cursor", styles["target"])
+                if examine_cursor is not None and (y, x) == examine_cursor:
+                    style = styles.get("examine_cursor", "bold reverse white")
                 out.append((glyph, style))
             rows.append(out)
         return rows
@@ -401,7 +507,8 @@ class DungeonMap:
             return config.symbols.gold, "gold"
         if cell.items:
             top = cell.items[-1]
-            return top.symbol, config.symbols.tile_style.get(top.symbol, "item")
+            if top is not None:
+                return top.symbol, config.symbols.tile_style.get(top.symbol, "item")
         if cell.trap and not cell.trap_hidden:
             return config.symbols.trap, "trap"
         if cell.feature:

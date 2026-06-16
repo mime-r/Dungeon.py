@@ -1,6 +1,9 @@
 import random
 
-from .items import DungeonItem, DungeonWeapon, DungeonPotion, DungeonInventory, DungeonScroll
+from .items import (
+    DungeonItem, DungeonWeapon, DungeonPotion, DungeonInventory, DungeonScroll,
+    DungeonThrowable, DungeonArmour, DungeonSpell, DungeonSpellBook,
+)
 from .people import DungeonPeople, DungeonTrader, DungeonHealer
 from .decoder import DungeonJSONDecoder
 
@@ -15,6 +18,7 @@ class DungeonDatabase:
         self.enemy_db = DungeonEnemyDatabase(global_db=self)
         self.people_db = DungeonPeopleDatabase(global_db=self)
         self.backgrounds = self.decoder.fetch_backgrounds()
+        self.skills_data = self.decoder.fetch_skills()
 
 
 class DungeonEnemyDatabase:
@@ -95,9 +99,16 @@ class DungeonItemDatabase:
         self.global_db = global_db
         self.potions: list[DungeonPotion] = self.global_db.decoder.fetch_potions()
         self.weapons: list[DungeonWeapon] = self.global_db.decoder.fetch_weapons()
+        self.throwables: list[DungeonThrowable] = self.global_db.decoder.fetch_throwables()
         self.inventory: list[DungeonInventory] = self.global_db.decoder.fetch_inventory()
         self.scrolls: list[DungeonScroll] = self.global_db.decoder.fetch_scrolls()
-        self.items: list[DungeonItem] = self.potions + self.weapons + self.inventory + self.scrolls
+        self.armour: list[DungeonArmour] = self.global_db.decoder.fetch_armour()
+        self.spells: list[DungeonSpell] = self.global_db.decoder.fetch_spells()
+        self.spellbooks: list[DungeonSpellBook] = self.global_db.decoder.fetch_spellbooks()
+        self.items: list[DungeonItem] = (
+            self.potions + self.weapons + self.throwables + self.inventory
+            + self.scrolls + self.armour + self.spellbooks
+        )
 
     def search_item(self, name: str, type=DungeonItem):
         search_list = {
@@ -105,7 +116,14 @@ class DungeonItemDatabase:
             DungeonInventory: self.inventory,
             DungeonPotion: self.potions,
             DungeonWeapon: self.weapons,
+            DungeonThrowable: self.throwables,
             DungeonScroll: self.scrolls,
+            DungeonArmour: self.armour,
+            DungeonSpellBook: self.spellbooks,
         }.get(type, self.items)
         results = [item for item in search_list if item.name == name]
+        return results[0] if results else None
+
+    def search_spell(self, name: str) -> DungeonSpell | None:
+        results = [s for s in self.spells if s.name == name]
         return results[0] if results else None

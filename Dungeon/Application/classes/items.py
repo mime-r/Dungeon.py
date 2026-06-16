@@ -35,7 +35,9 @@ class DungeonWeapon(DungeonItem):
         attack_range: int,
         accuracy: int,
         texts: DungeonWeaponTexts,
+        hands: str = "One",
         range: int = 1,
+        on_hit: dict | None = None,
     ) -> None:
         super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.EQUIP])
         self.type = type
@@ -43,8 +45,38 @@ class DungeonWeapon(DungeonItem):
         self.attack_range = attack_range
         self.accuracy = accuracy
         self.texts = texts
+        self.hands = hands
         self.range = range
         self.ranged = (type == WeaponType.RANGED) or range > 1
+        self.on_hit = on_hit or {}
+
+
+class DungeonThrowable(DungeonItem):
+    """A stackable thrown weapon: consumed from the pack, fired without being equipped."""
+
+    symbol = "/"
+
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        cost: int,
+        base_attack: int,
+        attack_range: list,
+        accuracy: int,
+        texts: DungeonWeaponTexts,
+        range: int = 4,
+        count: int = 1,
+    ) -> None:
+        super().__init__(name=name, description=description, cost=cost, actions=[])
+        self.base_attack = base_attack
+        self.attack_range = attack_range
+        self.accuracy = accuracy
+        self.texts = texts
+        self.range = range
+        self.ranged = True
+        self.on_hit = {}
+        self.count = count
 
 
 class DungeonInventory(DungeonItem):
@@ -79,6 +111,83 @@ class DungeonScroll(DungeonItem):
     def __init__(self, name: str, description: str, cost: int, effect: str) -> None:
         super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.USE])
         self.effect = effect
+
+
+class ArmourSlot(str, Enum):
+    BODY = "body"
+    SHIELD = "shield"
+    HELMET = "helmet"
+    CLOAK = "cloak"
+    GLOVES = "gloves"
+    BOOTS = "boots"
+
+
+class DungeonArmour(DungeonItem):
+    """An equippable piece of armour. Body armour and shields carry an encumbrance
+    rating that penalizes evasion, stealth, and ranged attack speed; every other
+    slot is free to wear."""
+
+    symbol = "["
+
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        cost: int,
+        slot: str,
+        ac: int = 0,
+        sh: int = 0,
+        encumbrance: int = 0,
+    ) -> None:
+        super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.EQUIP])
+        self.slot = slot
+        self.ac = ac
+        self.sh = sh
+        self.encumbrance = encumbrance
+
+
+class DungeonSpell:
+    """A spell the player can memorise and cast."""
+
+    def __init__(
+        self,
+        name: str,
+        schools: list[str],
+        level: int,
+        base_difficulty: int,
+        mp_cost: int,
+        range: int,
+        effect: str,
+        damage: list | None = None,
+        damage_type: str = "",
+        status: dict | None = None,
+        description: str = "",
+        cast_text: str = "",
+        **kwargs,
+    ) -> None:
+        self.name = name
+        self.schools = schools
+        self.level = level
+        self.base_difficulty = base_difficulty
+        self.mp_cost = mp_cost
+        self.range = range
+        self.effect = effect
+        self.damage = damage
+        self.damage_type = damage_type
+        self.status = status
+        self.description = description
+        self.cast_text = cast_text
+        self.extra = kwargs
+
+
+class DungeonSpellBook(DungeonItem):
+    """A book that teaches one or more spells when read."""
+
+    symbol = "?"
+
+    def __init__(self, name: str, description: str, cost: int, spells: list[str]) -> None:
+        super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.USE])
+        self.spells = spells
 
 
 class DungeonShard(DungeonItem):

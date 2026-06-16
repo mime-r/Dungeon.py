@@ -6,6 +6,11 @@ class WeaponType(str, Enum):
     RANGED = "ranged"
 
 
+class Hands(str, Enum):
+    ONE = "One"
+    TWO = "Two"
+
+
 class DungeonWeaponTexts:
     """Combat text templates for a weapon."""
 

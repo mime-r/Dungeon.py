@@ -7,6 +7,7 @@
         "base_attack": 1,
         "attack_range": [0, 2],
         "accuracy": 50,
+        "hands": "One",
         "texts": {
             "critical_hit": "You deliver a smashing blow to the {0} with your {1}.",
             "hit": "You hit the {0} with your {1}.",
@@ -14,13 +15,44 @@
         }
     },
     {
+        "name": "Club",
+        "description": "A crude wooden club. Better than nothing.",
+        "cost": 5,
+        "type": "MELEE",
+        "base_attack": 1,
+        "attack_range": [0, 3],
+        "accuracy": 60,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "You crack the {0} over the head with your {1}!",
+            "hit": "You clout the {0} with your {1}.",
+            "missed_hit": "Your {1} thumps the ground beside the {0}."
+        }
+    },
+    {
+        "name": "Whip",
+        "description": "A braided leather whip, light and fast in the hand.",
+        "cost": 14,
+        "type": "MELEE",
+        "base_attack": 2,
+        "attack_range": [0, 4],
+        "accuracy": 65,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} cracks across the {0} like a thunderclap!",
+            "hit": "Your {1} snaps against the {0}.",
+            "missed_hit": "Your {1} cracks the air past the {0}."
+        }
+    },
+    {
         "name": "Dagger",
         "description": "A sharp, lightweight dagger. Quick but light.",
-        "cost": 6,
+        "cost": 10,
         "type": "MELEE",
         "base_attack": 2,
         "attack_range": [0, 5],
         "accuracy": 55,
+        "hands": "One",
         "texts": {
             "critical_hit": "You drive your {1} into the {0} up to the hilt!",
             "hit": "You slash the {0} with your {1}.",
@@ -28,13 +60,44 @@
         }
     },
     {
+        "name": "Quick Blade",
+        "description": "A sliver of a blade, honed for speed over power. The truly skilled strike twice before others strike once.",
+        "cost": 34,
+        "type": "MELEE",
+        "base_attack": 2,
+        "attack_range": [0, 3],
+        "accuracy": 72,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} flickers twice and the {0} barely sees either cut!",
+            "hit": "Your {1} flicks against the {0} almost too fast to follow.",
+            "missed_hit": "Your {1} darts past the {0} in a blur."
+        }
+    },
+    {
+        "name": "Rapier",
+        "description": "A slender duelling blade. Light, fast, and precise.",
+        "cost": 18,
+        "type": "MELEE",
+        "base_attack": 2,
+        "attack_range": [0, 4],
+        "accuracy": 68,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "You lunge and put your {1} clean through the {0}!",
+            "hit": "You prick the {0} with your {1}.",
+            "missed_hit": "Your {1} darts past the {0} without finding purchase."
+        }
+    },
+    {
         "name": "Quarterstaff",
         "description": "A balanced wooden staff. Reliable and forgiving.",
-        "cost": 10,
+        "cost": 16,
         "type": "MELEE",
         "base_attack": 3,
         "attack_range": [0, 5],
         "accuracy": 60,
+        "hands": "Two",
         "texts": {
             "critical_hit": "You crack your {1} down on the {0} in a perfect arc!",
             "hit": "You rap the {0} smartly with your {1}.",
@@ -42,13 +105,29 @@
         }
     },
     {
+        "name": "Magic Staff",
+        "description": "An ashwood staff keyed to channel raw magic. Boosts all spellcasting schools.",
+        "cost": 20,
+        "type": "MELEE",
+        "base_attack": 3,
+        "attack_range": [0, 4],
+        "accuracy": 62,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "You catch the {0} with a perfect strike of your {1}!",
+            "hit": "You rap the {0} with your {1}.",
+            "missed_hit": "Your {1} swishes harmlessly past the {0}."
+        }
+    },
+    {
         "name": "Short Sword",
         "description": "A dependable short blade favoured by adventurers.",
-        "cost": 14,
+        "cost": 22,
         "type": "MELEE",
         "base_attack": 3,
         "attack_range": [0, 4],
         "accuracy": 55,
+        "hands": "One",
         "texts": {
             "critical_hit": "You run the {0} clean through with your {1}!",
             "hit": "You cut the {0} with your {1}.",
@@ -58,11 +137,12 @@
     {
         "name": "Hand Axe",
         "description": "A heavy chopping axe. Hits hard when it lands.",
-        "cost": 16,
+        "cost": 26,
         "type": "MELEE",
         "base_attack": 4,
         "attack_range": [0, 4],
         "accuracy": 50,
+        "hands": "One",
         "texts": {
             "critical_hit": "You bury your {1} deep in the {0}!",
             "hit": "You chop at the {0} with your {1}.",
@@ -70,13 +150,29 @@
         }
     },
     {
+        "name": "Scimitar",
+        "description": "A curved blade built for quick, slashing cuts.",
+        "cost": 28,
+        "type": "MELEE",
+        "base_attack": 4,
+        "attack_range": [1, 6],
+        "accuracy": 63,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "You open the {0} from hip to shoulder with your {1}!",
+            "hit": "You slash the {0} with your {1}.",
+            "missed_hit": "Your {1} curves wide of the {0}."
+        }
+    },
+    {
         "name": "Mace",
         "description": "A spiked iron mace. Crushes bone and armour alike.",
-        "cost": 18,
+        "cost": 30,
         "type": "MELEE",
         "base_attack": 4,
         "attack_range": [1, 5],
         "accuracy": 50,
+        "hands": "One",
         "texts": {
             "critical_hit": "You bring your {1} down on the {0} with a sickening crunch!",
             "hit": "You smash the {0} with your {1}.",
@@ -84,13 +180,29 @@
         }
     },
     {
+        "name": "Flail",
+        "description": "A spiked ball on a chain. Hard to control, harder to block.",
+        "cost": 32,
+        "type": "MELEE",
+        "base_attack": 5,
+        "attack_range": [1, 6],
+        "accuracy": 44,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} whips around the {0}'s guard and shatters it!",
+            "hit": "Your {1} cracks against the {0}.",
+            "missed_hit": "Your {1} swings wide and tangles past the {0}."
+        }
+    },
+    {
         "name": "Spear",
         "description": "A long spear with good reach.",
-        "cost": 20,
+        "cost": 32,
         "type": "MELEE",
         "base_attack": 4,
         "attack_range": [1, 6],
         "accuracy": 55,
+        "hands": "One",
         "texts": {
             "critical_hit": "You skewer the {0} on your {1}!",
             "hit": "You stab the {0} with your {1}.",
@@ -98,13 +210,149 @@
         }
     },
     {
+        "name": "Trident",
+        "description": "A three-pronged spear, equally at home on land or in water.",
+        "cost": 36,
+        "type": "MELEE",
+        "base_attack": 5,
+        "attack_range": [1, 7],
+        "accuracy": 58,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "All three tines of your {1} punch into the {0}!",
+            "hit": "You spear the {0} with your {1}.",
+            "missed_hit": "Your {1} glances off the floor past the {0}."
+        }
+    },
+    {
+        "name": "Demon Trident",
+        "description": "A trident forged in the lower planes, its tines still warm to the touch.",
+        "cost": 54,
+        "type": "MELEE",
+        "base_attack": 6,
+        "attack_range": [2, 7],
+        "accuracy": 58,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "All three burning tines of your {1} punch clean through the {0}!",
+            "hit": "You gore the {0} with your {1}.",
+            "missed_hit": "Your {1} hisses past the {0}, tines smoking."
+        }
+    },
+    {
+        "name": "Morningstar",
+        "description": "A spiked flanged head atop a sturdy haft. Brutally simple.",
+        "cost": 38,
+        "type": "MELEE",
+        "base_attack": 6,
+        "attack_range": [1, 7],
+        "accuracy": 47,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "You stave in the {0}'s skull with your {1}!",
+            "hit": "You club the {0} with your {1}.",
+            "missed_hit": "Your {1} drags past the {0}, spikes scraping stone."
+        }
+    },
+    {
+        "name": "Falchion",
+        "description": "A wide, single-edged blade built for cleaving strikes.",
+        "cost": 40,
+        "type": "MELEE",
+        "base_attack": 5,
+        "attack_range": [0, 6],
+        "accuracy": 55,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "You cleave deep into the {0} with your {1}!",
+            "hit": "You hack the {0} with your {1}.",
+            "missed_hit": "Your {1} rings off stone beside the {0}."
+        }
+    },
+    {
+        "name": "Dire Flail",
+        "description": "A flail too heavy for one hand, its twin spiked heads swung in punishing arcs.",
+        "cost": 46,
+        "type": "MELEE",
+        "base_attack": 6,
+        "attack_range": [1, 7],
+        "accuracy": 40,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Both heads of your {1} crash into the {0} at once, crushing it!",
+            "hit": "Your {1} slams against the {0}.",
+            "missed_hit": "Your {1} tangles wildly, missing the {0} entirely."
+        }
+    },
+    {
+        "name": "Broad Axe",
+        "description": "A wide-bladed axe, heavier than a hand axe and just as hungry.",
+        "cost": 42,
+        "type": "MELEE",
+        "base_attack": 6,
+        "attack_range": [0, 6],
+        "accuracy": 48,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} splits the {0} clean to the spine!",
+            "hit": "You hew the {0} with your {1}.",
+            "missed_hit": "Your {1} bites the flagstones beside the {0}."
+        }
+    },
+    {
+        "name": "Demon Blade",
+        "description": "A blackened blade humming with infernal malice.",
+        "cost": 64,
+        "type": "MELEE",
+        "base_attack": 7,
+        "attack_range": [2, 7],
+        "accuracy": 54,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} flares black and tears the {0} apart!",
+            "hit": "You cut the {0} with your {1}.",
+            "missed_hit": "Your {1} hisses through the air past the {0}."
+        }
+    },
+    {
+        "name": "Eveningstar",
+        "description": "A masterwork flanged mace, its head etched with twilight runes.",
+        "cost": 50,
+        "type": "MELEE",
+        "base_attack": 7,
+        "attack_range": [2, 7],
+        "accuracy": 45,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} crushes the {0} with a sound like breaking stone!",
+            "hit": "You club the {0} with your {1}.",
+            "missed_hit": "Your {1} drags past the {0}, runes flickering."
+        }
+    },
+    {
+        "name": "Sacred Scourge",
+        "description": "A consecrated flail wound with silver chain, blessed against the unholy.",
+        "cost": 58,
+        "type": "MELEE",
+        "base_attack": 7,
+        "attack_range": [1, 7],
+        "accuracy": 52,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} flares with holy light and shatters the {0}!",
+            "hit": "Your {1} cracks against the {0}.",
+            "missed_hit": "Your {1} swings wide, chain rattling past the {0}."
+        }
+    },
+    {
         "name": "Long Sword",
         "description": "A fine balanced long sword. The mark of a real warrior.",
-        "cost": 30,
+        "cost": 48,
         "type": "MELEE",
         "base_attack": 6,
         "attack_range": [1, 7],
         "accuracy": 55,
+        "hands": "One",
         "texts": {
             "critical_hit": "You sweep your {1} through the {0} in a single brilliant stroke!",
             "hit": "You hew the {0} with your {1}.",
@@ -112,13 +360,149 @@
         }
     },
     {
+        "name": "Eudemon Blade",
+        "description": "A radiant blade said to house a sliver of a celestial's will.",
+        "cost": 78,
+        "type": "MELEE",
+        "base_attack": 8,
+        "attack_range": [2, 8],
+        "accuracy": 52,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} blazes with light and cleaves the {0} in two!",
+            "hit": "You smite the {0} with your {1}.",
+            "missed_hit": "Your {1} flashes past the {0} without finding its mark."
+        }
+    },
+    {
+        "name": "Trishula",
+        "description": "A three-bladed trident of ancient make, each tip honed to a razor point.",
+        "cost": 68,
+        "type": "MELEE",
+        "base_attack": 7,
+        "attack_range": [2, 8],
+        "accuracy": 57,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "All three blades of your {1} punch through the {0} as one!",
+            "hit": "You gore the {0} with your {1}.",
+            "missed_hit": "Your {1} glances past the {0}, blades ringing."
+        }
+    },
+    {
+        "name": "Demon Whip",
+        "description": "A barbed infernal whip that draws blood with every crack.",
+        "cost": 80,
+        "type": "MELEE",
+        "base_attack": 8,
+        "attack_range": [2, 7],
+        "accuracy": 56,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} lashes the {0} to ribbons in a single crack!",
+            "hit": "Your {1} cracks across the {0}.",
+            "missed_hit": "Your {1} snaps the air past the {0}."
+        }
+    },
+    {
+        "name": "Double Sword",
+        "description": "Twin blades fused to a single hilt, swung as one in a blur of steel.",
+        "cost": 84,
+        "type": "MELEE",
+        "base_attack": 9,
+        "attack_range": [2, 8],
+        "accuracy": 54,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Both edges of your {1} open the {0} in a single brutal sweep!",
+            "hit": "Your {1} cuts the {0} twice over.",
+            "missed_hit": "Your {1} flashes past the {0} without finding purchase."
+        }
+    },
+    {
+        "name": "Halberd",
+        "description": "A heavy polearm combining axe blade, spike, and hook.",
+        "cost": 56,
+        "type": "MELEE",
+        "base_attack": 7,
+        "attack_range": [2, 8],
+        "accuracy": 48,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} hooks the {0} and tears it open!",
+            "hit": "You hack at the {0} with your {1}.",
+            "missed_hit": "Your {1} sweeps past the {0}, too unwieldy to correct."
+        }
+    },
+    {
+        "name": "Battleaxe",
+        "description": "A massive two-handed axe. Slow, but it ends fights.",
+        "cost": 58,
+        "type": "MELEE",
+        "base_attack": 7,
+        "attack_range": [1, 7],
+        "accuracy": 46,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} near-cleaves the {0} in half!",
+            "hit": "You hack the {0} with your {1}.",
+            "missed_hit": "The weight of your {1} carries it past the {0}."
+        }
+    },
+    {
+        "name": "Great Sword",
+        "description": "A blade nearly as tall as its wielder, swung in great two-handed arcs.",
+        "cost": 62,
+        "type": "MELEE",
+        "base_attack": 8,
+        "attack_range": [2, 8],
+        "accuracy": 46,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} cleaves through the {0} in one massive stroke!",
+            "hit": "You hew the {0} with your {1}.",
+            "missed_hit": "The weight of your {1} drags it past the {0}."
+        }
+    },
+    {
+        "name": "Partisan",
+        "description": "A broad-bladed spear flanked by twin lugs, prized for its precision.",
+        "cost": 76,
+        "type": "MELEE",
+        "base_attack": 8,
+        "attack_range": [2, 8],
+        "accuracy": 60,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} catches the {0} square on the point and drives through!",
+            "hit": "You skewer the {0} with your {1}.",
+            "missed_hit": "Your {1} jabs past the {0}, lugs scraping stone."
+        }
+    },
+    {
+        "name": "Glaive",
+        "description": "A blade mounted on a long pole, built for sweeping reach.",
+        "cost": 64,
+        "type": "MELEE",
+        "base_attack": 8,
+        "attack_range": [2, 9],
+        "accuracy": 50,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} sweeps clean through the {0}!",
+            "hit": "You slash the {0} with your {1}.",
+            "missed_hit": "Your {1} arcs wide of the {0}."
+        }
+    },
+    {
         "name": "War Axe",
         "description": "A brutal two-handed war axe. Devastating but unwieldy.",
-        "cost": 40,
+        "cost": 65,
         "type": "MELEE",
         "base_attack": 8,
         "attack_range": [1, 9],
         "accuracy": 45,
+        "hands": "Two",
         "texts": {
             "critical_hit": "You cleave the {0} from shoulder to hip with your {1}!",
             "hit": "You hack at the {0} with your {1}.",
@@ -126,13 +510,119 @@
         }
     },
     {
+        "name": "Lajatang",
+        "description": "A double-bladed staff, spun in wide arcs that cut on every side.",
+        "cost": 60,
+        "type": "MELEE",
+        "base_attack": 8,
+        "attack_range": [2, 8],
+        "accuracy": 46,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Both blades of your {1} whirl through the {0} in one pass!",
+            "hit": "Your {1} cuts the {0} as it spins.",
+            "missed_hit": "Your {1} whirls past the {0} without biting."
+        }
+    },
+    {
+        "name": "Great Mace",
+        "description": "An enormous iron-bound mace. Few can swing it twice.",
+        "cost": 72,
+        "type": "MELEE",
+        "base_attack": 9,
+        "attack_range": [2, 9],
+        "accuracy": 40,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} pulps the {0} in a single, earth-shaking blow!",
+            "hit": "You crush the {0} with your {1}.",
+            "missed_hit": "Your {1} crashes into the ground, dragged off-line by its own weight."
+        }
+    },
+    {
+        "name": "Giant Club",
+        "description": "A tree-trunk of a club, swung two-handed with bone-shattering force.",
+        "cost": 84,
+        "type": "MELEE",
+        "base_attack": 10,
+        "attack_range": [1, 8],
+        "accuracy": 35,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} caves in the {0} with one earth-shaking swing!",
+            "hit": "You club the {0} with your {1}.",
+            "missed_hit": "Your {1} thunders into the ground, missing the {0} by a mile."
+        }
+    },
+    {
+        "name": "Bardiche",
+        "description": "A massive single-edged blade on a long shaft, swung to fell several foes at once.",
+        "cost": 88,
+        "type": "MELEE",
+        "base_attack": 10,
+        "attack_range": [3, 9],
+        "accuracy": 40,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} mows through the {0} in a single titanic sweep!",
+            "hit": "You hew the {0} with your {1}.",
+            "missed_hit": "Your {1} sweeps wide, far too heavy to correct, missing the {0}."
+        }
+    },
+    {
+        "name": "Triple Sword",
+        "description": "Three blades fused into one immense weapon, wielded only by the strongest.",
+        "cost": 90,
+        "type": "MELEE",
+        "base_attack": 10,
+        "attack_range": [3, 9],
+        "accuracy": 42,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "All three edges of your {1} tear through the {0} at once!",
+            "hit": "Your {1} cuts the {0} three times over.",
+            "missed_hit": "Your {1} scythes past the {0}, far too unwieldy to correct."
+        }
+    },
+    {
+        "name": "Giant Spiked Club",
+        "description": "A giant club studded with iron spikes, the heaviest melee weapon known.",
+        "cost": 92,
+        "type": "MELEE",
+        "base_attack": 11,
+        "attack_range": [2, 9],
+        "accuracy": 33,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} drives the {0} into the ground in a single ruinous blow!",
+            "hit": "You crush the {0} with your {1}.",
+            "missed_hit": "Your {1} crashes down, spikes biting only stone, missing the {0}."
+        }
+    },
+    {
+        "name": "Executioner's Axe",
+        "description": "A vast, gleaming axe meant for one purpose. Rarely sold, never lent.",
+        "cost": 95,
+        "type": "MELEE",
+        "base_attack": 11,
+        "attack_range": [3, 10],
+        "accuracy": 42,
+        "hands": "Two",
+        "texts": {
+            "critical_hit": "Your {1} takes the {0}'s head clean off!",
+            "hit": "You hew the {0} with your {1}.",
+            "missed_hit": "Your {1} buries itself in the stone floor, missing the {0}."
+        }
+    },
+    {
         "name": "Sling",
         "description": "A simple leather sling that flings stones at range.",
-        "cost": 12,
+        "cost": 18,
         "type": "RANGED",
         "base_attack": 2,
         "attack_range": [0, 4],
         "accuracy": 55,
+        "hands": "One",
         "range": 5,
         "texts": {
             "critical_hit": "Your stone cracks the {0} square in the skull!",
@@ -141,13 +631,30 @@
         }
     },
     {
+        "name": "Hand Crossbow",
+        "description": "A small one-handed crossbow. Light and quick to loose.",
+        "cost": 24,
+        "type": "RANGED",
+        "base_attack": 2,
+        "attack_range": [0, 3],
+        "accuracy": 65,
+        "hands": "One",
+        "range": 4,
+        "texts": {
+            "critical_hit": "Your bolt punches into the {0} with surprising force!",
+            "hit": "You snap off a bolt at the {0}.",
+            "missed_hit": "Your bolt clatters off the wall past the {0}."
+        }
+    },
+    {
         "name": "Short Bow",
         "description": "A hunter's bow. Reliable damage from a safe distance.",
-        "cost": 22,
+        "cost": 36,
         "type": "RANGED",
         "base_attack": 3,
         "attack_range": [0, 6],
         "accuracy": 60,
+        "hands": "Two",
         "range": 6,
         "texts": {
             "critical_hit": "Your arrow buries itself to the fletching in the {0}!",
@@ -156,18 +663,178 @@
         }
     },
     {
+        "name": "Orcbow",
+        "description": "A crudely powerful orcish bow, loosing heavy shafts with little finesse.",
+        "cost": 58,
+        "type": "RANGED",
+        "base_attack": 6,
+        "attack_range": [1, 7],
+        "accuracy": 48,
+        "hands": "Two",
+        "range": 7,
+        "texts": {
+            "critical_hit": "Your heavy shaft punches clean through the {0}!",
+            "hit": "You loose a heavy arrow at the {0}.",
+            "missed_hit": "Your arrow goes wide, thudding into the wall past the {0}."
+        }
+    },
+    {
+        "name": "Long Bow",
+        "description": "A tall bow with a heavy draw, built for distance and power.",
+        "cost": 50,
+        "type": "RANGED",
+        "base_attack": 4,
+        "attack_range": [1, 7],
+        "accuracy": 62,
+        "hands": "Two",
+        "range": 8,
+        "texts": {
+            "critical_hit": "Your arrow drops the {0} at a tremendous distance!",
+            "hit": "You loose a long arrow at the {0}.",
+            "missed_hit": "Your arrow falls short of the {0}."
+        }
+    },
+    {
         "name": "Crossbow",
         "description": "A heavy crossbow. Slow to aim, but it hits like a hammer.",
-        "cost": 34,
+        "cost": 55,
         "type": "RANGED",
         "base_attack": 5,
         "attack_range": [1, 8],
         "accuracy": 60,
+        "hands": "Two",
         "range": 7,
         "texts": {
             "critical_hit": "Your bolt punches clean through the {0}!",
             "hit": "You fire a bolt into the {0}.",
             "missed_hit": "Your bolt thunks into the wall past the {0}."
+        }
+    },
+    {
+        "name": "Arbalest",
+        "description": "A massive crossbow cranked taut by a built-in winch. Punishing to carry, punishing to face.",
+        "cost": 75,
+        "type": "RANGED",
+        "base_attack": 8,
+        "attack_range": [2, 8],
+        "accuracy": 50,
+        "hands": "Two",
+        "range": 8,
+        "texts": {
+            "critical_hit": "Your bolt punches clean through the {0} and out the other side!",
+            "hit": "You loose a heavy bolt into the {0}.",
+            "missed_hit": "Your bolt buries itself in the wall past the {0}."
+        }
+    },
+    {
+        "name": "Hand Cannon",
+        "description": "A rare one-handed firearm, equal parts dangerous to load and devastating to fire.",
+        "cost": 85,
+        "type": "RANGED",
+        "base_attack": 9,
+        "attack_range": [2, 8],
+        "accuracy": 66,
+        "hands": "One",
+        "range": 6,
+        "texts": {
+            "critical_hit": "Your {1} roars and the {0} is blown clean off its feet!",
+            "hit": "You fire your {1} at the {0}.",
+            "missed_hit": "Your {1} bucks hard, the shot sparking off stone past the {0}."
+        }
+    },
+    {
+        "name": "Triple Crossbow",
+        "description": "Three crossbow stocks bound into one frame, loosing a volley with a single pull.",
+        "cost": 95,
+        "type": "RANGED",
+        "base_attack": 10,
+        "attack_range": [3, 9],
+        "accuracy": 52,
+        "hands": "Two",
+        "range": 9,
+        "texts": {
+            "critical_hit": "All three bolts of your {1} punch into the {0} at once!",
+            "hit": "You loose a volley from your {1} at the {0}.",
+            "missed_hit": "Your volley clatters off the wall past the {0}."
+        }
+    },
+    {
+        "name": "Staff of Earth",
+        "description": "A gnarled staff capped in raw stone. Strikes with crushing, unmagical force.",
+        "cost": 44,
+        "type": "MELEE",
+        "base_attack": 6,
+        "attack_range": [2, 7],
+        "accuracy": 50,
+        "hands": "One",
+        "texts": {
+            "critical_hit": "Your {1} comes down like a falling boulder, crushing the {0}!",
+            "hit": "You crack the {0} with your {1}.",
+            "missed_hit": "Your {1} thuds into the ground beside the {0}."
+        }
+    },
+    {
+        "name": "Staff of Flame",
+        "description": "A blackened staff that wreathes its tip in fire when it strikes.",
+        "cost": 46,
+        "type": "MELEE",
+        "base_attack": 3,
+        "attack_range": [1, 5],
+        "accuracy": 58,
+        "hands": "One",
+        "on_hit": {"effect": "burn", "chance": 50, "duration": 4, "potency": 2},
+        "texts": {
+            "critical_hit": "Your {1} erupts in flame as it strikes the {0}!",
+            "hit": "You scorch the {0} with your {1}.",
+            "missed_hit": "Your {1} sears the air past the {0}."
+        }
+    },
+    {
+        "name": "Staff of Frost",
+        "description": "A pale, ice-cold staff that chills whatever it touches.",
+        "cost": 46,
+        "type": "MELEE",
+        "base_attack": 3,
+        "attack_range": [1, 5],
+        "accuracy": 58,
+        "hands": "One",
+        "on_hit": {"effect": "slow", "chance": 50, "duration": 5},
+        "texts": {
+            "critical_hit": "Your {1} sheathes the {0} in frost, slowing it to a crawl!",
+            "hit": "You strike the {0} with your {1}, frost crackling.",
+            "missed_hit": "Your {1} trails frost past the {0}."
+        }
+    },
+    {
+        "name": "Staff of Venom",
+        "description": "A staff inlaid with serpent fangs that weep dark venom.",
+        "cost": 44,
+        "type": "MELEE",
+        "base_attack": 2,
+        "attack_range": [0, 5],
+        "accuracy": 60,
+        "hands": "One",
+        "on_hit": {"effect": "poison", "chance": 55, "duration": 6, "potency": 2},
+        "texts": {
+            "critical_hit": "Your {1} bites deep, flooding the {0} with venom!",
+            "hit": "You jab the {0} with your {1}.",
+            "missed_hit": "Your {1} hisses past the {0}."
+        }
+    },
+    {
+        "name": "Staff of Lightning",
+        "description": "A staff crackling with restless static, prone to lashing out wildly.",
+        "cost": 48,
+        "type": "MELEE",
+        "base_attack": 3,
+        "attack_range": [1, 6],
+        "accuracy": 55,
+        "hands": "One",
+        "on_hit": {"effect": "confusion", "chance": 45, "duration": 4},
+        "texts": {
+            "critical_hit": "Your {1} discharges into the {0}, leaving it reeling!",
+            "hit": "Your {1} crackles against the {0}.",
+            "missed_hit": "Your {1} arcs harmlessly past the {0}."
         }
     },
     {
@@ -178,6 +845,7 @@
         "base_attack": 9,
         "attack_range": [2, 10],
         "accuracy": 65,
+        "hands": "One",
         "texts": {
             "critical_hit": "Your {1} flares with golden light and shears clean through the {0}!",
             "hit": "You strike the {0} with the singing {1}.",

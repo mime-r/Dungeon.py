@@ -8,6 +8,7 @@ move time); only poison and regeneration do something on each game-tick via :met
 # effect name -> (HUD label, rich style, short tag)
 EFFECT_STYLE = {
     "poison": ("Poison", "poison", "Psn"),
+    "burn": ("Burning", "burn", "Brn"),
     "regen": ("Regen", "regen", "Reg"),
     "might": ("Might", "might", "Mgt"),
     "haste": ("Haste", "haste", "Hst"),
@@ -34,7 +35,7 @@ class StatusSet:
         self.effects.pop(name, None)
 
     def clear_harmful(self) -> list[str]:
-        harmful = [n for n in ("poison", "slow", "confusion") if n in self.effects]
+        harmful = [n for n in ("poison", "burn", "slow", "confusion") if n in self.effects]
         for n in harmful:
             del self.effects[n]
         return harmful
@@ -66,6 +67,11 @@ class StatusSet:
                 actor.health -= dmg
                 if is_player:
                     game.message(f"[poison]You take {dmg} poison damage.[/poison]")
+            elif name == "burn":
+                dmg = max(1, eff["potency"])
+                actor.health -= dmg
+                if is_player:
+                    game.message(f"[burn]You are seared for {dmg} fire damage.[/burn]")
             elif name == "regen":
                 healed = min(actor.max_health - actor.health, eff["potency"])
                 if healed > 0:

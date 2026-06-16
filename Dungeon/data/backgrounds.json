@@ -3,28 +3,139 @@
         "name": "Fighter",
         "description": "Tough and well-armed. Starts with a sword, sturdy health, and healing.",
         "hp_bonus": 8,
+        "intelligence": 6,
+        "max_mp": 0,
         "start_weapon": "Short Sword",
-        "start_items": ["Medium Healing Potion", "Medium Healing Potion"]
+        "start_armour": "Leather Armour",
+        "start_items": ["Medium Healing Potion", "Medium Healing Potion"],
+        "start_skills": {"Fighting": 3.0, "Short Blades": 2.0, "Armour": 2.0, "Shields": 1.0, "Dodging": 1.0}
     },
     {
         "name": "Hunter",
         "description": "Strikes from afar. Begins with a Short Bow and a healing potion.",
         "hp_bonus": 2,
+        "intelligence": 7,
+        "max_mp": 2,
         "start_weapon": "Short Bow",
-        "start_items": ["Weak Healing Potion", "Weak Healing Potion"]
+        "start_items": ["Weak Healing Potion", "Weak Healing Potion"],
+        "start_skills": {"Fighting": 2.0, "Ranged": 3.0, "Dodging": 2.0, "Stealth": 1.0}
     },
     {
         "name": "Acolyte",
-        "description": "Frail but resourceful, carrying scrolls and curing draughts.",
+        "description": "Frail but resourceful, carrying scrolls and curing draughts. Born with spells already memorised. Has an affinity with magic, but a poor aptitude for physical combat.",
         "hp_bonus": 0,
+        "intelligence": 12,
+        "max_mp": 8,
         "start_weapon": "Quarterstaff",
-        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Potion of Curing"]
+        "start_armour": "Robe",
+        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Potion of Curing"],
+        "start_spells": ["Magic Dart", "Stone Fist", "Sting"],
+        "start_skills": {"Spellcasting": 4.0, "Conjuration": 2.0, "Earth Magic": 1.0}
     },
     {
         "name": "Wanderer",
         "description": "A jack-of-all-trades with a mixed pack and balanced health.",
         "hp_bonus": 4,
+        "intelligence": 9,
+        "max_mp": 4,
         "start_weapon": "Dagger",
-        "start_items": ["Weak Healing Potion", "Weak Healing Potion", "Scroll of Teleportation"]
+        "start_items": ["Weak Healing Potion", "Weak Healing Potion", "Scroll of Teleportation"],
+        "start_spells": ["Magic Dart"],
+        "start_skills": {"Fighting": 2.0, "Short Blades": 1.0, "Dodging": 1.0, "Stealth": 1.0, "Spellcasting": 1.0}
+    },
+    {
+        "name": "Pyrelord",
+        "description": "A master of fire magic, with a powerful but temperamental staff and a cache of firebombs.",
+        "hp_bonus": -2,
+        "intelligence": 14,
+        "max_mp": 10,
+        "start_weapon": "Staff of Flame",
+        "start_armour": "Robe",
+        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Medium Healing Potion"],
+        "start_spells": ["Searing Ray", "Flame Wave", "Fireball"],
+        "start_skills": {"Spellcasting": 4.0, "Fire Magic": 4.0, "Conjuration": 2.0}
+    },
+    {
+        "name": "Shaman",
+        "description": "A spiritualist who draws on the power of nature. Starts with a staff and a collection of herbal remedies.",
+        "hp_bonus": -2,
+        "intelligence": 13,
+        "max_mp": 8,
+        "start_weapon": "Staff of Earth",
+        "start_armour": "Animal Skin",
+        "start_items": ["Weak Healing Potion", "Potion of Curing", "Potion of Curing"],
+        "start_spells": ["Summon Small Mammal", "Petrify", "Ice Shard"],
+        "start_skills": {"Spellcasting": 3.0, "Summoning": 3.0, "Earth Magic": 2.0, "Ice Magic": 1.0}
+    },
+    {
+        "name": "Frostbringer",
+        "description": "A reclusive hermit from the northern tundra who commands the biting cold. The Staff of Frost answers only those whose blood runs thin.",
+        "hp_bonus": -1,
+        "intelligence": 13,
+        "max_mp": 9,
+        "start_weapon": "Staff of Frost",
+        "start_armour": "Robe",
+        "start_items": ["Potion of Curing", "Weak Healing Potion"],
+        "start_spells": ["Freeze", "Ice Shard", "Blizzard"],
+        "start_skills": {"Spellcasting": 3.0, "Ice Magic": 4.0}
+    },
+    {
+        "name": "Venomancer",
+        "description": "A swamp-dwelling alchemist who laces her staff with weeping serpent fangs. Toxins are a currency, and the Venomancer trades in pain.",
+        "hp_bonus": -1,
+        "intelligence": 12,
+        "max_mp": 8,
+        "start_weapon": "Staff of Venom",
+        "start_armour": "Robe",
+        "start_items": ["Potion of Curing", "Potion of Curing", "Weak Healing Potion"],
+        "start_spells": ["Sting", "Venom Bolt"],
+        "start_skills": {"Spellcasting": 3.0, "Poison Magic": 4.0}
+    },
+    {
+        "name": "Stormcaller",
+        "description": "A volatile mage who draws power from thunderheads and static-charged air. The Staff of Lightning crackles in their grip, prone to lash out unbidden.",
+        "hp_bonus": -2,
+        "intelligence": 14,
+        "max_mp": 10,
+        "start_weapon": "Staff of Lightning",
+        "start_armour": "Robe",
+        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Weak Healing Potion"],
+        "start_spells": ["Static Touch", "Searing Ray", "Magic Dart"],
+        "start_skills": {"Spellcasting": 3.0, "Conjuration": 4.0, "Dodging": 1.0}
+    },
+    {
+        "name": "Arcanist",
+        "description": "A discipline of one, the Arcanist studies magic in the abstract. Wields a Magic Staff attuned to raw potential rather than any single element.",
+        "hp_bonus": 0,
+        "intelligence": 13,
+        "max_mp": 10,
+        "start_weapon": "Magic Staff",
+        "start_armour": "Robe",
+        "start_items": ["Scroll of Magic Mapping", "Potion of Curing"],
+        "start_spells": ["Magic Dart", "Phase Shift", "Blink"],
+        "start_skills": {"Spellcasting": 4.0, "Conjuration": 2.0, "Translocation": 2.0}
+    },
+    {
+        "name": "Shadowblade",
+        "description": "Trained in the dark guilds of the underworld. A poisoned dagger and a talent for silence — they strike and fade before the mark hits the ground.",
+        "hp_bonus": 2,
+        "intelligence": 8,
+        "max_mp": 2,
+        "start_weapon": "Dagger",
+        "start_armour": "Leather Armour",
+        "start_items": ["Potion of Curing", "Potion of Curing", "Weak Healing Potion"],
+        "start_spells": ["Phase Shift"],
+        "start_skills": {"Fighting": 2.0, "Short Blades": 3.0, "Stealth": 3.0, "Dodging": 2.0, "Spellcasting": 1.0, "Translocation": 1.0}
+    },
+    {
+        "name": "Crusader",
+        "description": "A battle-hardened pilgrim armed with a heavy mace and clad in ring mail. Relies on grit, faith, and a stout arm rather than parlor tricks.",
+        "hp_bonus": 10,
+        "intelligence": 6,
+        "max_mp": 0,
+        "start_weapon": "Mace",
+        "start_armour": "Ring Mail",
+        "start_items": ["Medium Healing Potion"],
+        "start_skills": {"Fighting": 3.0, "Maces & Flails": 3.0, "Armour": 2.0, "Shields": 1.0, "Dodging": 1.0}
     }
 ]

@@ -98,7 +98,7 @@ class DungeonUI:
                 f"[stairs]More shards wait deeper.[/stairs]"
             )
         else:
-            objective = "[item]Find 3 sigil shards on depths 6–8.[/item]\n[stairs]Take down-stairs (>) to descend.[/stairs]"
+            objective = ""
 
         full = len(p.inventory) >= p.max_inventory
         shard_tag = f"  [shard]+{shard_count}★[/shard]" if shard_count > 0 else ""
@@ -108,21 +108,45 @@ class DungeonUI:
             + shard_tag
         )
         background = f" [flavor]{p.background}[/flavor]" if getattr(p, "background", None) else ""
+        mp_bar = ""
+        if getattr(p, "max_mp", 0) > 0:
+            mp_ratio = p.mp / p.max_mp if p.max_mp else 0
+            mp_filled = max(0, min(bar_w, round(mp_ratio * bar_w)))
+            mp_bar = f"[haste]{'█' * mp_filled}[/haste][grey23]{'░' * (bar_w - mp_filled)}[/grey23]"
+
         lines = [
             f"[name]{p.name or 'Adventurer'}[/name]{background}",
             f"[level]Level {p.level}[/level]  [xp_count]XP {p.xp}/{p.xp_next}[/xp_count]",
             "",
             f"[health]HP[/health] {p.health}/{p.max_health}",
             bar,
+        ]
+        if getattr(p, "max_mp", 0) > 0:
+            lines.append(f"[haste]MP[/haste] {int(p.mp)}/{p.max_mp}")
+            lines.append(mp_bar)
+        lines += [
             f"[coin]Gold[/coin]  {p.coins}",
             f"[depth]Depth[/depth] {self.game.depth}",
         ]
+        lines.append("")
+        lines.append("[warn]Status[/warn]:")
         if p.status.any():
-            lines.append("  ".join(f"[{style}]{label}[/{style}]" for label, style in p.status.summary()))
+            for label, style in p.status.summary():
+                lines.append(f"  [{style}]{label}[/{style}]")
+        else:
+            lines.append("  [flavor]clear[/flavor]")
         weapon_tag = f"[weapons]Weapon[/weapons]: {self.game.display_name(p.equipped)}"
         if getattr(p.equipped, "ranged", False):
             weapon_tag += f" [flavor](ranged {p.equipped.range})[/flavor]"
-        lines += ["", weapon_tag, pack_line, "", objective]
+        armour_tag = f"[armour]AC[/armour] {p.armor_class()}  [armour]EV[/armour] {p.evasion()}"
+        lines += ["", weapon_tag, armour_tag, pack_line, "", objective]
+
+        summons = self.game.map.visible_summons()
+        if summons:
+            lines += ["", "[haste]Summons[/haste]:"]
+            for s in summons:
+                ttl = max(0, s.despawn_timer)
+                lines.append(f"  [{s.style}]{s.symbol} {s.name}[/{s.style}] {s.health}/{s.max_health} ({ttl}t)")
 
         enemies = self.game.map.visible_enemies()
         if enemies:
@@ -155,13 +179,17 @@ class DungeonUI:
             "[controls]move[/controls] arrows/hjkl/yubn",
             "[controls]f[/controls] fire",
             "[controls]g[/controls] pick up",
+            "[controls]A[/controls] armour",
             "[controls]i[/controls] pack",
+            "[controls]m[/controls] skills",
+            "[controls]z[/controls] spells",
             "[controls]o[/controls] explore",
             "[controls]>[/controls]/[controls]<[/controls] stairs",
             "[controls]G[/controls] goto-stairs",
             "[controls][[/controls]/[controls]][/controls] view stairs",
             "[controls]X[/controls] exclude",
             "[controls]\\\\[/controls] pickup-cfg",
+            "[controls]x[/controls] examine",
             "[controls]s[/controls] search",
             "[controls].[/controls] wait",
             "[controls]?[/controls] help",

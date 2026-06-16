@@ -1,6 +1,6 @@
 [
     {
-        "name": "Giant Rat",
+        "name": "Rat",
         "symbol": "r",
         "tier": "weak",
         "depth": [1, 3],
@@ -270,6 +270,66 @@
             "hit": "The {} reaches through the dark and rakes cold fingers across you.",
             "missed_hit": "The {} dissolves into shadow where you strike, reforming behind you.",
             "death": "The {} unravels with a hollow shriek. The Shard of Shadow is yours."
+        }
+    },
+    {
+        "name": "Snake",
+        "symbol": "s",
+        "tier": "weak",
+        "depth": [1, 2],
+        "spawn_weight": 0,
+        "health_range": [5, 9],
+        "coin_drop_range": [0, 0],
+        "xp_drop": 3,
+        "attack_base": 3,
+        "attack_range": [0, 2],
+        "accuracy": 55,
+        "speed": 12,
+        "texts": {
+            "critical_hit": "The {} sinks its fangs deep!",
+            "hit": "The {} strikes you.",
+            "missed_hit": "The {}'s strike falls short.",
+            "death": "The {} goes limp."
+        }
+    },
+    {
+        "name": "Canine",
+        "symbol": "h",
+        "tier": "weak",
+        "depth": [3, 6],
+        "spawn_weight": 0,
+        "health_range": [8, 14],
+        "coin_drop_range": [0, 0],
+        "xp_drop": 5,
+        "attack_base": 3,
+        "attack_range": [1, 3],
+        "accuracy": 65,
+        "speed": 14,
+        "texts": {
+            "critical_hit": "The {} latches on and tears!",
+            "hit": "The {} bites you.",
+            "missed_hit": "The {} snaps at the air.",
+            "death": "The {} whimpers and falls."
+        }
+    },
+    {
+        "name": "Wolf",
+        "symbol": "w",
+        "tier": "moderate",
+        "depth": [4, 8],
+        "spawn_weight": 0,
+        "health_range": [14, 22],
+        "coin_drop_range": [0, 0],
+        "xp_drop": 8,
+        "attack_base": 5,
+        "attack_range": [1, 3],
+        "accuracy": 70,
+        "speed": 16,
+        "texts": {
+            "critical_hit": "The {} sinks its fangs into your throat!",
+            "hit": "The {} tears at you with flashing teeth.",
+            "missed_hit": "The {} snaps past your face.",
+            "death": "The {} dissolves into shadow."
         }
     }
 ]

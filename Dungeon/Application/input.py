@@ -57,7 +57,7 @@ def _read_key_windows() -> str:
             "H": UP, "P": DOWN, "K": LEFT, "M": RIGHT,
             "G": "home", "O": "end", "I": "pageup", "Q": "pagedown",
             "S": "delete",
-        }.get(code, "")
+        }.get(code, ch)
     return _normalise(ch)
 
 

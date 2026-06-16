@@ -2,19 +2,19 @@
     {
         "name": "Scroll of Magic Mapping",
         "description": "Reading this reveals the layout of the current floor.",
-        "cost": 8,
+        "cost": 14,
         "effect": "magic_mapping"
     },
     {
         "name": "Scroll of Teleportation",
         "description": "Reading this whisks you to a random spot on the floor. A lifesaver in a pinch.",
-        "cost": 10,
+        "cost": 16,
         "effect": "teleport"
     },
     {
         "name": "Scroll of Identification",
         "description": "Reading this reveals the true nature of one unidentified item in your pack.",
-        "cost": 9,
+        "cost": 15,
         "effect": "identify"
     }
 ]

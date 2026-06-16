@@ -1,5 +1,45 @@
 # Changelog
 
+## 16/6/26 v2.4 — "The Magic Expansion"
+
+**Spellcasting Rework**
+- Magic staff now boosts all spell schools via Spellcasting skill
+- `_MAGIC_SCHOOLS` expanded with generic "Spellcasting" school for Magic Staff
+- Staff damage multiplier now uses Spellcasting level for all spells
+- Staff Boosted label in spell menu for generic staves
+
+**New Spells (8)**
+- Ice Shard (lvl 2, Ice Magic) — projectile + slow
+- Static Touch (lvl 2, Conjuration) — touch + confusion
+- Stone Fist (lvl 2, Earth Magic) — projectile
+- Venom Bolt (lvl 3, Poison Magic) — projectile + poison
+- Phase Shift (lvl 3, Translocation) — self-teleport
+- Summon Spectral Wolf (lvl 4, Summoning) — summon wolf ally
+- Blizzard (lvl 5, Ice Magic) — expanding AoE + slow
+- Chain Lightning (lvl 7, Conjuration) — explosion
+- All spells have unique cast_text flavour displayed on cast
+
+**New Spellbooks (3)**
+- Book of Ice, Book of Venom, Book of the Storm
+- Existing books updated: Book of Summoning, Book of Fire, Book of Earth, Book of Power
+
+**New Backgrounds (6)**
+- Frostbringer (Ice Magic), Venomancer (Poison Magic), Stormcaller (Air/Lightning)
+- Arcanist (Translocation), Shadowblade (Phase Shift), Crusader (no MP, all combat)
+- Background selection paginated (9 per page) with description column replacing starting kit
+- Inspect screen now shows starting spells
+- ESC in class selection prompts exit instead of auto-picking Wanderer
+
+**Quality of Life**
+- Gold auto-pickup toggleable in `\` menu (default ON)
+- Sidebar objective text removed for zero-shard state (help screen covers it)
+- AoE spells now apply status effects via `_expanding_aoe` / `_explosion`
+
+**Bugfixes**
+- Wolf enemy added for Spectral Wolf summon
+- Class selection pagination correctly maps page-local numbers to global indices
+- Fixed Rich markup collision in exit prompt
+
 ## 15/6/26 v2.3 — "The Terrain Update"
 
 **Terrain & Scenery**

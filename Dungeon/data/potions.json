@@ -2,25 +2,25 @@
     {
         "name": "Weak Healing Potion",
         "description": "A berry-flavoured tonic that restores 7 health.",
-        "cost": 2,
+        "cost": 4,
         "hp_change": 7
     },
     {
         "name": "Medium Healing Potion",
         "description": "A concentrated draught that restores 15 health.",
-        "cost": 6,
+        "cost": 10,
         "hp_change": 15
     },
     {
         "name": "Strong Healing Potion",
         "description": "A potent elixir that restores 25 health.",
-        "cost": 12,
+        "cost": 20,
         "hp_change": 25
     },
     {
         "name": "Potion of Might",
         "description": "Floods your muscles with strength, adding to your attacks for a while.",
-        "cost": 14,
+        "cost": 22,
         "effect": "might",
         "duration": 20,
         "potency": 3
@@ -28,14 +28,14 @@
     {
         "name": "Potion of Speed",
         "description": "Quickens your every move, letting you act faster than your foes.",
-        "cost": 16,
+        "cost": 26,
         "effect": "haste",
         "duration": 18
     },
     {
         "name": "Potion of Regeneration",
         "description": "Knits your wounds closed over the coming turns.",
-        "cost": 12,
+        "cost": 20,
         "effect": "regen",
         "duration": 12,
         "potency": 2
@@ -43,7 +43,7 @@
     {
         "name": "Potion of Curing",
         "description": "Purges poison and other ailments from your body.",
-        "cost": 8,
+        "cost": 14,
         "hp_change": 5,
         "effect": "curing"
     }

@@ -17,6 +17,8 @@ class StyleConfig:
     potions: str = "#ff6bf8"
     scroll: str = "#e8e0c0"
     weapons: str = "#6bc6ff"
+    armour: str = "#8fb9a8"
+    throwables: str = "#d6b25c"
     bag: str = "#c9a06b"
     gold: str = "#FFD900"
     orb: str = "bold #fffb00"
@@ -27,6 +29,7 @@ class StyleConfig:
     blacksmith: str = "bold #ff9d5c"
     healer: str = "bold #7CFFCB"
     merchant: str = "bold #C9B3FF"
+    fletcher: str = "bold #8CD68C"
 
     # --- enemies (rendered by tier colour) ---
     enemy: str = "bold #FF2424"
@@ -63,6 +66,7 @@ class StyleConfig:
 
     # --- status effects ---
     poison: str = "#7CFF6B"
+    burn: str = "#FF7043"
     regen: str = "#6BFFB0"
     might: str = "#FF9D5C"
     haste: str = "#6BE0FF"
@@ -131,6 +135,8 @@ class SymbolConfig:
     potions: str = "!"
     scrolls: str = "?"
     weapons: str = ")"
+    armour: str = "["
+    throwables: str = "/"
     bag: str = "("
     orb: str = "0"
     shard: str = "*"
@@ -156,8 +162,9 @@ class SymbolConfig:
     blacksmith: str = "B"
     healer: str = "H"
     merchant: str = "M"
-    traders: list[str] = [chemist, blacksmith, merchant]
-    npcs: list[str] = [chemist, blacksmith, healer, merchant]
+    fletcher: str = "F"
+    traders: list[str] = [chemist, blacksmith, merchant, fletcher]
+    npcs: list[str] = [chemist, blacksmith, healer, merchant, fletcher]
 
     # enemies (symbol set is data-driven via enemies.json; this is the render hint set)
     enemies: list[str] = ["r", "b", "k", "g", "o", "z", "s", "O", "W", "T", "&"]
@@ -193,6 +200,8 @@ class SymbolConfig:
         potions: "potions",
         scrolls: "scroll",
         weapons: "weapons",
+        armour: "armour",
+        throwables: "throwables",
         bag: "bag",
         orb: "orb",
         "*": "shard",
@@ -202,6 +211,7 @@ class SymbolConfig:
         blacksmith: "blacksmith",
         healer: "healer",
         merchant: "merchant",
+        fletcher: "fletcher",
         # scenery terrain
         shallow_water: "shallow_water",
         deep_water: "deep_water",
@@ -252,6 +262,9 @@ class SpawnConfig:
     floor_scrolls: int = 2
     gold_piles: int = 5
     floor_weapons: int = 2
+    floor_armour: int = 2
+    floor_throwables: int = 2
+    floor_spellbooks: int = 1
     traps_base: int = 2             # +depth // 2
 
 
@@ -271,7 +284,7 @@ class ProgressionConfig:
 class PlayerConfig:
     """Player starting statistics."""
 
-    max_inventory: int = 8
+    max_inventory: int = 42
     health: int = 30
     max_health: int = 30
     coins: int = 30

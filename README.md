@@ -13,9 +13,10 @@ floors, and escape back to the surface alive.
 - **Multi-floor descent** - 8 procedurally generated floors with up/down stairs
 - **3 shard win condition** - collect all three sigil shards from depths 6, 7, 8, then escape
 - **Boss fights** - Flame Guardian, Stone Guardian, Shadow Guardian guard each shard
-- **Character classes** - Fighter, Hunter, Acolyte, or Wanderer, each with unique starting kit
+- **Character classes** - 12 classes (Fighter, Hunter, Acolyte, Wanderer, Frostbringer, Venomancer, Stormcaller, Arcanist, Shadowblade, Crusader, and more) each with unique starting kit, spells, and aptitudes
 - **Level & XP system** - kill monsters to gain XP, levels, more HP, and better attacks
 - **Ranged combat** - bows, crossbow, sling with an on-map aiming cursor
+- **Spellcasting** - 21 spells across 8 schools (Conjuration, Fire Magic, Ice Magic, Earth Magic, Poison Magic, Summoning, Translocation, Transmutation); staves boost matching schools
 - **Status effects** - poison, regeneration, might, haste, slow, confusion for player and monsters
 - **Traps** - hidden dart, poison, teleport, and alarm traps revealed by searching (`s`)
 - **Item identification** - potions and scrolls start unidentified; discover them by using
@@ -25,8 +26,8 @@ floors, and escape back to the surface alive.
 ### 🗺️ Dynamic World Generation
 - **Three level generators** - rooms-and-corridors, cellular automata caves, BSP layouts
 - **Variable map sizes** - floors average ~70×70 with scrolling player-centred view
-- **7 terrain types** - shallow/deep water, lava, trees, chasms, grass, mud
-- **3 floor features** - shrubs, mushrooms, rubble
+- **7 terrain types** with 3 floor features (shrubs, mushrooms, rubble)
+- **Biome themes** - each floor generates a unique AI-assisted setting (volcanic rift, fungal depths, sacred shrine, etc.)
 - **Secret doors** and **hidden vault rooms**
 - **Temples** - pillared chambers guarded by monsters but holding treasure
 
@@ -42,7 +43,7 @@ Configure via `.env` (see [INSTRUCTIONS.md](INSTRUCTIONS.md) for details).
 
 ### 🏪 NPCs & Items
 - **4 NPC types** - Chemist, Blacksmith, Merchant, Healer with unique shops
-- **10+ weapons**, potions, scrolls, gold
+- **10+ weapons**, 4 staves, potions, scrolls, spellbooks, gold
 - **Hidden wares** - NPCs have a base stock plus randomised extra items
 
 ## How to play
@@ -51,8 +52,8 @@ Your goal: **collect all three shards of the Broken Sigil** - one on each of dep
 and 8 - then **climb back to the surface**. Each shard is guarded by a boss. The exit only
 unlocks once you carry the complete sigil. Monsters get tougher the deeper you go.
 
-At the start you choose a **class** (Fighter, Hunter, Acolyte or Wanderer), each with
-its own starting kit and health. Killing monsters grants **XP and levels** (more HP and
+At the start you choose a **class** from 12 options (Fighter, Hunter, Acolyte, Wanderer, Frostbringer, Venomancer, Stormcaller, Arcanist, Shadowblade, Crusader, and more), each with
+its own starting kit, spells, skills and health. Killing monsters grants **XP and levels** (more HP and
 better attacks).
 
 | Key | Action |

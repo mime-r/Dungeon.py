@@ -1,0 +1,77 @@
+[
+    {
+        "name": "Stone",
+        "description": "A fist-sized stone, good for nothing but throwing.",
+        "cost": 1,
+        "base_attack": 1,
+        "attack_range": [0, 1],
+        "accuracy": 60,
+        "range": 3,
+        "count": 5,
+        "texts": {
+            "critical_hit": "Your stone cracks the {0} square in the skull!",
+            "hit": "Your stone strikes the {0}.",
+            "missed_hit": "Your stone clatters off the floor past the {0}."
+        }
+    },
+    {
+        "name": "Dart",
+        "description": "A small weighted dart, cheap and common.",
+        "cost": 2,
+        "base_attack": 1,
+        "attack_range": [0, 2],
+        "accuracy": 65,
+        "range": 4,
+        "count": 5,
+        "texts": {
+            "critical_hit": "Your dart sinks deep into the {0}!",
+            "hit": "Your dart sticks the {0}.",
+            "missed_hit": "Your dart skitters past the {0}."
+        }
+    },
+    {
+        "name": "Boomerang",
+        "description": "A curved throwing weapon that loops back to the hand. Rarely lost.",
+        "cost": 8,
+        "base_attack": 3,
+        "attack_range": [1, 4],
+        "accuracy": 55,
+        "range": 5,
+        "count": 3,
+        "texts": {
+            "critical_hit": "Your boomerang cracks the {0} and spins back to your hand!",
+            "hit": "Your boomerang strikes the {0} and arcs back.",
+            "missed_hit": "Your boomerang loops past the {0} and returns empty."
+        }
+    },
+    {
+        "name": "Javelin",
+        "description": "A long-shafted throwing spear, heavy enough to punch through armour.",
+        "cost": 14,
+        "base_attack": 5,
+        "attack_range": [2, 6],
+        "accuracy": 50,
+        "range": 6,
+        "count": 3,
+        "texts": {
+            "critical_hit": "Your javelin runs the {0} clean through!",
+            "hit": "Your javelin skewers the {0}.",
+            "missed_hit": "Your javelin thuds into the ground past the {0}."
+        }
+    },
+    {
+        "name": "Large Rock",
+        "description": "A boulder-sized rock, brutal to throw and brutal to be hit by.",
+        "cost": 22,
+        "base_attack": 8,
+        "attack_range": [3, 8],
+        "accuracy": 40,
+        "range": 4,
+        "count": 2,
+        "texts": {
+            "critical_hit": "Your rock crushes the {0} flat!",
+            "hit": "Your rock slams into the {0}.",
+            "missed_hit": "Your rock crashes to the ground past the {0}."
+        }
+    }
+]

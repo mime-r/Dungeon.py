@@ -1,3 +1,4 @@
+import copy
 import json
 import random
 from pathlib import Path
@@ -60,12 +61,19 @@ class DungeonPeopleLoader:
         self.data = data
         self.type = {"TRADER": DungeonTrader, "HEALER": DungeonHealer}.get(self.data.type)
 
+    def _stock_item(self, name: str):
+        """Resolve a sale by name; throwables get a fresh copy so their stack count
+        doesn't mutate the shared database singleton or other traders' stock."""
+        from .items import DungeonThrowable
+        item = self.game.db.item_db.search_item(name=name)
+        return copy.copy(item) if isinstance(item, DungeonThrowable) else item
+
     def load(self):
         people_data = self.data
         if self.type == DungeonTrader:
             potential_sales = (
                 TraderSales(
-                    item=self.game.db.item_db.search_item(name=sale_dict["item"]),
+                    item=self._stock_item(sale_dict["item"]),
                     chance=sale_dict["chance"],
                 )
                 for sale_dict in people_data.potential_sales

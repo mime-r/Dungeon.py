@@ -1,14 +1,1 @@
-[
-    {
-        "name": "Cloth Bag",
-        "description": "A useful cloth bag that increases your inventory storage by 4.",
-        "cost": 8,
-        "inventory": 4
-    },
-    {
-        "name": "Leather Pack",
-        "description": "A sturdy leather pack that increases your inventory storage by 8.",
-        "cost": 20,
-        "inventory": 8
-    }
-]
+[]

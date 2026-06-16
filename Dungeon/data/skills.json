@@ -1,0 +1,94 @@
+{
+  "skills": [
+    "Fighting",
+    "Maces & Flails",
+    "Axes",
+    "Long Blades",
+    "Short Blades",
+    "Polearms",
+    "Staves",
+    "Ranged",
+    "Throwing",
+    "Armour",
+    "Shields",
+    "Dodging",
+    "Stealth",
+    "Spellcasting",
+    "Conjuration",
+    "Fire Magic",
+    "Ice Magic",
+    "Earth Magic",
+    "Poison Magic",
+    "Transmutation",
+    "Translocation",
+    "Summoning"
+  ],
+  "cross_training": {
+    "Maces & Flails": ["Axes"],
+    "Axes": ["Maces & Flails"],
+    "Long Blades": ["Short Blades"],
+    "Short Blades": ["Long Blades"],
+    "Polearms": ["Staves"],
+    "Staves": ["Polearms"]
+  },
+  "aptitudes": {
+    "Fighter": {
+      "Fighting": 1,
+      "Maces & Flails": 1,
+      "Long Blades": 1,
+      "Armour": 1,
+      "Shields": 1,
+      "Spellcasting": -3,
+      "Conjuration": -2
+    },
+    "Hunter": {
+      "Fighting": 0,
+      "Ranged": 2,
+      "Throwing": 1,
+      "Dodging": 1,
+      "Stealth": 0,
+      "Spellcasting": -2,
+      "Conjuration": -1
+    },
+    "Acolyte": {
+      "Fighting": -1,
+      "Staves": 1,
+      "Dodging": 1,
+      "Stealth": 1,
+      "Spellcasting": 2,
+      "Conjuration": 1,
+      "Transmutation": 1,
+      "Translocation": 1
+    },
+    "Wanderer": {
+      "Fighting": 0,
+      "Dodging": 0,
+      "Stealth": 0,
+      "Spellcasting": 1,
+      "Conjuration": 0,
+      "Fire Magic": 0,
+      "Ice Magic": 0,
+      "Earth Magic": 0
+    },
+    "Pyrelord": {
+      "Fighting": -1,
+      "Staves": 2,
+      "Dodging": 0,
+      "Stealth": -1,
+      "Spellcasting": 1,
+      "Conjuration": 1,
+      "Fire Magic": 2,
+      "Transmutation": 1
+    },
+    "Shaman": {
+      "Fighting": -1,
+      "Staves": 2,
+      "Dodging": 0,
+      "Stealth": -1,
+      "Spellcasting": 1,
+      "Conjuration": 1,
+      "Earth Magic": 2,
+      "Transmutation": 2
+    }
+  }
+}

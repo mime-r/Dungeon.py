@@ -36,6 +36,8 @@ class DungeonEnemy:
     """A living dungeon enemy: combat stats, position, and simple chase AI."""
 
     is_enemy = True
+    is_summon = False
+    despawn_timer = 0
 
     def __init__(
         self,
@@ -97,13 +99,20 @@ class DungeonEnemy:
         """Resolve one attack against the player, applying damage, status, and messaging."""
         if self.game.godmode:
             return
-        if random.randint(1, 100) < self.accuracy:
+        player = self.game.player
+        hit_chance = max(5, self.accuracy - player.evasion())
+        if random.randint(1, 100) < hit_chance:
             damage = (self.attack_base
                       + random.randint(self.attack_range[0], self.attack_range[1])
                       + self.status.potency("might"))
             crit = damage >= self.attack_base + self.attack_range[1]
+            damage = max(1, damage - player.armor_class())
             self.game.message(self.texts.critical_hit if crit else self.texts.hit, drop=damage)
-            self.game.player.health -= damage
+            player.health -= damage
+            if player.skills:
+                player.skills.record("Armour")
+                if player.armour.get("shield"):
+                    player.skills.record("Shields")
             self._apply_on_hit()
         else:
             self.game.message(self.texts.missed_hit)
@@ -120,26 +129,67 @@ class DungeonEnemy:
                 "confusion": "reel in confusion"}.get(effect, f"are afflicted with {effect}")
         self.game.message(f"[{effect}]You {verb}![/{effect}]")
 
+    def _closest_summon(self):
+        """Return closest living summon and its Chebyshev distance, or (None, 999)."""
+        best = None
+        best_d = 999
+        for s in self.game.map.summon:
+            if s.health <= 0:
+                continue
+            d = max(abs(s.y - self.y), abs(s.x - self.x))
+            if d < best_d:
+                best_d = d
+                best = s
+        return best, best_d
+
+    def _attack_target(self, target) -> None:
+        """Resolve one melee attack against a target entity (summon, not player)."""
+        hit_chance = max(5, self.accuracy - 5)  # summons have no evasion
+        if random.randint(1, 100) < hit_chance:
+            dmg = self.attack_base + random.randint(self.attack_range[0], self.attack_range[1])
+            dmg = max(1, dmg)
+            target.health -= dmg
+            self.game.message(f"[enemy]The {self.name} attacks your {target.name}![/enemy]", drop=dmg)
+            if target.health <= 0:
+                self.game.on_summon_death(target)
+        else:
+            self.game.message(f"[enemy]The {self.name} misses your {target.name}.[/enemy]")
+
     def act(self) -> None:
         """Take one turn: wake near the player, then chase, fire, or bump-attack."""
         player = self.game.player
-        dist = max(abs(self.y - player.y), abs(self.x - player.x))
+        pdist = max(abs(self.y - player.y), abs(self.x - player.x))
         if not self.awake:
-            if dist <= config.depth.sight_radius:
+            if pdist <= config.depth.sight_radius + player.stealth_penalty():
                 self.awake = True
             else:
                 return
         if self.status.has("confusion"):
             self._step_confused()
             return
-        if dist == 1:
-            self.attack_player()
+        # Choose closest target (player or summon); player wins ties
+        closest_summon, sdist = self._closest_summon()
+        if closest_summon and sdist < pdist:
+            target = closest_summon
+            tdist = sdist
+        else:
+            target = player
+            tdist = pdist
+        # Act toward chosen target
+        if tdist == 1:
+            if target is player:
+                self.attack_player()
+            else:
+                self._attack_target(target)
             return
-        if self.ranged and dist <= self.attack_distance \
-                and self.game.map._line_of_sight(self.y, self.x, player.y, player.x):
-            self.attack_player(ranged=True)
+        if self.ranged and tdist <= self.attack_distance \
+                and self.game.map._line_of_sight(self.y, self.x, target.y, target.x):
+            if target is player:
+                self.attack_player(ranged=True)
+            else:
+                self._attack_target(target)
             return
-        self._step_toward(player.y, player.x)
+        self._step_toward(target.y, target.x)
 
     def _walkable_neighbors(self):
         for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1),

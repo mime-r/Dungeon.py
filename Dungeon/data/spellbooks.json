@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Book of Minor Magic",
+    "description": "A slim primer containing the basics of magical combat.",
+    "cost": 20,
+    "spells": ["Magic Dart", "Freeze", "Sting"]
+  },
+  {
+    "name": "Book of Fire",
+    "description": "Warm to the touch. Its pages smell faintly of ash.",
+    "cost": 40,
+    "spells": ["Searing Ray", "Flame Wave", "Fireball"]
+  },
+  {
+    "name": "Book of Transmutation",
+    "description": "Leather-bound notes on the art of changing matter.",
+    "cost": 35,
+    "spells": ["Petrify", "Ignite Flora"]
+  },
+  {
+    "name": "Book of Summoning",
+    "description": "A tome of binding rites and familiar spirits.",
+    "cost": 40,
+    "spells": ["Summon Small Mammal", "Summon Canine Familiar", "Summon Spectral Wolf"]
+  },
+  {
+    "name": "Book of Earth",
+    "description": "Heavy granite plates bound in iron. Each page is a stone slab.",
+    "cost": 55,
+    "spells": ["Stone Fist", "Iron Shot", "Petrify"]
+  },
+  {
+    "name": "Book of Power",
+    "description": "A forbidden grimoire. Its text shifts when unobserved.",
+    "cost": 80,
+    "spells": ["Chain Lightning", "Lehudib's Crystal Spear"]
+  },
+  {
+    "name": "Book of Ice",
+    "description": "Bound in blue leather that never warms to the touch. Each page glistens with rime.",
+    "cost": 35,
+    "spells": ["Ice Shard", "Blizzard"]
+  },
+  {
+    "name": "Book of Venom",
+    "description": "Stained and pungent, bound in something leathery. The illustrations writhe.",
+    "cost": 30,
+    "spells": ["Sting", "Venom Bolt"]
+  },
+  {
+    "name": "Book of the Storm",
+    "description": "Crackles with static when handled. The ink shifts between raindrops and lightning.",
+    "cost": 55,
+    "spells": ["Static Touch", "Phase Shift", "Chain Lightning"]
+  }
+]
