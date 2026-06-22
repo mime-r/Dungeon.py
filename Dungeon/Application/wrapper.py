@@ -7,7 +7,7 @@ from rich.theme import Theme
 from . import input as keys
 from .config import config
 from .utils import style_text, clear_screen
-from .main import Dungeon
+from .main import Dungeon, _read_save_state
 
 
 class GameWrapper:
@@ -32,10 +32,21 @@ class GameWrapper:
 """,
             highlight=False,
         )
+        save_state = _read_save_state()
+        resume_text = ""
+        if save_state is not None:
+            sd = save_state.get("player", {})
+            resume_text = (
+                f"Press {style_text('r', 'controls')} to {style_text('resume', 'action')} "
+                f"(depth {save_state.get('depth', '?')}, "
+                f"HP {sd.get('health', '?')}/{sd.get('max_health', '?')}, "
+                f"shards {len(sd.get('shards', []))}/3).\n"
+            )
         self.print(
             "[flavor]Descend the dungeon, collect three sigil shards, and escape to the surface.[/flavor]\n\n"
             f"Press {style_text('enter', 'controls')} to {style_text('start', 'action')}.\n"
-            f"Press {style_text('esc', 'controls')} to {style_text('exit', 'action')}.\n",
+            + resume_text
+            + f"Press {style_text('esc', 'controls')} to {style_text('exit', 'action')}.\n",
             highlight=False,
         )
         while True:
@@ -43,6 +54,10 @@ class GameWrapper:
             if key == keys.ENTER:
                 time.sleep(0.1)
                 Dungeon.__start__(logger=self.logger, rich_console=self.rich_console)
+                break
+            if key == "r" and save_state is not None:
+                time.sleep(0.1)
+                Dungeon.__start__(logger=self.logger, rich_console=self.rich_console, load_state=save_state)
                 break
             if key == keys.ESC:
                 print("Exiting [Dungeon]...")

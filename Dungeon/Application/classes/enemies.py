@@ -167,6 +167,8 @@ class DungeonEnemy:
         if self.status.has("confusion"):
             self._step_confused()
             return
+        if self.status.has("petrify"):
+            return
         # Choose closest target (player or summon); player wins ties
         closest_summon, sdist = self._closest_summon()
         if closest_summon and sdist < pdist:

@@ -41,6 +41,11 @@ floors, and escape back to the surface alive.
 
 Configure via `.env` (see [INSTRUCTIONS.md](INSTRUCTIONS.md) for details).
 
+### 💾 Save & Restore
+- **Save anytime** with `S` — preserves full game state: player, inventory, equipment, all floors, enemies, NPCs, and floor themes
+- **Resume** on next launch by pressing `R` at the splash screen
+- Game state persists to `savegame.json`
+
 ### 🏪 NPCs & Items
 - **4 NPC types** - Chemist, Blacksmith, Merchant, Healer with unique shops
 - **10+ weapons**, 4 staves, potions, scrolls, spellbooks, gold
@@ -66,6 +71,7 @@ better attacks).
 | `i` / `d` | use / equip / unequip / drink / read / drop items from your pack |
 | `>` / `<` | take stairs down / up |
 | `s` | search adjacent tiles for secret doors and traps |
+| `S` | save game (`R` to restore on next launch) |
 | `.` or space | wait one turn |
 | `p` | pause · `?` | help · `esc` | quit |
 

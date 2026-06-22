@@ -72,6 +72,7 @@ class StyleConfig:
     haste: str = "#6BE0FF"
     slow: str = "#9aa0b0"
     confusion: str = "#C77DFF"
+    petrify: str = "#9E9E9E"
 
     # --- terrain scenery ---
     shallow_water: str = "#4fc3f7"
@@ -90,6 +91,7 @@ class StyleConfig:
     # --- traps / targeting / features ---
     trap: str = "bold #FF5C5C"
     altar: str = "bold #E6D8A0"
+    burning: str = "bold #FF5722"
     target: str = "bold #FFE066"
     target_path: str = "#8a7d3a"
     stair_cursor: str = "bold reverse #ffe066"
@@ -142,6 +144,7 @@ class SymbolConfig:
     shard: str = "*"
     trap: str = "^"          # a revealed trap
     altar: str = "_"         # a temple altar
+    burning: str = "#"       # burning terrain tile
 
     # scenery terrain
     shallow_water: str = "~"
@@ -285,8 +288,8 @@ class PlayerConfig:
     """Player starting statistics."""
 
     max_inventory: int = 42
-    health: int = 30
-    max_health: int = 30
+    health: int = 20
+    max_health: int = 20
     coins: int = 30
     xp: int = 0
 

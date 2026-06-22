@@ -25,7 +25,6 @@ _MAGIC_SCHOOLS = {
     "Staff of Earth": "Earth Magic",
     "Staff of Venom": "Poison Magic",
     "Staff of Lightning": "Conjuration",
-    "Staff of Air": "Conjuration",
     "Magic Staff": "Spellcasting",
 }
 
@@ -171,17 +170,27 @@ def _touch(spell, player, game, target, mult):
         game.message("No target in range.")
         return
     en = style_text(target.name, "enemy")
+    dmg_text = {
+        "cold": "is frozen solid",
+        "fire": "is seared",
+        "lightning": "is electrocuted",
+        "poison": "is poisoned",
+        "force": "is blasted",
+    }
+    verb = dmg_text.get(spell.damage_type, "is struck")
     if spell.damage:
         lo, hi = spell.damage
         raw = random.randint(lo, hi)
         dmg = max(1, int(raw * mult))
-        game.message(f"[action]You cast {style_text(spell.name, 'item')}! The {en} is chilled.[/action]", drop=dmg)
+        game.message(f"[action]You cast {style_text(spell.name, 'item')}! The {en} {verb}.[/action]", drop=dmg)
         target.health -= dmg
         if target.health <= 0:
             game.on_enemy_death(target)
     if spell.status:
         target.status.add(spell.status["effect"], spell.status.get("duration", 4), spell.status.get("potency", 1))
-        game.message(f"[ice]The {en} slows to a crawl![/ice]")
+        status_verb = {"slow": "slows to a crawl", "confusion": "reels in confusion", "poison": "is poisoned", "burn": "catches fire", "petrify": "begins to turn to stone"}
+        sv = status_verb.get(spell.status["effect"], f"is afflicted by {spell.status['effect']}")
+        game.message(f"[action]The {en} {sv}![/action]")
 
 
 def _channel(spell, player, game, target, mult):
@@ -290,13 +299,21 @@ def _summon(spell, player, game):
 
 def _ignite_flora(spell, player, game, mult):
     burned = 0
+    duration = spell.extra.get("duration", 5)
     for y, x in game.map.visible:
         cell = game.map.matrix[y][x]
         if cell.terrain in ("grass", "tree", "shrub") or cell.feature == "altar":
-            # Actually, let's just target grass/shrub/tree
             if cell.terrain in ("grass", "tree") or cell.feature in ("shrub",):
                 cell.feature = "burning"
+                game.map.burning_cells[(y, x)] = duration
                 burned += 1
+                if cell.occupant and getattr(cell.occupant, "is_enemy", False) and spell.damage:
+                    lo, hi = spell.damage
+                    dmg = max(1, int(random.randint(lo, hi) * mult))
+                    cell.occupant.health -= dmg
+                    game.message(f"[fire]{style_text(cell.occupant.name, 'enemy')} is caught in the blaze![/fire]", drop=dmg)
+                    if cell.occupant.health <= 0:
+                        game.on_enemy_death(cell.occupant)
     if burned:
         game.message(f"[fire]You cast {style_text(spell.name, 'item')}! {burned} tiles burst into flame.[/fire]")
     else:

@@ -1,12 +1,15 @@
 import copy
 import datetime
+import json
 import os
 import sys
 import time
 import operator
 import traceback
 import random
+import types
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from tinydb import TinyDB, Query
 from rich.panel import Panel
@@ -16,14 +19,40 @@ from .config import config
 from .utils import style_text, clear_screen
 from .classes.map import DungeonMap, DungeonPlayer, DIRS
 from .classes.menus import DungeonMenu
-from .classes.items import DungeonShard, DungeonPotion, DungeonScroll, DungeonThrowable, DungeonArmour
+from .classes.items import (
+    DungeonShard, DungeonPotion, DungeonScroll, DungeonThrowable,
+    DungeonArmour, DungeonSpellBook, DungeonWeapon, DungeonInventory,
+    DungeonSpell,
+)
 from .classes.database import DungeonDatabase
 from .classes.misc import DungeonTimeData
+from .classes.status import StatusSet
+from __version__ import __version__
 from .classes.people import DungeonTrader, DungeonHealer
-from .classes.levelgen import generate_level, STRUCTURE_CATALOG
+from .classes.skills import SkillSet, SkillState
+from .classes.enemies import DungeonEnemy, EnemyTexts
+from .classes.levelgen import generate_level, LevelLayout, Room, STRUCTURE_CATALOG
 from .llm import LLMClient
 
+SAVE_FILE_NAME = "savegame.json"
+SAVE_FILE = Path(__file__).resolve().parent.parent.parent / SAVE_FILE_NAME
+SAVE_VERSION = 1
+
 print("Loading...")
+
+
+def _read_save_state() -> dict | None:
+    if not SAVE_FILE.exists():
+        return None
+    try:
+        with open(SAVE_FILE, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if int(data.get("version", 0)) != SAVE_VERSION:
+            return None
+        return data
+    except Exception:
+        return None
+
 
 T = config.terrain
 
@@ -34,6 +63,427 @@ DIR_DELTA = {
     "n": (-1, 0), "s": (1, 0), "w": (0, -1), "e": (0, 1),
     "ne": (-1, 1), "nw": (-1, -1), "se": (1, 1), "sw": (1, -1),
 }
+
+# Serialization helpers for save/load state.
+
+def _coord_to_list(coord):
+    return [coord[0], coord[1]] if coord is not None else None
+
+
+def _list_to_coord(value):
+    return tuple(value) if value is not None else None
+
+
+def _room_to_dict(room: Room) -> dict:
+    return {
+        "x": room.x,
+        "y": room.y,
+        "w": room.w,
+        "h": room.h,
+        "shape": room.shape,
+    }
+
+
+def _room_from_dict(data: dict) -> Room:
+    return Room(data["x"], data["y"], data["w"], data["h"], shape=data.get("shape", "rect"))
+
+
+def _save_item(item) -> dict | None:
+    if item is None:
+        return None
+    data = {"kind": type(item).__name__, "name": item.name}
+    if isinstance(item, DungeonThrowable):
+        data["count"] = item.count
+    if isinstance(item, DungeonInventory):
+        data["inventory"] = item.inventory
+    if isinstance(item, DungeonArmour):
+        data["slot"] = item.slot
+    if isinstance(item, DungeonSpellBook):
+        data["spells"] = item.spells
+    return data
+
+
+def _load_item(data: dict, game):
+    if data is None:
+        return None
+    kind = data["kind"]
+    name = data["name"]
+
+    if kind == "DungeonShard":
+        return DungeonShard(name)
+    if kind == "DungeonThrowable":
+        item = game.db.item_db.search_item(name=name, type=DungeonThrowable)
+        item = copy.copy(item) if item else None
+        if item:
+            item.count = int(data.get("count", 1))
+        return item
+    if kind == "DungeonPotion":
+        item = game.db.item_db.search_item(name=name, type=DungeonPotion)
+        return copy.copy(item) if item else None
+    if kind == "DungeonScroll":
+        item = game.db.item_db.search_item(name=name, type=DungeonScroll)
+        return copy.copy(item) if item else None
+    if kind == "DungeonWeapon":
+        item = game.db.item_db.search_item(name=name, type=DungeonWeapon)
+        return copy.copy(item) if item else None
+    if kind == "DungeonArmour":
+        item = game.db.item_db.search_item(name=name, type=DungeonArmour)
+        return copy.copy(item) if item else None
+    if kind == "DungeonInventory":
+        item = game.db.item_db.search_item(name=name, type=DungeonInventory)
+        return copy.copy(item) if item else None
+    if kind == "DungeonSpellBook":
+        item = game.db.item_db.search_item(name=name, type=DungeonSpellBook)
+        return copy.copy(item) if item else None
+    return None
+
+
+def _save_status(status) -> dict:
+    return {name: {"duration": eff["duration"], "potency": eff["potency"]}
+            for name, eff in status.effects.items()}
+
+
+def _load_status(data: dict):
+    status = StatusSet()
+    for name, eff in data.items():
+        status.effects[name] = {"duration": int(eff["duration"]), "potency": int(eff["potency"])}
+    return status
+
+
+def _save_skills(skills) -> dict | None:
+    if skills is None:
+        return None
+    return {
+        "manual_mode": bool(skills.manual_mode),
+        "recent_actions": list(skills.recent_actions),
+        "cross_training": skills.cross_training,
+        "skills": {
+            name: {
+                "level": skill.level,
+                "aptitude": skill.aptitude,
+                "state": skill.state.value,
+                "target": skill.target,
+            }
+            for name, skill in skills.skills.items()
+        },
+    }
+
+
+def _load_skills(data: dict) -> SkillSet | None:
+    if data is None:
+        return None
+    skills = SkillSet(
+        skill_names=list(data["skills"].keys()),
+        aptitudes={name: int(info.get("aptitude", 0)) for name, info in data["skills"].items()},
+        cross_training=data.get("cross_training", {}),
+    )
+    skills.manual_mode = bool(data.get("manual_mode", False))
+    skills.recent_actions = list(data.get("recent_actions", []))
+    for name, info in data["skills"].items():
+        skill = skills.skills.get(name)
+        if not skill:
+            continue
+        skill.level = float(info.get("level", 0.0))
+        skill.aptitude = int(info.get("aptitude", 0))
+        skill.state = SkillState(info.get("state", SkillState.DISABLED.value))
+        skill.target = info.get("target")
+    return skills
+
+
+def _save_theme(theme) -> dict | None:
+    if theme is None:
+        return None
+    return {
+        "name": theme.name,
+        "description": theme.description,
+        "layout_bias": theme.layout_bias,
+        "enemy_bias": list(theme.enemy_bias),
+        "trap_type": theme.trap_type,
+        "trap_density": theme.trap_density,
+        "loot_bias": theme.loot_bias,
+        "ambient": theme.ambient,
+        "structures": list(theme.structures),
+        "terrain_features": list(theme.terrain_features),
+    }
+
+
+def _load_theme(data: dict):
+    if data is None:
+        return None
+    return FloorTheme(
+        name=data.get("name", ""),
+        description=data.get("description", ""),
+        layout_bias=data.get("layout_bias", "any"),
+        enemy_bias=list(data.get("enemy_bias", [])),
+        trap_type=data.get("trap_type", "any"),
+        trap_density=data.get("trap_density", "normal"),
+        loot_bias=data.get("loot_bias", "balanced"),
+        ambient=data.get("ambient", ""),
+        structures=list(data.get("structures", [])),
+        terrain_features=list(data.get("terrain_features", [])),
+    )
+
+
+def _save_player(player) -> dict:
+    return {
+        "name": player.name,
+        "background": player.background,
+        "health": player.health,
+        "max_health": player.max_health,
+        "xp": player.xp,
+        "xp_next": player.xp_next,
+        "coins": player.coins,
+        "shards": list(player.shards),
+        "inventory": [_save_item(item) for item in player.inventory],
+        "max_inventory": player.max_inventory,
+        "equipped": _save_item(player.equipped),
+        "armour": {slot: _save_item(item) for slot, item in player.armour.items()},
+        "location": _coord_to_list(player.location),
+        "level": player.level,
+        "status": _save_status(player.status),
+        "energy": player.energy,
+        "speed": player.speed,
+        "mp": player.mp,
+        "max_mp": player.max_mp,
+        "intelligence": player.intelligence,
+        "known_spells": [spell.name for spell in player.known_spells],
+        "channeling": player._channeling,
+        "skills": _save_skills(player.skills),
+    }
+
+
+def _load_player(data: dict, game) -> DungeonPlayer:
+    equipped = _load_item(data.get("equipped"), game) or game.db.item_db.search_item(name="Fists")
+    player = DungeonPlayer(
+        health=int(data.get("health", 1)),
+        max_health=int(data.get("max_health", 1)),
+        max_inventory=int(data.get("max_inventory", config.player.max_inventory)),
+        coins=int(data.get("coins", 0)),
+        xp=int(data.get("xp", 0)),
+        equipped=equipped,
+        game=game,
+    )
+    player.name = data.get("name")
+    player.background = data.get("background")
+    player.xp_next = int(data.get("xp_next", config.progression.xp_for(player.level)))
+    player.shards = set(data.get("shards", []))
+    player.inventory = [_load_item(item_proto, game) for item_proto in data.get("inventory", []) if _load_item(item_proto, game) is not None]
+    player.armour = {slot: _load_item(item_proto, game) for slot, item_proto in data.get("armour", {}).items()}
+    player.location = tuple(data.get("location", (0, 0)))
+    player.level = int(data.get("level", 1))
+    player.status = _load_status(data.get("status", {}))
+    player.energy = int(data.get("energy", TURN))
+    player.speed = int(data.get("speed", 10))
+    player.mp = float(data.get("mp", 0))
+    player.max_mp = float(data.get("max_mp", 0))
+    player.intelligence = int(data.get("intelligence", 8))
+    player.known_spells = [game.db.item_db.search_spell(name) for name in data.get("known_spells", [])]
+    player.known_spells = [s for s in player.known_spells if s is not None]
+    player._channeling = {name: int(turns) for name, turns in data.get("channeling", {}).items()}
+    player.skills = _load_skills(data.get("skills"))
+    if player.skills:
+        player.skills.recent_actions = list(data.get("skills", {}).get("recent_actions", []))
+    player.equipped = None
+    if equipped is not None:
+        # Reuse the matching object from inventory if possible.
+        for inv_item in player.inventory:
+            if inv_item is not None and inv_item.name == equipped.name and type(inv_item) is type(equipped):
+                player.equipped = inv_item
+                break
+        if player.equipped is None:
+            player.equipped = equipped
+    return player
+
+
+def _save_cell(cell) -> dict:
+    return {
+        "terrain": cell.terrain,
+        "explored": cell.explored,
+        "trap": cell.trap,
+        "trap_hidden": cell.trap_hidden,
+        "feature": cell.feature,
+        "gold": cell.gold,
+        "items": [_save_item(item) for item in cell.items],
+    }
+
+
+def _load_cell(data: dict, cell):
+    cell.explored = bool(data.get("explored", False))
+    cell.trap = data.get("trap")
+    cell.trap_hidden = bool(data.get("trap_hidden", True))
+    cell.feature = data.get("feature")
+    cell.gold = int(data.get("gold", 0))
+    cell.items = [_load_item(item_proto, cell.game) for item_proto in data.get("items", []) if _load_item(item_proto, cell.game) is not None]
+
+
+def _save_entity(entity) -> dict:
+    if isinstance(entity, DungeonTrader):
+        return {
+            "kind": "trader",
+            "name": entity.name,
+            "occupation": entity.occupation,
+            "personality": entity.personality,
+            "symbol": entity.symbol,
+            "style": entity.style,
+            "location": _coord_to_list(entity.location),
+            "stuff": [_save_item(item) for item in entity.stuff],
+        }
+    if isinstance(entity, DungeonHealer):
+        return {
+            "kind": "healer",
+            "name": entity.name,
+            "occupation": entity.occupation,
+            "personality": entity.personality,
+            "symbol": entity.symbol,
+            "style": entity.style,
+            "location": _coord_to_list(entity.location),
+            "heal_cost_per_hp": entity.heal_cost_per_hp,
+        }
+    kind = "summon" if getattr(entity, "is_summon", False) else "enemy"
+    return {
+        "kind": kind,
+        "name": entity.name,
+        "tier": entity.tier,
+        "health": entity.health,
+        "max_health": entity.max_health,
+        "coin_drop": getattr(entity, "coin_drop", 0),
+        "xp_drop": getattr(entity, "xp_drop", 0),
+        "attack_base": entity.attack_base,
+        "attack_range": list(entity.attack_range),
+        "accuracy": entity.accuracy,
+        "ranged": bool(getattr(entity, "ranged", False)),
+        "attack_distance": int(getattr(entity, "attack_distance", 1)),
+        "speed": int(getattr(entity, "speed", 10)),
+        "awake": bool(getattr(entity, "awake", False)),
+        "energy": int(getattr(entity, "energy", 0)),
+        "status": _save_status(entity.status),
+        "location": _coord_to_list(entity.location),
+        "despawn_timer": int(getattr(entity, "despawn_timer", 0)),
+    }
+
+
+def _load_entity(data: dict, game):
+    kind = data.get("kind")
+    if kind == "trader":
+        trader = DungeonTrader(
+            potential_sales=[],
+            occupation=data.get("occupation", "trader"),
+            personality=data.get("personality", ""),
+        )
+        trader.name = data.get("name", trader.name)
+        trader.symbol = data.get("symbol", trader.symbol)
+        trader.style = data.get("style", trader.style)
+        trader.location = _list_to_coord(data.get("location")) or (0, 0)
+        trader.stuff = [_load_item(item_proto, game) for item_proto in data.get("stuff", []) if _load_item(item_proto, game) is not None]
+        return trader
+    if kind == "healer":
+        healer = DungeonHealer(
+            heal_cost_per_hp=int(data.get("heal_cost_per_hp", 1)),
+            occupation=data.get("occupation", "Healer"),
+            personality=data.get("personality", ""),
+        )
+        healer.name = data.get("name", healer.name)
+        healer.symbol = data.get("symbol", healer.symbol)
+        healer.style = data.get("style", healer.style)
+        healer.location = _list_to_coord(data.get("location")) or (0, 0)
+        return healer
+    name = data.get("name")
+    loader = game.db.enemy_db.search_enemy(name=name)
+    if loader:
+        entity = loader.load()
+    else:
+        texts = EnemyTexts("The {} attacks!", "The {} hits!", "The {} misses!", "The {} dies.", name)
+        entity = DungeonEnemy(
+            name=name,
+            symbol="?",
+            tier=data.get("tier", "mid"),
+            health=int(data.get("max_health", 1)),
+            coin_drop=int(data.get("coin_drop", 0)),
+            xp_drop=int(data.get("xp_drop", 0)),
+            attack_base=int(data.get("attack_base", 1)),
+            attack_range=list(data.get("attack_range", [0, 1])),
+            accuracy=int(data.get("accuracy", 50)),
+            texts=texts,
+            game=game,
+            ranged=bool(data.get("ranged", False)),
+            attack_distance=int(data.get("attack_distance", 1)),
+            speed=int(data.get("speed", 10)),
+        )
+    entity.health = int(data.get("health", entity.health))
+    entity.max_health = int(data.get("max_health", entity.max_health))
+    entity.coin_drop = int(data.get("coin_drop", getattr(entity, "coin_drop", 0)))
+    entity.xp_drop = int(data.get("xp_drop", getattr(entity, "xp_drop", 0)))
+    entity.attack_base = int(data.get("attack_base", getattr(entity, "attack_base", 0)))
+    entity.attack_range = list(data.get("attack_range", getattr(entity, "attack_range", [0, 1])))
+    entity.accuracy = int(data.get("accuracy", getattr(entity, "accuracy", 50)))
+    entity.ranged = bool(data.get("ranged", getattr(entity, "ranged", False)))
+    entity.attack_distance = int(data.get("attack_distance", getattr(entity, "attack_distance", 1)))
+    entity.speed = int(data.get("speed", getattr(entity, "speed", 10)))
+    entity.awake = bool(data.get("awake", False))
+    entity.energy = int(data.get("energy", 0))
+    entity.status = _load_status(data.get("status", {}))
+    entity.location = _list_to_coord(data.get("location")) or (0, 0)
+    if kind == "summon":
+        entity.is_enemy = False
+        entity.is_summon = True
+        entity.despawn_timer = int(data.get("despawn_timer", 0))
+    return entity
+
+
+def _save_level(level: DungeonMap) -> dict:
+    return {
+        "width": level.width,
+        "height": level.height,
+        "rooms": [_room_to_dict(room) for room in level.rooms],
+        "stairs_up": _coord_to_list(level.stairs_up),
+        "stairs_down": _coord_to_list(level.stairs_down),
+        "vault_cells": [_coord_to_list(c) for c in level.vault_cells],
+        "temple_cells": [_coord_to_list(c) for c in level.temple_cells],
+        "altar": _coord_to_list(level.altar),
+        "floor_cells": [_coord_to_list(c) for c in level.floor_cells],
+        "scenery_features": [[y, x, feat] for (y, x, feat) in getattr(level, "scenery_features", [])],
+        "excluded_stairs": [_coord_to_list(c) for c in level.excluded_stairs],
+        "terrain": [[cell.terrain for cell in row] for row in level.matrix],
+        "cells": [[_save_cell(cell) for cell in row] for row in level.matrix],
+        "enemies": [_save_entity(e) for e in level.enemies],
+        "summon": [_save_entity(s) for s in level.summon],
+        "npcs": [_save_entity(n) for n in level.npcs],
+    }
+
+
+def _load_level(data: dict, game) -> DungeonMap:
+    layout = LevelLayout(int(data.get("width", 1)), int(data.get("height", 1)))
+    layout.rooms = [_room_from_dict(room) for room in data.get("rooms", [])]
+    layout.stairs_up = _list_to_coord(data.get("stairs_up"))
+    layout.stairs_down = _list_to_coord(data.get("stairs_down"))
+    layout.vault_cells = [_list_to_coord(c) for c in data.get("vault_cells", []) if c is not None]
+    layout.temple_cells = [_list_to_coord(c) for c in data.get("temple_cells", []) if c is not None]
+    layout.altar = _list_to_coord(data.get("altar"))
+    layout.floor_cells = [_list_to_coord(c) for c in data.get("floor_cells", []) if c is not None]
+    layout.scenery_features = [tuple(feat) for feat in data.get("scenery_features", [])]
+    layout.terrain = [list(row) for row in data.get("terrain", [])]
+    level = DungeonMap(game=game, layout=layout)
+    level.excluded_stairs = {tuple(c) for c in data.get("excluded_stairs", []) if c is not None}
+    for y, row in enumerate(data.get("cells", [])):
+        for x, cell_data in enumerate(row):
+            _load_cell(cell_data, level.matrix[y][x])
+    level.enemies = []
+    level.summon = []
+    level.npcs = []
+    for entity_data in data.get("enemies", []):
+        enemy = _load_entity(entity_data, game)
+        level.enemies.append(enemy)
+        level.place_occupant(enemy, *enemy.location)
+    for entity_data in data.get("summon", []):
+        summon = _load_entity(entity_data, game)
+        level.summon.append(summon)
+        level.place_occupant(summon, *summon.location)
+    for entity_data in data.get("npcs", []):
+        npc = _load_entity(entity_data, game)
+        level.npcs.append(npc)
+        level.place_occupant(npc, *npc.location)
+    return level
+
 
 # Weapons seeded into vault treasure, by how deep you are.
 _VAULT_WEAPONS = [
@@ -88,7 +538,7 @@ _SCROLL_LABELS = [
 class Dungeon:
     """Main game controller: owns the floors, player, database, and game loop."""
 
-    def __init__(self, logger, rich_console) -> None:
+    def __init__(self, logger, rich_console, load_state: dict | None = None) -> None:
         self.log = logger
         self.rich_console = rich_console
         self.print = self.rich_console.print
@@ -110,7 +560,8 @@ class Dungeon:
 
         self.llm = LLMClient()
         self.log.info(f"LLM status: {self.llm.status}")
-        self._ai_toggle_prompt()
+        if load_state is None:
+            self._ai_toggle_prompt()
 
         # DM hint state
         self._hint_future = None
@@ -145,27 +596,31 @@ class Dungeon:
         self.player.mp = 0
         self.player.max_mp = 0
         self.player.intelligence = 8
-        self._choose_background()
 
-        while True:
-            self.session_id = random.getrandbits(64)
-            if not self.leaderboard.search(self.leaderboardQuery.session_id == self.session_id):
-                break
+        if load_state is None:
+            self._choose_background()
 
-        self.player.name = input("Hello adventurer, what is your name? (Enter for random)\n> ").strip()
-        if not self.player.name:
-            from .classes.people import DungeonPeople
-            self.player.name = DungeonPeople.generate_name()
-            print(f"You are {self.player.name}.")
-            time.sleep(1.2)
+            while True:
+                self.session_id = random.getrandbits(64)
+                if not self.leaderboard.search(self.leaderboardQuery.session_id == self.session_id):
+                    break
 
-        self.enter_level(1, mode="down")
-        self.message(f"[flavor]You descend into the dungeon. Three shards of a Broken Sigil lie scattered in the depths — find them all.[/flavor]")
-        if self.llm.enabled:
-            self.message(f"[flavor]The dungeon breathes with strange intelligence. ({self.llm.status})[/flavor]")
-        elif self.llm.status != "disabled":
-            self.message(f"[warn]LLM unavailable: {self.llm.status}[/warn]")
-        self.log.info("dungeon initialised")
+            self.player.name = input("Hello adventurer, what is your name? (Enter for random)\n> ").strip()
+            if not self.player.name:
+                from .classes.people import DungeonPeople
+                self.player.name = DungeonPeople.generate_name()
+                print(f"You are {self.player.name}.")
+                time.sleep(1.2)
+
+            self.enter_level(1, mode="down")
+            self.message(f"[flavor]You descend into the dungeon. Three shards of a Broken Sigil lie scattered in the depths — find them all.[/flavor]")
+            if self.llm.enabled:
+                self.message(f"[flavor]The dungeon breathes with strange intelligence. ({self.llm.status})[/flavor]")
+            elif self.llm.status != "disabled":
+                self.message(f"[warn]LLM unavailable: {self.llm.status}[/warn]")
+            self.log.info("dungeon initialised")
+        else:
+            self._load_state(load_state)
 
     # --- pre-game setup ------------------------------------------------
     def _ai_toggle_prompt(self) -> None:
@@ -206,6 +661,89 @@ class Dungeon:
             self.llm.enabled = False
 
     # --- character creation --------------------------------------------
+    def _serialize_state(self) -> dict:
+        return {
+            "version": SAVE_VERSION,
+            "depth": self.depth,
+            "moves": self.moves,
+            "time_elapsed": getattr(self.time, "elapsed", 0.0),
+            "auto_pickup_types": list(self.auto_pickup_types),
+            "godmode": self.godmode,
+            "llm_enabled": self.llm.enabled,
+            "floor_themes": {str(depth): _save_theme(theme) for depth, theme in self._floor_themes.items() if theme is not None},
+            "theme_history": list(self._theme_history),
+            "ident": self.ident,
+            "lore_done": list(self._lore_done),
+            "player": _save_player(self.player),
+            "levels": {str(depth): _save_level(level) for depth, level in self.levels.items()},
+        }
+
+    def save_game(self) -> None:
+        clear_screen()
+        shard_count = len(self.player.shards)
+        self.print(Panel(
+            f"[menu_header]Save Game[/menu_header]\n\n"
+            f"Depth: [move_count]{self.depth}[/move_count]   "
+            f"HP: {self.player.health}/{self.player.max_health}   "
+            f"Shards: {shard_count}/3\n"
+            f"XP: {self.player.xp}   "
+            f"Gold: {self.player.coins}   "
+            f"Turns: {self.moves}\n\n"
+            f"Save to [warn]{SAVE_FILE_NAME}[/warn]?\n\n"
+            f"{style_text('y', 'controls')} save    "
+            f"{style_text('n', 'controls')} / {style_text('esc', 'controls')} cancel",
+            border_style="grey37"))
+        confirm = keys.read_key()
+        if confirm != "y":
+            self.render()
+            return
+        try:
+            SAVE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(SAVE_FILE, "w", encoding="utf-8") as handle:
+                json.dump(self._serialize_state(), handle, indent=2)
+            self.log.info(f"saved game to {SAVE_FILE}")
+            self.message(f"[success]Game saved to {SAVE_FILE_NAME}.[/success]")
+        except Exception as exc:
+            self.log.info(f"failed to save game: {exc}")
+            self.message("[warn]Unable to save the game.[/warn]")
+        self.render()
+
+    def _load_state(self, data: dict) -> None:
+        self.depth = int(data.get("depth", 1))
+        self.moves = int(data.get("moves", 0))
+        self.auto_pickup_types = set(data.get("auto_pickup_types", list(self.auto_pickup_types)))
+        self.godmode = bool(data.get("godmode", self.godmode))
+        self.llm.enabled = bool(data.get("llm_enabled", self.llm.enabled))
+        self._theme_history = list(data.get("theme_history", []))
+        self._floor_themes = {
+            int(depth): _load_theme(theme_data)
+            for depth, theme_data in (data.get("floor_themes", {}) or {}).items()
+            if theme_data is not None
+        }
+        self.ident = {
+            name: {
+                "appearance": rec.get("appearance"),
+                "identified": bool(rec.get("identified")),
+                "lore": rec.get("lore"),
+            }
+            for name, rec in (data.get("ident", {}) or {}).items()
+        }
+        self._lore_done = set(data.get("lore_done", []))
+        self._lore_futures = {}
+        self.time = DungeonTimeData(game=self)
+        self.time.elapsed = float(data.get("time_elapsed", 0.0))
+
+        levels = {}
+        for depth, level_data in (data.get("levels", {}) or {}).items():
+            level = _load_level(level_data, self)
+            levels[int(depth)] = level
+        self.levels = levels
+        self.map = self.levels.get(self.depth) or next(iter(self.levels.values()), None)
+
+        self.player = _load_player(data.get("player", {}), self)
+        if self.map is not None:
+            self.map.update_fov()
+
     def _choose_background(self) -> None:
         from rich.table import Table
         from rich.text import Text
@@ -762,6 +1300,7 @@ class Dungeon:
         if hasattr(self, "map") and self.map:
             for s in list(self.map.summon):
                 self.on_summon_death(s)
+        self.player._channeling.clear()
         if depth not in self.levels:
             self.levels[depth] = self._new_level(depth)
         self.depth = depth
@@ -805,8 +1344,30 @@ class Dungeon:
             regen = 0.2 + spellcasting * 0.05
             self.player.mp = min(self.player.max_mp, self.player.mp + regen)
 
+    def _tick_burning_terrain(self) -> None:
+        expired = []
+        for (y, x), remaining in self.map.burning_cells.items():
+            cell = self.map.matrix[y][x]
+            if cell.occupant:
+                dmg = max(1, random.randint(1, 3))
+                cell.occupant.health -= dmg
+                if cell.occupant is self.player:
+                    self.message(f"[burn]You are scorched by burning terrain! ({dmg} damage)[/burn]")
+                else:
+                    self.message(f"[burn]{style_text(cell.occupant.name, 'enemy')} is scorched by flames![/burn]", drop=dmg)
+                    if cell.occupant.health <= 0:
+                        self.on_enemy_death(cell.occupant)
+            self.map.burning_cells[(y, x)] = remaining - 1
+            if remaining - 1 <= 0:
+                expired.append((y, x))
+        for y, x in expired:
+            del self.map.burning_cells[(y, x)]
+            if self.map.matrix[y][x].feature == "burning":
+                self.map.matrix[y][x].feature = None
+
     def game_tick(self) -> None:
         """One unit of world time: grant energy, tick statuses, run monster and summon actions."""
+        self._tick_burning_terrain()
         p = self.player
         p.energy += p.effective_speed()
         p.status.tick(p, self)
@@ -1689,6 +2250,9 @@ class Dungeon:
         if key == "x":
             self.examine_mode()
             return False
+        if key == "S":
+            self.save_game()
+            return False
         if key in (".", keys.SPACE):
             self.message("You wait.")
             return True
@@ -1708,17 +2272,25 @@ class Dungeon:
             self.message(f"[warn]Developer god mode {'ENABLED' if self.godmode else 'disabled'}.[/warn]")
             return False
         if key == "?":
-            self.help_screen()
+            self.manual_screen()
+            self.render()
             return False
         if key == keys.ESC:
             clear_screen()
-            self.print(
-                f"Quit the game? "
-                f"{style_text('y', 'controls')} yes   "
-                f"{style_text('n', 'controls')} / {style_text('esc', 'controls')} no",
-                highlight=False,
-            )
+            self.print(Panel(
+                "[menu_header]Quit[/menu_header]\n\n"
+                f"{style_text('S', 'controls')} save & quit    "
+                f"{style_text('y', 'controls')} quit (no save)    "
+                f"{style_text('n', 'controls')} / {style_text('esc', 'controls')} cancel",
+                border_style="grey37"))
             confirm = keys.read_key()
+            if confirm == "S":
+                self.save_game()
+                self.over = True
+                self.log.info("game exited by player (saved)")
+                clear_screen()
+                print("Exiting [Dungeon]...")
+                sys.exit()
             if confirm == "y":
                 self.over = True
                 self.log.info("game exited by player")
@@ -1729,28 +2301,227 @@ class Dungeon:
             return False
         return False
 
-    def help_screen(self) -> None:
-        clear_screen()
+    def manual_screen(self) -> None:
+        pages = {
+            "0": ("Controls", self._manual_controls),
+            "1": ("Game Objective", self._manual_objective),
+            "2": ("Combat", self._manual_combat),
+            "3": ("Items & Equipment", self._manual_items),
+            "4": ("Identification", self._manual_ident),
+            "5": ("Skills & Spells", self._manual_skills),
+            "6": ("Status Effects", self._manual_status),
+            "7": ("NPCs & Services", self._manual_npcs),
+            "8": ("Terrain & Map", self._manual_terrain),
+            "9": ("Tips", self._manual_tips),
+        }
+        while True:
+            clear_screen()
+            lines = [
+                "[menu_header]Dungeon.py — Manual[/menu_header]\n",
+                f"  {style_text('0', 'controls')}  Controls (keybindings)",
+                f"  {style_text('1', 'controls')}  Game Objective",
+                f"  {style_text('2', 'controls')}  Combat",
+                f"  {style_text('3', 'controls')}  Items & Equipment",
+                f"  {style_text('4', 'controls')}  Identification System",
+                f"  {style_text('5', 'controls')}  Skills & Spells",
+                f"  {style_text('6', 'controls')}  Status Effects",
+                f"  {style_text('7', 'controls')}  NPCs & Services",
+                f"  {style_text('8', 'controls')}  Terrain & Map Symbols",
+                f"  {style_text('9', 'controls')}  Tips\n",
+                f"Press a {style_text('number', 'controls')} to view a page, "
+                f"{style_text('?', 'controls')} or {style_text('esc', 'controls')} to return.",
+            ]
+            self.print(Panel("\n".join(lines), border_style="grey37"))
+            key = keys.read_key()
+            if key in pages:
+                clear_screen()
+                pages[key][1]()
+            if key in ("?", keys.ESC):
+                break
+
+    def _manual_controls(self) -> None:
         self.print(Panel(
-            "[menu_header]Dungeon.py — Controls[/menu_header]\n\n"
+            "[menu_header]Controls[/menu_header]\n\n"
             "[controls]arrows[/controls] or [controls]hjkl[/controls]  move / attack (walk into a monster)\n"
             "[controls]yubn[/controls]  diagonal movement (nw / ne / sw / se)\n"
-            "[controls]f[/controls]  fire a ranged weapon or throw a pack item (aim, then [controls]f[/controls]/[controls]enter[/controls]; [controls]tab[/controls] next target)\n"
-            "[controls]o[/controls]  autoexplore the floor (pauses on enemy or new staircase)\n"
-            "[controls]g[/controls]  pick up items on your tile (choose which, or take all)\n"
+            "[controls]f[/controls]  fire a ranged weapon or throw (aim, [controls]f[/controls]/[controls]enter[/controls]; [controls]tab[/controls] cycle targets)\n"
+            "[controls]o[/controls]  autoexplore (pauses on enemy or new staircase)\n"
+            "[controls]g[/controls]  pick up items (choose which, or take all)\n"
             "[controls]i[/controls] / [controls]d[/controls]  open pack — use, equip, unequip, drop\n"
+            "[controls]A[/controls]  armour management\n"
+            "[controls]m[/controls]  skills overview\n"
+            "[controls]z[/controls]  spellcasting\n"
             "[controls]>[/controls] / [controls]<[/controls]  descend / ascend stairs\n"
-            "[controls]G[/controls]  goto stairs — then [controls]<[/controls] or [controls]>[/controls] to walk to nearest up/down staircase\n"
-            "[controls][[/controls] / [controls]][/controls]  pan view to known up-stairs / down-stairs (any key returns)\n"
-            "[controls]X[/controls]  exclude staircase under you from auto-explore (toggle)\n"
-            "[controls]\\\\[/controls]  auto-pickup settings — toggle which item types are grabbed on contact\n"
-            "[controls]x[/controls]  examine mode — move cursor to inspect tiles (arrows/vi-keys), [controls]v[/controls] cursor to self, [controls].[/controls] cycle features, [controls]esc[/controls]/[controls]x[/controls] exit\n"
-            "[controls]s[/controls]  search adjacent tiles for secret doors and traps\n"
+            "[controls]G[/controls]  goto stairs — [controls]<[/controls] or [controls]>[/controls] walks to nearest staircase\n"
+            "[controls][[/controls] / [controls]][/controls]  pan view to known up/down-stairs\n"
+            "[controls]X[/controls]  exclude stair under you from auto-explore\n"
+            "[controls]\\\\[/controls]  auto-pickup settings\n"
+            "[controls]x[/controls]  examine mode ([controls]v[/controls] to self, [controls].[/controls] cycle features)\n"
+            "[controls]s[/controls]  search for secret doors and traps\n"
+            "[controls]S[/controls]  save game to disk\n"
             "[controls].[/controls] or [controls]space[/controls]  wait one turn\n"
-            "[controls]p[/controls]  pause    [controls]esc[/controls]  quit\n\n"
-            "[flavor]At a trader/healer, press [controls]space[/controls] to step past them.[/flavor]\n"
-            "[flavor]Developer: [controls]~[/controls] toggles god mode (or set DUNGEON_GODMODE=1).[/flavor]\n\n"
-            "[flavor]Find all three shards of the Broken Sigil (depths 6–8) and escape to the surface.[/flavor]\n\n"
+            "[controls]?[/controls]  this manual    [controls]p[/controls]  pause    [controls]esc[/controls] quit\n"
+            "[controls]~[/controls]  toggle god mode (dev)\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_objective(self) -> None:
+        self.print(Panel(
+            "[menu_header]Game Objective[/menu_header]\n\n"
+            "Win condition: collect all [success]three shards[/success] of the Broken Sigil\n"
+            "and escape to the surface.\n\n"
+            "Shards are found on depths [move_count]6, 7, 8[/move_count], each guarded by a boss:\n"
+            "  [fail]Flame Guardian[/fail] (deep 6), [fail]Stone Guardian[/fail] (deep 7),\n"
+            "  [fail]Shadow Guardian[/fail] (deep 8).\n\n"
+            "Once you hold all three shards, the exit unlocks. Return to\n"
+            "depth 1, find the up-stairs, and climb out.\n\n"
+            "Monsters get tougher on deeper floors. Stock up, level up, and\n"
+            "prepare before challenging the guardians.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_combat(self) -> None:
+        self.print(Panel(
+            "[menu_header]Combat[/menu_header]\n\n"
+            "Walk [controls]into[/controls] a monster to attack it (\"bump attack\").\n"
+            "Melee damage depends on your weapon, strength, and skills.\n"
+            "Accuracy is checked against the target's evasion.\n\n"
+            "[controls]f[/controls] enters ranged aiming mode. Move cursor with arrows,\n"
+            "[controls]tab[/controls] cycles targets. Press [controls]f[/controls]/[controls]enter[/controls] to fire.\n"
+            "Ranged attacks use ammo (arrows, bolts, stones) from your pack.\n\n"
+            "Damage shown in message log. Watch your [fail]HP bar[/fail] in HUD.\n"
+            "Monsters chase you if they detect you (line-of-sight).\n"
+            "You can kite around corners or through doors to lose pursuers.\n\n"
+            "Two-handed weapons hit harder but reduce accuracy.\n"
+            "Fighting from [warn]shallow water[/warn] or [warn]deep water[/warn] may slow you.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_items(self) -> None:
+        self.print(Panel(
+            "[menu_header]Items & Equipment[/menu_header]\n\n"
+            "[controls]i[/controls] opens your pack. Select an item to use, equip, or drop.\n"
+            "[controls]A[/controls] opens armour management (body, shield, helmet, cloak, gloves, boots).\n"
+            "Weapons are one-handed or two-handed. Two-handed = more damage,\n"
+            "  less accuracy. Can't use a shield with a two-handed weapon.\n\n"
+            "Item types: potions ([warn]![/warn]), scrolls ([warn]?[/warn]), weapons ([warn])[/warn]),\n"
+            "  armour ([warn][[/warn]), spellbooks ([warn]+[/warn]), shards ([warn]o[/warn]).\n\n"
+            "Gold ([warn]$[/warn]) is used at NPC traders. Carry weight limit:\n"
+            "  max_inventory items. Stash unneeded gear or sell it.\n\n"
+            "Throwing weapons (darts, javelins, tomahawks) stack in pack.\n"
+            "Press [controls]f[/controls] to fire them without equipping.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_ident(self) -> None:
+        self.print(Panel(
+            "[menu_header]Identification System[/menu_header]\n\n"
+            "Potions and scrolls start [warn]unidentified[/warn]. You see only an\n"
+            "appearance (e.g. \"potion of yellow liquid\", \"scroll of Ytorb\").\n\n"
+            "[controls]Use[/controls] (quaff/read) an item to discover its true name.\n"
+            "Identified items show their real name in future drops.\n\n"
+            "Effects can be helpful or harmful. Quaffing a random potion\n"
+            "might heal you — or poison you. Reading an unknown scroll\n"
+            "might reveal the map — or summon monsters.\n\n"
+            "Risk vs reward: use items when you need them, or wait until\n"
+            "you can identify safely (e.g. in a cleared room).\n\n"
+            "Some NPCs may sell identified items at a premium.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_skills(self) -> None:
+        self.print(Panel(
+            "[menu_header]Skills & Spells[/menu_header]\n\n"
+            "[controls]m[/controls] opens the skills screen. Skills improve as you use them\n"
+            "(e.g. swinging a mace trains Maces & Flails).\n\n"
+            "Skill levels boost: damage, accuracy, spell success rate.\n"
+            "Aptitudes vary by class — some learn faster in certain skills.\n\n"
+            "[controls]z[/controls] opens the spellcasting screen. Select a known spell\n"
+            "to cast it. Spells cost [controls]MP[/controls] (magic points).\n\n"
+            "MP recovers over time. Intelligence boosts max MP.\n"
+            "Equipping a [controls]staff[/controls] matching your spell's school\n"
+            "boosts spell power.\n\n"
+            "Spell schools: Conjuration, Fire, Ice, Earth, Poison,\n"
+            "  Summoning, Translocation, Transmutation.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_status(self) -> None:
+        self.print(Panel(
+            "[menu_header]Status Effects[/menu_header]\n\n"
+            "Status effects appear in the HUD status line.\n\n"
+            "[success]Beneficial:[/success]\n"
+            "  [controls]Might[/controls]  +damage, lasts several turns\n"
+            "  [controls]Haste[/controls]  act more frequently (double speed)\n"
+            "  [controls]Regen[/controls]  heal HP over time\n"
+            "  [controls]Curing[/controls]  cures poison, restores a bit of HP\n\n"
+            "[fail]Harmful:[/fail]\n"
+            "  [fail]Poison[/fail]  take damage each turn until cured\n"
+            "  [fail]Slow[/fail]  act less frequently (half speed)\n"
+            "  [fail]Confusion[/fail]  movement becomes uncontrollable\n\n"
+            "Potions grant buffs. Monster attacks (e.g. poison needles,\n"
+            "slow bolts) inflict debuffs. Check the message log.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_npcs(self) -> None:
+        self.print(Panel(
+            "[menu_header]NPCs & Services[/menu_header]\n\n"
+            "Friendly NPCs appear on dungeon floors. Walk into them to\n"
+            "interact. Press [controls]space[/controls] to step past without trading.\n\n"
+            "[controls]Chemist[/controls]  sells potions (healing, buffs, curing)\n"
+            "[controls]Blacksmith[/controls]  buys/sells weapons and armour\n"
+            "[controls]Merchant[/controls]  general goods: scrolls, food, supplies\n"
+            "[controls]Fletcher[/controls]  ranged weapons and ammunition\n"
+            "[controls]Healer[/controls]  restores HP for gold (cost scales with missing HP)\n\n"
+            "NPCs have base stock plus random extra items each game.\n"
+            "Prices are fixed per item. Sell unwanted gear for gold.\n\n"
+            "If you have the LLM feature enabled, NPCs greet you with\n"
+            "unique dialogue based on their personality.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_terrain(self) -> None:
+        self.print(Panel(
+            "[menu_header]Terrain & Map Symbols[/menu_header]\n\n"
+            "[controls]@[/controls]  you (the player)\n"
+            "[controls]#[/controls]  wall    [controls].[/controls]  floor    [controls]+[/controls]  door\n"
+            "[controls]>[/controls]  down-stairs    [controls]<[/controls]  up-stairs\n"
+            "[controls]~[/controls]  shallow water  [controls]≈[/controls]  deep water\n"
+            "[controls]%[/controls]  shrub    [controls]♂[/controls]  mushroom    [controls]%[/controls]  rubble\n"
+            "[controls]^[/controls]  hidden trap (revealed by searching)\n\n"
+            "Monster symbols: various letters and glyphs (see examine mode).\n"
+            "[controls]$[/controls]  gold    [controls]![/controls]  potion    [controls]?[/controls]  scroll\n"
+            "[controls])[/controls]  weapon    [controls][[/controls]  armour    [controls]=[/controls]  staff\n"
+            "[controls]+[/controls]  spellbook    [controls]o[/controls]  shard\n\n"
+            "Use [controls]x[/controls] (examine mode) to inspect any tile in detail.\n"
+            "Secret doors look like walls until you [controls]s[/controls]earch nearby.\n\n"
+            f"Press {style_text('any key', 'controls')} to return.",
+            border_style="grey37"))
+        keys.read_key()
+
+    def _manual_tips(self) -> None:
+        self.print(Panel(
+            "[menu_header]Tips[/menu_header]\n\n"
+            "[controls]•[/controls] Search ([controls]s[/controls]) frequently near walls to find secrets.\n"
+            "[controls]•[/controls] Use autoexplore ([controls]o[/controls]) to map floors quickly.\n"
+            "[controls]•[/controls] Identify potions/scrolls early — knowledge is power.\n"
+            "[controls]•[/controls] Save gold for Healers and Blacksmiths.\n"
+            "[controls]•[/controls] Stairs are one-way until you find the up-stairs.\n"
+            "[controls]•[/controls] Kite tough enemies through doors or around corners.\n"
+            "[controls]•[/controls] Don't fight multiple enemies at once — use doorways.\n"
+            "[controls]•[/controls] Check every floor for hidden vault rooms.\n"
+            "[controls]•[/controls] Two-handed weapons trade accuracy for damage.\n"
+            "[controls]•[/controls] Save the game ([controls]S[/controls]) before risky fights.\n"
+            "[controls]•[/controls] Adjust auto-pickup ([controls]\\\\[/controls]) to filter junk.\n\n"
             f"Press {style_text('any key', 'controls')} to return.",
             border_style="grey37"))
         keys.read_key()
@@ -1800,9 +2571,9 @@ class Dungeon:
         sys.exit()
 
     @staticmethod
-    def __start__(logger, rich_console) -> None:
+    def __start__(logger, rich_console, load_state: dict | None = None) -> None:
         try:
-            d = Dungeon(logger=logger, rich_console=rich_console)
+            d = Dungeon(logger=logger, rich_console=rich_console, load_state=load_state)
             d.log.info("dungeon set up is done, starting game")
             d.gameloop()
         except SystemExit:

@@ -1,5 +1,16 @@
 # Changelog
 
+## 22/6/26 v2.5 — "Save & Restore"
+
+**Save/Restore System**
+- New `S` key saves game state to `savegame.json` (player, inventory, equipment, all levels, enemies, NPCs, floor themes)
+- Splash screen detects existing save and offers `R` to resume with depth/HP/shards summary
+- Full round-trip serialization: player stats, inventory, armour, equipped weapon, status effects, skills, spells, known items, auto-pickup config
+- Per-level persistence: terrain, items, enemies, summons, NPCs with full state (HP, position, status effects, trader stock)
+- Controls HUD updated — `S` save shown, "restart to restore" hint displayed
+- Bugfix: `burning` tile style no longer overwrites wall color (orange `#` fix)
+- Bugfix: NPC `symbol`/`style` attributes defaulted in base class so restore doesn't crash on traders/healers
+
 ## 16/6/26 v2.4 — "The Magic Expansion"
 
 **Spellcasting Rework**

@@ -14,6 +14,7 @@ EFFECT_STYLE = {
     "haste": ("Haste", "haste", "Hst"),
     "slow": ("Slow", "slow", "Slo"),
     "confusion": ("Confused", "confusion", "Cnf"),
+    "petrify": ("Petrified", "petrify", "Ptr"),
 }
 
 
@@ -35,7 +36,7 @@ class StatusSet:
         self.effects.pop(name, None)
 
     def clear_harmful(self) -> list[str]:
-        harmful = [n for n in ("poison", "burn", "slow", "confusion") if n in self.effects]
+        harmful = [n for n in ("poison", "burn", "slow", "confusion", "petrify") if n in self.effects]
         for n in harmful:
             del self.effects[n]
         return harmful

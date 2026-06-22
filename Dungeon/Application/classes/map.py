@@ -6,10 +6,15 @@ door / stairs), an optional living *occupant* (enemy or NPC), ground *items*, an
 *gold* pile. The player is tracked separately by location and drawn on top.
 """
 
+import copy
 import random
 
 from ..utils import style_text
 from ..config import config
+from .items import (
+    DungeonWeapon, DungeonPotion, DungeonScroll, DungeonThrowable,
+    DungeonInventory, DungeonArmour, DungeonShard, DungeonSpellBook,
+)
 from .status import StatusSet
 from .skills import SkillSet, skill_for_weapon
 from .items import DungeonSpell
@@ -324,6 +329,7 @@ class DungeonMap:
         self.npcs: list = []
         self.visible: set[tuple[int, int]] = set()
         self.excluded_stairs: set[tuple[int, int]] = set()
+        self.burning_cells: dict[tuple[int, int], int] = {}
         if self.altar:
             ay, ax = self.altar
             self.matrix[ay][ax].feature = "altar"

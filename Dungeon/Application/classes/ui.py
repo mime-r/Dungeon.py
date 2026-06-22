@@ -191,6 +191,8 @@ class DungeonUI:
             "[controls]\\\\[/controls] pickup-cfg",
             "[controls]x[/controls] examine",
             "[controls]s[/controls] search",
+            "[controls]S[/controls] save",
+            "[flavor]restart to restore[/flavor]",
             "[controls].[/controls] wait",
             "[controls]?[/controls] help",
             "[controls]esc[/controls] quit",

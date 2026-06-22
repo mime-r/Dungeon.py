@@ -26,6 +26,8 @@ class DungeonPeople:
         self.name = DungeonPeople.generate_name()
         self.occupation = occupation
         self.personality = personality
+        self.symbol: str = "?"
+        self.style: str = "occupation"
 
     @staticmethod
     def generate_name() -> str:

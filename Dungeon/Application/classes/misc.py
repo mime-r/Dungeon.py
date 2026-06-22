@@ -1,7 +1,8 @@
+import sys
 import time
 
 from .. import input as keys
-from ..utils import style_text
+from ..utils import style_text, clear_screen
 
 
 class DungeonTimeData:
@@ -23,12 +24,31 @@ class DungeonTimeData:
     def pause_menu(self) -> None:
         self.add()
         self.game.print(
-            f"\n[move_count]Game paused.[/move_count] "
-            f"Press {style_text('p', 'controls')} to {style_text('resume', 'action')}.",
+            f"[menu_header]Paused[/menu_header]\n\n"
+            f"{style_text('p', 'controls')} resume\n"
+            f"{style_text('S', 'controls')} save game\n"
+            f"{style_text('?', 'controls')} manual\n"
+            f"{style_text('esc', 'controls')} quit",
             highlight=False,
         )
         while True:
-            if keys.read_key() == "p":
+            key = keys.read_key()
+            if key == "p":
                 self.reset()
                 self.game.render()
                 break
+            if key == "S":
+                self.game.save_game()
+                self.reset()
+                self.game.render()
+                break
+            if key == "?":
+                self.game.manual_screen()
+                self.game.render()
+                break
+            if key == keys.ESC:
+                self.game.over = True
+                self.game.log.info("game exited by player")
+                clear_screen()
+                print("Exiting [Dungeon]...")
+                sys.exit()
