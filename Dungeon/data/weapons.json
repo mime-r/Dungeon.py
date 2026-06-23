@@ -338,6 +338,7 @@
         "attack_range": [1, 7],
         "accuracy": 52,
         "hands": "One",
+        "dmg_pct_vs_holiness": {"undead": 0.5, "demonic": 0.25},
         "texts": {
             "critical_hit": "Your {1} flares with holy light and shatters the {0}!",
             "hit": "Your {1} cracks against the {0}.",
@@ -760,17 +761,18 @@
     },
     {
         "name": "Staff of Earth",
-        "description": "A gnarled staff capped in raw stone. Strikes with crushing, unmagical force.",
-        "cost": 44,
+        "description": "A heavy granite staff that resonates with the deep places of the world.",
+        "cost": 35,
         "type": "MELEE",
-        "base_attack": 6,
-        "attack_range": [2, 7],
-        "accuracy": 50,
+        "base_attack": 5,
+        "attack_range": [0, 6],
+        "accuracy": 70,
         "hands": "One",
+        "magical_staff": true,
         "texts": {
-            "critical_hit": "Your {1} comes down like a falling boulder, crushing the {0}!",
-            "hit": "You crack the {0} with your {1}.",
-            "missed_hit": "Your {1} thuds into the ground beside the {0}."
+            "critical_hit": "You shatter the {0} with a granite blow of your {1}!",
+            "hit": "You smash the {0} with your {1}.",
+            "missed_hit": "Your {1} thuds against the ground beside the {0}."
         }
     },
     {
@@ -782,6 +784,7 @@
         "attack_range": [1, 5],
         "accuracy": 58,
         "hands": "One",
+        "magical_staff": true,
         "on_hit": {"effect": "burn", "chance": 50, "duration": 4, "potency": 2},
         "texts": {
             "critical_hit": "Your {1} erupts in flame as it strikes the {0}!",
@@ -798,6 +801,7 @@
         "attack_range": [1, 5],
         "accuracy": 58,
         "hands": "One",
+        "magical_staff": true,
         "on_hit": {"effect": "slow", "chance": 50, "duration": 5},
         "texts": {
             "critical_hit": "Your {1} sheathes the {0} in frost, slowing it to a crawl!",
@@ -814,6 +818,7 @@
         "attack_range": [0, 5],
         "accuracy": 60,
         "hands": "One",
+        "magical_staff": true,
         "on_hit": {"effect": "poison", "chance": 55, "duration": 6, "potency": 2},
         "texts": {
             "critical_hit": "Your {1} bites deep, flooding the {0} with venom!",
@@ -830,6 +835,7 @@
         "attack_range": [1, 6],
         "accuracy": 55,
         "hands": "One",
+        "magical_staff": true,
         "on_hit": {"effect": "confusion", "chance": 45, "duration": 4},
         "texts": {
             "critical_hit": "Your {1} discharges into the {0}, leaving it reeling!",

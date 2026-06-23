@@ -36,7 +36,7 @@ from .llm import LLMClient
 
 SAVE_FILE_NAME = "savegame.json"
 SAVE_FILE = Path(__file__).resolve().parent.parent.parent / SAVE_FILE_NAME
-SAVE_VERSION = 1
+SAVE_VERSION = 2  # v2: brand/ego/enchant/fog/silence/holiness fields
 
 print("Loading...")
 
@@ -100,6 +100,32 @@ def _save_item(item) -> dict | None:
         data["slot"] = item.slot
     if isinstance(item, DungeonSpellBook):
         data["spells"] = item.spells
+    # Weapon fields added with the brand/ego/enchant systems.
+    if isinstance(item, DungeonWeapon):
+        if getattr(item, "brand", None):
+            data["brand"] = item.brand
+        if getattr(item, "enchant", 0):
+            data["enchant"] = item.enchant
+        if getattr(item, "magical_staff", False):
+            data["magical_staff"] = True
+        if getattr(item, "dmg_pct_vs_holiness", None):
+            data["dmg_pct_vs_holiness"] = dict(item.dmg_pct_vs_holiness)
+    # Armour fields added with the ego/enchant system.
+    if isinstance(item, DungeonArmour):
+        if getattr(item, "ego", None):
+            data["ego"] = item.ego
+        if getattr(item, "enchant", 0):
+            data["enchant"] = item.enchant
+        if getattr(item, "resistances", None):
+            data["resistances"] = dict(item.resistances)
+        if getattr(item, "ev_bonus", 0):
+            data["ev_bonus"] = item.ev_bonus
+        if getattr(item, "sh_bonus", 0):
+            data["sh_bonus"] = item.sh_bonus
+        if getattr(item, "ranged_dmg_bonus", 0.0):
+            data["ranged_dmg_bonus"] = item.ranged_dmg_bonus
+        if getattr(item, "grant_see_invisible", False):
+            data["grant_see_invisible"] = True
     return data
 
 
@@ -125,10 +151,32 @@ def _load_item(data: dict, game):
         return copy.copy(item) if item else None
     if kind == "DungeonWeapon":
         item = game.db.item_db.search_item(name=name, type=DungeonWeapon)
-        return copy.copy(item) if item else None
+        item = copy.copy(item) if item else None
+        if item is not None:
+            item.brand = data.get("brand")
+            item.enchant = int(data.get("enchant", 0))
+            if data.get("magical_staff"):
+                item.magical_staff = True
+            if data.get("dmg_pct_vs_holiness"):
+                item.dmg_pct_vs_holiness = dict(data["dmg_pct_vs_holiness"])
+        return item
     if kind == "DungeonArmour":
         item = game.db.item_db.search_item(name=name, type=DungeonArmour)
-        return copy.copy(item) if item else None
+        item = copy.copy(item) if item else None
+        if item is not None:
+            item.ego = data.get("ego")
+            item.enchant = int(data.get("enchant", 0))
+            if data.get("resistances"):
+                item.resistances = dict(data["resistances"])
+            if data.get("ev_bonus"):
+                item.ev_bonus = int(data["ev_bonus"])
+            if data.get("sh_bonus"):
+                item.sh_bonus = int(data["sh_bonus"])
+            if data.get("ranged_dmg_bonus"):
+                item.ranged_dmg_bonus = float(data["ranged_dmg_bonus"])
+            if data.get("grant_see_invisible"):
+                item.grant_see_invisible = True
+        return item
     if kind == "DungeonInventory":
         item = game.db.item_db.search_item(name=name, type=DungeonInventory)
         return copy.copy(item) if item else None
@@ -280,6 +328,7 @@ def _load_player(data: dict, game) -> DungeonPlayer:
     player.known_spells = [game.db.item_db.search_spell(name) for name in data.get("known_spells", [])]
     player.known_spells = [s for s in player.known_spells if s is not None]
     player._channeling = {name: int(turns) for name, turns in data.get("channeling", {}).items()}
+    player._channel_targets = {}
     player.skills = _load_skills(data.get("skills"))
     if player.skills:
         player.skills.recent_actions = list(data.get("skills", {}).get("recent_actions", []))
@@ -340,7 +389,7 @@ def _save_entity(entity) -> dict:
             "heal_cost_per_hp": entity.heal_cost_per_hp,
         }
     kind = "summon" if getattr(entity, "is_summon", False) else "enemy"
-    return {
+    data = {
         "kind": kind,
         "name": entity.name,
         "tier": entity.tier,
@@ -360,6 +409,16 @@ def _save_entity(entity) -> dict:
         "location": _coord_to_list(entity.location),
         "despawn_timer": int(getattr(entity, "despawn_timer", 0)),
     }
+    # Holiness (added with the Sacred Scourge / holy_wrath system).
+    holiness = getattr(entity, "holiness", "natural")
+    if holiness != "natural":
+        data["holiness"] = holiness
+    # Special summon flags used by Spectral / Butterfly brands.
+    if getattr(entity, "is_spectral", False):
+        data["is_spectral"] = True
+    if getattr(entity, "is_butterfly", False):
+        data["is_butterfly"] = True
+    return data
 
 
 def _load_entity(data: dict, game):
@@ -427,6 +486,13 @@ def _load_entity(data: dict, game):
         entity.is_enemy = False
         entity.is_summon = True
         entity.despawn_timer = int(data.get("despawn_timer", 0))
+    if data.get("is_spectral"):
+        entity.is_spectral = True
+    if data.get("is_butterfly"):
+        entity.is_butterfly = True
+    # Restore holiness (added with Sacred Scourge / holy_wrath system).
+    if data.get("holiness"):
+        entity.holiness = data["holiness"]
     return entity
 
 
@@ -448,6 +514,9 @@ def _save_level(level: DungeonMap) -> dict:
         "enemies": [_save_entity(e) for e in level.enemies],
         "summon": [_save_entity(s) for s in level.summon],
         "npcs": [_save_entity(n) for n in level.npcs],
+        # Floor effects added with the scroll system.
+        "silence_aura": int(getattr(level, "silence_aura", 0)),
+        "fog_cells": [[c[0], c[1], int(t)] for c, t in getattr(level, "fog_cells", {}).items()],
     }
 
 
@@ -482,6 +551,12 @@ def _load_level(data: dict, game) -> DungeonMap:
         npc = _load_entity(entity_data, game)
         level.npcs.append(npc)
         level.place_occupant(npc, *npc.location)
+    # Floor effects added with the scroll system.
+    level.silence_aura = int(data.get("silence_aura", 0))
+    level.fog_cells = {
+        (int(c[0]), int(c[1])): int(c[2])
+        for c in data.get("fog_cells", []) if len(c) >= 3
+    }
     return level
 
 
@@ -512,6 +587,7 @@ class FloorTheme:
     ambient: str = ""
     structures: list = field(default_factory=list)        # 0-2 names from STRUCTURE_CATALOG
     terrain_features: list = field(default_factory=list)  # 0-2 from _VALID_TERRAIN_FEATURES
+    water_density: str = "small"  # small | medium | large — size of ambient ponds
 
 _THEME_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 _VALID_BIAS_ENEMIES = [
@@ -522,7 +598,31 @@ _VALID_STRUCTURES = {
     "shrine", "mushroom_grove", "overgrown_room", "ruined_hall",
     "frozen_pond", "campsite", "poison_marsh", "standing_stones",
 }
-_VALID_TERRAIN_FEATURES = {"lava_pools", "chasms"}
+_VALID_TERRAIN_FEATURES = {"lava_pools", "chasms", "water_pools"}
+
+# Pre-defined biomes used when the LLM is disabled. Each tuple:
+#   (name, description, water_density, structures, terrain_features)
+# Empty list for structures/terrain_features = none placed.
+_FALLBACK_BIOMES: list[tuple[str, str, str, list, list]] = [
+    ("Flooded Catacombs", "Ancient graves half-drowned in stagnant water.", "large", ["ruined_hall"], ["water_pools"]),
+    ("Drowned Crypt", "Black water fills these burial halls to the brim.", "large", ["ruined_hall"], ["water_pools"]),
+    ("Sunken Temple", "Flooded ruins of a long-forgotten shrine.", "large", ["shrine", "ruined_hall"], ["water_pools"]),
+    ("Sodden Sewers", "Moss-lined tunnels where water pools knee-deep.", "medium", [], ["water_pools"]),
+    ("Mossy Caverns", "Verdant grottoes dotted with shallow pools.", "medium", ["overgrown_room"], []),
+    ("Mushroom Grotto", "Strange fungi glow in the damp earthen corners.", "medium", ["mushroom_grove"], []),
+    ("Twisting Tunnels", "Cramped passages worn smooth by time.", "small", [], []),
+    ("Forgotten Vault", "Locked chambers stuffed with dust and cobwebs.", "small", [], []),
+    ("Burning Halls", "Charred chambers reeking of old fire.", "small", ["ruined_hall"], ["lava_pools"]),
+    ("Whispering Galleries", "Long echoing corridors lined with worn frescoes.", "small", ["standing_stones"], []),
+]
+
+# Brands the Scroll of Brand Weapon can apply. Mirrors the BRAND_TABLE keys
+# in classes/map.py so the two stay in sync.
+BRAND_CHOICES = [
+    "flaming", "freezing", "venom", "electrocution", "pain", "holy_wrath", "draining",
+    "antimagic", "chaos", "distortion", "heavy", "protection", "spectral", "speed",
+    "vampiric",
+]
 
 # Randomised appearances for unidentified consumables (shuffled per game).
 _POTION_ADJ = [
@@ -531,7 +631,8 @@ _POTION_ADJ = [
 ]
 _SCROLL_LABELS = [
     "XYZZY", "FOOBIE", "KLATAA", "ZELGO", "NR9", "PRZ", "VELOX", "GNARL",
-    "HRUM", "TZADIK", "OByeDA", "WAffLE",
+    "HRUM", "TZADIK", "OByeDA", "WAffLE", "ZIMBO", "QUOATH", "XUANGS",
+    "BRYNDL", "PHLEGM", "KSIJ", "VARDE", "ULNOR", "MORPHI", "TENEBR",
 ]
 
 
@@ -822,7 +923,7 @@ class Dungeon:
         self.print(table)
 
         # Show skill aptitudes
-        aptitudes = self.db.skills_data.get("aptitudes", {}).get(bg["name"], {})
+        aptitudes = bg.get("aptitudes", {})
         if aptitudes:
             self.print("\n[menu_header]Skill Aptitudes[/menu_header]", highlight=False)
             apt_table = Table(expand=False, border_style="grey37")
@@ -850,7 +951,7 @@ class Dungeon:
         p.mp = p.max_mp
         from .classes.skills import SkillSet
         skills_data = self.db.skills_data
-        aptitudes = skills_data.get("aptitudes", {}).get(bg["name"], {})
+        aptitudes = bg.get("aptitudes", {})
         cross = skills_data.get("cross_training", {})
         p.skills = SkillSet(
             skill_names=skills_data.get("skills", []),
@@ -1019,7 +1120,13 @@ class Dungeon:
         rec = self.ident.get(getattr(item, "name", None))
         if rec and not rec["identified"]:
             return rec["appearance"]
-        return getattr(item, "name", "?")
+        name = getattr(item, "name", "?")
+        # Show enchantment as a "+N" suffix so the player can see the rolled
+        # upgrade at a glance (e.g. "Long Sword +3", "Plate Armour +5").
+        ench = getattr(item, "enchant", 0)
+        if ench > 0:
+            name = f"{name} +{ench}"
+        return name
 
     def identify(self, item, announce: bool = True) -> None:
         """Mark an item's whole type identified (optionally announcing its true name)."""
@@ -1034,16 +1141,36 @@ class Dungeon:
                     )
 
     # --- level generation & travel -------------------------------------
+    def _fallback_theme(self, depth: int) -> "FloorTheme":
+        """Biome for current depth when LLM is disabled.
+
+        Picks from a hand-tuned pool. Bias toward wet biomes on deeper
+        floors (depth >= 5 has a 40 % chance of forcing a wet biome).
+        """
+        pool = list(_FALLBACK_BIOMES)
+        if depth >= 5 and random.random() < 0.4:
+            wet = [b for b in pool if b[2] in ("medium", "large")]
+            if wet:
+                pool = wet
+        name, desc, water, structures, terrain_features = random.choice(pool)
+        return FloorTheme(
+            name=name, description=desc, water_density=water,
+            structures=structures, terrain_features=terrain_features,
+        )
+
     def _new_level(self, depth: int) -> DungeonMap:
         is_last = depth >= config.depth.floors
         theme = self._generate_floor_theme(depth)
+        if theme is None:
+            theme = self._fallback_theme(depth)
         self._floor_themes[depth] = theme
         layout = generate_level(
             is_last=is_last,
             depth=depth,
-            layout_hint=theme.layout_bias if theme else "any",
-            structures=theme.structures if theme else None,
-            terrain_features=theme.terrain_features if theme else None,
+            layout_hint=theme.layout_bias,
+            structures=theme.structures,
+            terrain_features=theme.terrain_features,
+            water_density=theme.water_density,
         )
         level = DungeonMap(game=self, layout=layout)
         self._populate(level, depth, is_last, theme=theme)
@@ -1071,8 +1198,9 @@ class Dungeon:
                 "ambient (one atmospheric sentence, max 15 words), "
                 "structures (JSON array of 0-2 names chosen ONLY from: "
                 "shrine mushroom_grove overgrown_room ruined_hall frozen_pond campsite poison_marsh standing_stones), "
-                "terrain_features (JSON array of 0-2 names chosen ONLY from: lava_pools chasms). "
-                "Choose structures and terrain_features that match the theme's name and description. "
+                "terrain_features (JSON array of 0-2 names chosen ONLY from: lava_pools chasms water_pools), "
+                "water_density (exactly one of: small medium large — size of ambient water pools; use large for flooded/sunken/drowned themes, small for dry/normal themes). "
+                "Choose structures, terrain_features, and water_density that match the theme's name and description. "
                 "No markdown fences, no explanation, no thinking — pure JSON only."
             )},
             {"role": "user", "content": (
@@ -1102,6 +1230,7 @@ class Dungeon:
         _valid_trap = {"dart", "poison", "teleport", "alarm", "any"}
         _valid_density = {"low", "normal", "high"}
         _valid_loot = {"potions", "scrolls", "weapons", "gold", "balanced"}
+        _valid_water = {"small", "medium", "large"}
         validated_structures = [
             s for s in (data.get("structures") or [])
             if isinstance(s, str) and s in _VALID_STRUCTURES
@@ -1121,6 +1250,7 @@ class Dungeon:
             ambient=str(data.get("ambient", "")),
             structures=validated_structures,
             terrain_features=validated_terrain_features,
+            water_density=data.get("water_density", "small") if data.get("water_density") in _valid_water else "small",
         )
         if theme.name:
             self._theme_history.append(f"{theme.name}: {theme.description}")
@@ -1189,11 +1319,19 @@ class Dungeon:
         for _ in range(pot_n):
             self._scatter(level, self._depth_potion(depth))
         for _ in range(scr_n):
-            self._scatter(level, random.choice(self.db.item_db.scrolls))
+            scrolls = self.db.item_db.scrolls
+            weights = [s.weight for s in scrolls]
+            self._scatter(level, random.choices(scrolls, weights=weights, k=1)[0])
         for _ in range(wpn_n):
-            self._scatter(level, random.choice(self.db.item_db.weapons[1:]))
+            weapon = copy.copy(random.choice(self.db.item_db.weapons[1:]))
+            from .classes.item_egos import maybe_brand_weapon
+            maybe_brand_weapon(weapon, depth, vault_bonus=0)
+            self._scatter(level, weapon)
         for _ in range(config.spawn.floor_armour):
-            self._scatter(level, random.choice(self.db.item_db.armour))
+            armour = copy.copy(random.choice(self.db.item_db.armour))
+            from .classes.item_egos import maybe_ego_armour
+            maybe_ego_armour(armour, depth, vault_bonus=0)
+            self._scatter(level, armour)
         for _ in range(config.spawn.floor_throwables):
             self._scatter(level, copy.copy(random.choice(self.db.item_db.throwables)))
         for _ in range(config.spawn.floor_spellbooks):
@@ -1242,6 +1380,9 @@ class Dungeon:
             return
         cells = list(level.vault_cells)
         random.shuffle(cells)
+        # Vaults get a +3 floor bonus on ego generation (per DCSS notes).
+        VAULT_BONUS = 3
+        from .classes.item_egos import maybe_brand_weapon
         if depth in _SHARD_FLOORS:
             shard_name, guardian_name = _SHARD_FLOORS[depth]
             sy, sx = cells.pop()
@@ -1260,7 +1401,11 @@ class Dungeon:
         else:
             wy, wx = cells.pop()
             weapon_name = _VAULT_WEAPONS[min(depth - 1, len(_VAULT_WEAPONS) - 1)]
-            level.matrix[wy][wx].items.append(self.db.item_db.search_item(name=weapon_name))
+            weapon = self.db.item_db.search_item(name=weapon_name)
+            if weapon is not None:
+                weapon = copy.copy(weapon)
+                maybe_brand_weapon(weapon, depth, vault_bonus=VAULT_BONUS)
+            level.matrix[wy][wx].items.append(weapon)
             if cells:
                 gy, gx = cells.pop()
                 level.matrix[gy][gx].gold += random.randint(15, 30 + depth * 5)
@@ -1301,6 +1446,7 @@ class Dungeon:
             for s in list(self.map.summon):
                 self.on_summon_death(s)
         self.player._channeling.clear()
+        self.player._channel_targets.clear()
         if depth not in self.levels:
             self.levels[depth] = self._new_level(depth)
         self.depth = depth
@@ -1334,8 +1480,9 @@ class Dungeon:
             })
 
     # --- turn engine (energy scheduler) --------------------------------
-    def spend_turn(self) -> None:
-        self.player.energy -= TURN
+    def spend_turn(self, cost: int = TURN) -> None:
+        """Subtract `cost` energy from the player (default one full turn)."""
+        self.player.energy -= cost
         self.moves += 1
         self.time.add()
         # MP regeneration
@@ -1350,6 +1497,8 @@ class Dungeon:
             cell = self.map.matrix[y][x]
             if cell.occupant:
                 dmg = max(1, random.randint(1, 3))
+                if cell.occupant is self.player:
+                    dmg = self.player.apply_resistance("fire", dmg)
                 cell.occupant.health -= dmg
                 if cell.occupant is self.player:
                     self.message(f"[burn]You are scorched by burning terrain! ({dmg} damage)[/burn]")
@@ -1365,9 +1514,48 @@ class Dungeon:
             if self.map.matrix[y][x].feature == "burning":
                 self.map.matrix[y][x].feature = None
 
+    def _detonate_inner_flame(self, enemy) -> None:
+        """Area fire explosion on death from a Scroll of Immolation victim."""
+        ey, ex = enemy.location
+        radius = 1
+        self.message(
+            f"[fire]{style_text(enemy.name, 'enemy')} erupts in a column of flame![/fire]"
+        )
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                if dy * dy + dx * dx > radius * radius:
+                    continue
+                ny, nx = ey + dy, ex + dx
+                if not self.map.in_bounds(ny, nx):
+                    continue
+                cell = self.map.matrix[ny][nx]
+                if cell.occupant is self.player:
+                    dmg = max(1, random.randint(3, 6) + self.depth)
+                    dmg = self.player.apply_resistance("fire", dmg)
+                    self.player.health -= dmg
+                    self.message(
+                        f"[fire]You are caught in the blast! ({dmg} fire damage)[/fire]", drop=dmg
+                    )
+                    if self.player.health <= 0:
+                        self.game_over("dead")
+                        return
+                elif getattr(cell.occupant, "is_enemy", False) and cell.occupant is not enemy:
+                    other = cell.occupant
+                    dmg = max(1, random.randint(2, 5))
+                    other.health -= dmg
+                    self.message(
+                        f"[fire]{style_text(other.name, 'enemy')} is caught in the blast.[/fire]",
+                        drop=dmg,
+                    )
+                    if other.health <= 0:
+                        self.on_enemy_death(other)
+        # Mark the source cell as briefly burning
+        self.map.burning_cells[(ey, ex)] = 2
+
     def game_tick(self) -> None:
         """One unit of world time: grant energy, tick statuses, run monster and summon actions."""
         self._tick_burning_terrain()
+        self.map.tick_floor_effects()
         p = self.player
         p.energy += p.effective_speed()
         p.status.tick(p, self)
@@ -1425,6 +1613,9 @@ class Dungeon:
         self.map.update_fov()
 
     def on_enemy_death(self, enemy) -> None:
+        # Scroll of Immolation: a dying enemy with inner_flame detonates for fire damage.
+        if enemy.status.has("inner_flame"):
+            self._detonate_inner_flame(enemy)
         self.player.gain_xp(enemy.xp_drop)
         if self.player.skills:
             leveled = self.player.skills.distribute(enemy.xp_drop)
@@ -1681,22 +1872,415 @@ class Dungeon:
         real = style_text(scroll.name, "item")
         read = (f"You read the {style_text(appearance, 'item')} — it is [success]{real}[/success]!"
                 if was_unknown else f"You read the {real}.")
-        if scroll.effect == "identify":
+        # Silence blocks both spells and scrolls. Check the aura + per-actor status.
+        if self.map.silence_aura > 0 or self.player.status.has("silence"):
+            self.message(f"[fail]A heavy silence swallows the {real}. The magic fizzles.[/fail]")
+            return True
+
+        effect = scroll.effect
+        if effect == "identify":
             self.message(read)
             target = self.menu.choose_unidentified(exclude=scroll)
-            if target is not None:
-                self.identify(target)
-            else:
-                self.message("You have nothing else to identify.")
+            if target is None:
+                self.message("[warn]You stop before the incantation — nothing to identify.[/warn]")
+                return False  # don't waste the scroll
+            self.identify(target)
             return True
-        if scroll.effect == "magic_mapping":
-            self.map.reveal_all()
-            self.message(f"{read} The floor's layout floods into your mind.")
-        elif scroll.effect == "teleport":
+        if effect == "teleport":
+            self.message(read)
             self.player.location = self.map.random_walkable()
             self.map.update_fov()
-            self.message(f"{read} You blink across the floor.")
+            self.message("[action]You blink across the floor.[/action]")
+            return True
+        if effect == "amnesia":
+            self.message(read)
+            target = self.menu.choose_spell_to_forget()
+            if target is None:
+                self.message("[warn]You have no spells to forget.[/warn]")
+                return False
+            self.player.known_spells.remove(target)
+            if target.name in self.player._channeling:
+                self.player._channeling.pop(target.name, None)
+                self.player._channel_targets.pop(target.name, None)
+            freed = target.level
+            self.message(
+                f"[flavor]The {style_text(target.name, 'item')} fades from your mind. "
+                f"([success]+{freed} spell slot{'s' if freed != 1 else ''}[/success])[/flavor]"
+            )
+            return True
+        if effect == "blinking":
+            self.message(read)
+            target = self.menu.choose_blink_target()
+            if target is None:
+                self.message("[warn]You find nowhere to blink to.[/warn]")
+                return False
+            self.player.location = target
+            self.map.update_fov()
+            self.message("[action]Space folds around you — you reappear in a chosen spot.[/action]")
+            return True
+        if effect == "butterflies":
+            self.message(read)
+            self._summon_butterflies()
+            return True
+        if effect == "enchant_weapon":
+            self.message(read)
+            weapon = self.menu.choose_enchantable_weapon(exclude=scroll)
+            if weapon is None:
+                self.message("[warn]You have no weapon to enchant.[/warn]")
+                return False
+            # Magical staves (and artefacts) cannot be enchanted (DCSS rule).
+            if getattr(weapon, "magical_staff", False):
+                self.message(
+                    f"[fail]The {style_text(weapon.name, 'weapons')} resists the enchantment "
+                    f"— magical staves cannot be enchanted.[/fail]"
+                )
+                return False
+            # Cap at +9 (DCSS max). Preserve the scroll on refusal.
+            if getattr(weapon, "enchant", 0) >= 9:
+                self.message(
+                    f"[warn]The {style_text(weapon.name, 'weapons')} cannot be enchanted further "
+                    f"— it has reached the maximum of +9.[/warn]"
+                )
+                return False
+            weapon.enchant = getattr(weapon, "enchant", 0) + 1
+            self.identify(weapon, announce=False)
+            self.message(
+                f"[success]The {style_text(weapon.name, 'weapons')} gleams "
+                f"([level]+1 enchant, now +{weapon.enchant}[/level]).[/success]"
+            )
+            return True
+        if effect == "enchant_armour":
+            self.message(read)
+            armour = self.menu.choose_enchantable_armour(exclude=scroll)
+            if armour is None:
+                self.message("[warn]You have no armour to enchant.[/warn]")
+                return False
+            # Cap at +9.
+            if getattr(armour, "enchant", 0) >= 9:
+                self.message(
+                    f"[warn]The {style_text(armour.name, 'armour')} cannot be enchanted further "
+                    f"— it has reached the maximum of +9.[/warn]"
+                )
+                return False
+            armour.enchant = getattr(armour, "enchant", 0) + 1
+            self.identify(armour, announce=False)
+            self.message(
+                f"[success]The {style_text(armour.name, 'armour')} hardens "
+                f"([level]+1 enchant, now +{armour.enchant}[/level]).[/success]"
+            )
+            return True
+        if effect == "fear":
+            self.message(read)
+            self._aoe_affect_enemies("fear", "flees in terror", duration=8, potency=1)
+            return True
+        if effect == "fog":
+            self.message(read)
+            self._spawn_fog()
+            self.message("[flavor]A thick mist rolls out from the parchment.[/flavor]")
+            self.map.update_fov()
+            return True
+        if effect == "immolation":
+            self.message(read)
+            count = self._aoe_affect_enemies("inner_flame", "catches inner flame", duration=999, potency=1)
+            if not count:
+                self.message("[warn]No creatures caught in sight.[/warn]")
+            else:
+                self.message(f"[fire]The inner flame ignites in {count} creature{'s' if count != 1 else ''}.[/fire]")
+            return True
+        if effect == "noise":
+            self.message(read)
+            self.awaken_floor()
+            self.message("[warn]A thunderous crack rolls through the dungeon![/warn]")
+            return True
+        if effect == "poison_cloud":
+            self.message(read)
+            placed = self._spawn_poison_clouds()
+            self.message(f"[poison]Noxious green clouds bloom in {placed} tile{'s' if placed != 1 else ''}.[/poison]")
+            return True
+        if effect == "revelation":
+            self.message(read)
+            self.map.reveal_all()
+            self.player.status.add("see_invisible", 6, 1)
+            self.message("[success]The floor's layout floods into your mind.[/success]")
+            return True
+        if effect == "silence":
+            self.message(read)
+            self.map.silence_aura = 10
+            self.message("[fail]A heavy silence settles over the floor.[/fail]")
+            return True
+        if effect == "summoning":
+            self.message(read)
+            count = self._summon_random_enemies(2 + self.depth // 3)
+            self.message(f"[action]{count} creature{'s' if count != 1 else ''} claw their way into being.[/action]")
+            return True
+        if effect == "torment":
+            self.message(read)
+            self._torment_all()
+            return True
+        if effect == "vulnerability":
+            self.message(read)
+            self._aoe_affect_enemies("vulnerable", "grows vulnerable", duration=10, potency=1)
+            self.player.status.add("vulnerable", 5, 1)
+            self.message("[fail]You too feel the will of magic weakening around you.[/fail]")
+            return True
+        if effect == "brand_weapon":
+            self.message(read)
+            weapon = self.menu.choose_enchantable_weapon(exclude=scroll)
+            if weapon is None:
+                self.message("[warn]You have no weapon to brand.[/warn]")
+                return False
+            # Magical staves cannot be branded (DCSS rule).
+            if getattr(weapon, "magical_staff", False):
+                self.message(
+                    f"[fail]The {style_text(weapon.name, 'weapons')} rejects the brand — "
+                    f"magical staves cannot be branded.[/fail]"
+                )
+                return False
+            brand = random.choice(list(BRAND_CHOICES))
+            weapon.brand = brand
+            self.identify(weapon, announce=False)
+            self.message(
+                f"[success]The {style_text(weapon.name, 'weapons')} is imbued with "
+                f"{style_text(brand, 'item')}[/success]"
+            )
+            return True
+        if effect == "acquirement":
+            self.message(read)
+            self._do_acquirement()
+            return True
+        # Fallback: no handler.
+        self.message(f"{read} (no effect implemented for {effect!r})")
         return True
+
+    # --- scroll effect helpers -----------------------------------------
+    def _aoe_affect_enemies(self, status_name: str, verb: str,
+                             duration: int, potency: int) -> int:
+        """Apply a status effect to every visible enemy. Returns count affected."""
+        count = 0
+        for e in self.map.enemies:
+            if e.health <= 0:
+                continue
+            if (e.y, e.x) not in self.map.visible:
+                continue
+            if getattr(e, "is_summon", False):
+                continue
+            e.status.add(status_name, duration, potency)
+            count += 1
+        if count:
+            self.message(
+                f"[warn]Every visible enemy {verb}.[/warn]"
+            )
+        return count
+
+    def _spawn_fog(self) -> None:
+        """Spread a fog cloud outwards from the player's location."""
+        py, px = self.player.location
+        radius = 6
+        for r in range(radius + 1):
+            for dy in range(-r, r + 1):
+                for dx in range(-r, r + 1):
+                    if dy * dy + dx * dx > r * r:
+                        continue
+                    ny, nx = py + dy, px + dx
+                    if not self.map.in_bounds(ny, nx):
+                        continue
+                    self.map.fog_cells[(ny, nx)] = max(self.map.fog_cells.get((ny, nx), 0), 12 - r)
+
+    def _spawn_poison_clouds(self) -> int:
+        """Mark every walkable, visible, unoccupied tile as a poison cloud for a few turns."""
+        placed = 0
+        for y, x in self.map.visible:
+            cell = self.map.matrix[y][x]
+            if not cell.walkable:
+                continue
+            if cell.occupant is not None:
+                continue
+            if cell.terrain in (T.DEEP_WATER, T.LAVA, T.CHASM):
+                continue
+            self.map.burning_cells[(y, x)] = 3  # poison "ticks" via burning mechanism
+            placed += 1
+        return placed
+
+    def _summon_butterflies(self) -> None:
+        """Summon 3 friendly summons that shove enemies away from the player."""
+        from .classes.enemies import DungeonEnemy, EnemyTexts
+        for _ in range(3):
+            loader = self.db.enemy_db.search_enemy(name="Bat")  # reuse bat as proxy
+            if not loader:
+                continue
+            d = loader.data
+            texts = EnemyTexts(
+                critical_hit=f"The {{}} flutters around.",
+                hit=f"The {{}} buffets you.",
+                missed_hit=f"The {{}} flits past.",
+                death=f"The {{}} dissolves into motes of light.",
+                enemy_name=d.name,
+            )
+            b = DungeonEnemy(
+                name="Butterfly",
+                symbol="*",
+                tier="weak",
+                health=1, coin_drop=0, xp_drop=0,
+                attack_base=0, attack_range=[0, 0], accuracy=0,
+                texts=texts, game=self,
+                ranged=False, attack_distance=0, speed=14,
+            )
+            b.is_enemy = False
+            b.is_summon = True
+            b.is_butterfly = True
+            b.despawn_timer = 18
+            b.awake = True
+            # Place adjacent to player
+            py, px = self.player.location
+            candidates = []
+            for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                ny, nx = py + dy, px + dx
+                if self.map.in_bounds(ny, nx) and self.map.matrix[ny][nx].walkable \
+                        and self.map.matrix[ny][nx].occupant is None:
+                    candidates.append((ny, nx))
+            if not candidates:
+                continue
+            ny, nx = random.choice(candidates)
+            self.map.place_occupant(b, ny, nx)
+            self.map.summon.append(b)
+        # Push enemies in adjacent cells away by one tile
+        py, px = self.player.location
+        for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            ny, nx = py + dy, px + dx
+            if not self.map.in_bounds(ny, nx):
+                continue
+            occ = self.map.matrix[ny][nx].occupant
+            if not getattr(occ, "is_enemy", False):
+                continue
+            # Try to shove one step further away
+            fy, fx = ny + dy, nx + dx
+            if self.map.in_bounds(fy, fx) and self.map.matrix[fy][fx].walkable \
+                    and self.map.matrix[fy][fx].occupant is None:
+                self.map.move_occupant(occ, fy, fx)
+
+    def _summon_random_enemies(self, n: int) -> int:
+        """Spawn n random native enemies adjacent to or near the player."""
+        from .classes.enemies import DungeonEnemy
+        spawned = 0
+        depth = self.depth
+        py, px = self.player.location
+        # Build candidate tiles in spiral from player
+        candidates = []
+        for r in range(1, 8):
+            for dy in range(-r, r + 1):
+                for dx in range(-r, r + 1):
+                    if abs(dy) != r and abs(dx) != r:
+                        continue
+                    ny, nx = py + dy, px + dx
+                    if not self.map.in_bounds(ny, nx):
+                        continue
+                    cell = self.map.matrix[ny][nx]
+                    if not cell.walkable or cell.occupant is not None:
+                        continue
+                    candidates.append((ny, nx))
+        random.shuffle(candidates)
+        for _ in range(n):
+            if not candidates:
+                break
+            loader = self.db.enemy_db.random_for_depth(depth)
+            if not loader:
+                break
+            enemy = loader.load()
+            ny, nx = candidates.pop()
+            self.map.place_occupant(enemy, ny, nx)
+            self.map.enemies.append(enemy)
+            spawned += 1
+        return spawned
+
+    def _torment_all(self) -> None:
+        """Damage all visible creatures (including the player) for torment damage."""
+        dmg_player = max(1, random.randint(2, 4) + self.depth)
+        self.player.health -= dmg_player
+        self.message(f"[fail]Torment tears at your soul! ({dmg_player} damage)[/fail]", drop=dmg_player)
+        if self.player.health <= 0:
+            self.game_over("dead")
+            return
+        for e in list(self.map.enemies):
+            if e.health <= 0:
+                continue
+            if (e.y, e.x) not in self.map.visible:
+                continue
+            if getattr(e, "is_summon", False):
+                continue
+            d = max(1, random.randint(1, 3) + self.depth // 2)
+            e.health -= d
+            self.message(f"[fail]{style_text(e.name, 'enemy')} writhes in torment ({d}).[/fail]", drop=d)
+            if e.health <= 0:
+                self.on_enemy_death(e)
+
+    def _do_acquirement(self) -> None:
+        """Offer the player a choice of 3 items tailored to their skills (or 500 gold)."""
+        player = self.player
+        # Build a pool biased toward the player's high skills.
+        pool = []
+        if player.skills:
+            for skill, info in player.skills.skills.items():
+                lvl = info.level if hasattr(info, "level") else 0
+                if lvl >= 2.0 and skill in ("Spellcasting", "Conjuration", "Fire Magic",
+                                              "Ice Magic", "Earth Magic", "Air Magic",
+                                              "Poison Magic", "Transmutation",
+                                              "Translocation", "Summoning"):
+                    # Add a relevant spellbook
+                    pool.extend(self.db.item_db.spellbooks)
+                if lvl >= 2.0 and skill in ("Long Blades", "Short Blades", "Maces & Flails",
+                                              "Axes", "Polearms", "Staves", "Ranged", "Throwing"):
+                    pool.extend(self.db.item_db.weapons)
+                if lvl >= 1.5 and skill == "Armour":
+                    pool.extend(self.db.item_db.armour)
+        # Always offer some potions / scrolls
+        pool.extend(self.db.item_db.potions)
+        pool.extend(self.db.item_db.scrolls)
+        if not pool:
+            pool = list(self.db.item_db.items)
+        offerings = []
+        chosen = random.sample(pool, min(3, len(pool)))
+        for item in chosen:
+            if isinstance(item, DungeonWeapon):
+                lo, hi = item.attack_range
+                detail = f"Atk {item.base_attack} (+{lo}-{hi}), {item.accuracy}% acc"
+            elif isinstance(item, DungeonArmour):
+                detail = f"AC {item.ac}, {item.slot}"
+            elif isinstance(item, DungeonPotion):
+                detail = f"heals +{item.hp_change} HP"
+            elif isinstance(item, DungeonScroll):
+                detail = f"{item.effect.replace('_', ' ')}"
+            elif isinstance(item, DungeonSpellBook):
+                detail = f"teaches {', '.join(item.spells)}"
+            else:
+                detail = item.description
+            offerings.append((item, detail))
+        if len(offerings) < 3:
+            # Pad with random items if not enough
+            extras = random.sample(list(self.db.item_db.items),
+                                   min(3 - len(offerings), len(self.db.item_db.items)))
+            for item in extras:
+                if any(it is item for it, _ in offerings):
+                    continue
+                offerings.append((item, item.description))
+        choice = self.menu.choose_acquirement(offerings)
+        if choice[0] == "cancel":
+            return
+        if choice[0] == "gold":
+            _, amount = choice
+            player.coins += amount
+            self.message(f"[success]{amount} gold coins materialise at your feet.[/success]")
+            return
+        item = choice[1]
+        # Place in inventory if room, otherwise at feet
+        if len(player.inventory) < player.max_inventory:
+            player.inventory.append(item)
+            self.identify(item, announce=False)
+            self.message(f"[success]You acquire a {style_text(item.name, 'item')}.[/success]")
+        else:
+            cell = self.map.matrix[player.y][player.x]
+            import copy
+            cell.items.append(copy.copy(item))
+            self.message(f"[success]A {style_text(item.name, 'item')} appears at your feet.[/success]")
 
     def search(self) -> None:
         if self.map.search(self.player.y, self.player.x):
@@ -1750,11 +2334,13 @@ class Dungeon:
             return throwables[0]
         return self.menu.choose_throwable(throwables)
 
-    def fire(self) -> bool:
+    def fire(self) -> int:
+        """Fire a ranged weapon or throw. Returns the energy cost of the action
+        (0 if no shot was fired, otherwise the weapon's ranged delay)."""
         weapon = self._ranged_source()
         if weapon is None:
             self.message("You have no ranged weapon equipped and nothing to throw.")
-            return False
+            return 0
         rng = weapon.range
         py, px = self.player.location
 
@@ -1766,7 +2352,7 @@ class Dungeon:
                          key=lambda e: max(abs(e.y - py), abs(e.x - px)))
         if not targets:
             self.message("There is no target in range.")
-            return False
+            return 0
         idx = 0
         cursor = list(targets[idx].location)
         while True:
@@ -1775,7 +2361,7 @@ class Dungeon:
             key = keys.read_key()
             if key in (keys.ESC, "q"):
                 self._clear_target()
-                return False
+                return 0
             if key in (keys.ENTER, "f"):
                 break
             if key == keys.TAB:
@@ -1798,7 +2384,8 @@ class Dungeon:
         else:
             self.message("Your shot flies wide and strikes nothing.")
             self._consume_throwable(weapon)
-        return True
+        # Ranged cost = weapon's delay (bows/crossbows slow, throwables default 10).
+        return max(1, getattr(weapon, "delay", TURN))
 
     def _show_target(self, cursor) -> None:
         self.target_cursor = (cursor[0], cursor[1])
@@ -1818,6 +2405,11 @@ class Dungeon:
 
         # Coordinates
         parts.append(f"[flavor]({x},{y})[/flavor]")
+
+        # Unexplored + out of sight: hide everything except the marker.
+        if not cell.explored and (y, x) not in self.map.visible:
+            parts.append("[warn](unexplored)[/warn]")
+            return " ".join(parts)
 
         # Terrain
         terrain_labels = {
@@ -1839,10 +2431,6 @@ class Dungeon:
         label = terrain_labels.get(cell.terrain, cell.terrain.replace("_", " ").title())
         parts.append(f"[terrain]{label}[/terrain]")
 
-        # Unexplored
-        if not cell.explored and (y, x) not in self.map.visible:
-            parts.append("[warn](unexplored)[/warn]")
-
         # Features
         if cell.feature:
             parts.append(f"[warn]{cell.feature.title()}[/warn]")
@@ -1861,6 +2449,11 @@ class Dungeon:
                     tags = [short_map.get(n, n[:3].upper()) for n in occ.status.effects]
                     status_tags = f" [flavor]({'/'.join(tags)})[/flavor]"
                 parts.append(f"[enemy]{occ.symbol} {occ.name}[/enemy] {occ.health}/{occ.max_health}HP{status_tags}")
+                # Tag the enemy's holiness so the player knows when Sacred Scourge
+                # or the holy_wrath brand get a damage bonus.
+                holiness = getattr(occ, "holiness", "natural")
+                if holiness != "natural":
+                    parts.append(f"  [flavor]({holiness})[/flavor]")
             elif getattr(occ, "occupation", None):
                 parts.append(f"[occupation]{occ.symbol} {occ.name}[/occupation] [flavor]({occ.occupation})[/flavor]")
             else:
@@ -1868,17 +2461,48 @@ class Dungeon:
 
         # Items on ground
         if cell.items:
-            from .classes.items import DungeonWeapon, DungeonThrowable, DungeonPotion, DungeonScroll
+            from .classes.items import DungeonWeapon, DungeonThrowable, DungeonPotion, DungeonScroll, DungeonArmour
             for item in reversed(cell.items):
                 detail = ""
                 if isinstance(item, DungeonWeapon):
                     lo, hi = item.attack_range
-                    detail = f" — Atk {item.base_attack} (+{lo}-{hi}), {item.accuracy}% acc, {item.hands}-handed"
+                    enchant = getattr(item, "enchant", 0)
+                    detail = f" — Atk {item.base_attack + enchant} (+{lo}-{hi}), {item.accuracy + enchant}% acc, {item.hands}-handed"
+                    if enchant:
+                        detail += f" [level]+{enchant}[/level]"
+                    brand = getattr(item, "brand", None)
+                    if brand:
+                        detail += f" [arcane]({brand})[/arcane]"
+                    holiness_bonuses = getattr(item, "dmg_pct_vs_holiness", {}) or {}
+                    if holiness_bonuses:
+                        bonuses = ", ".join(
+                            f"+{int(v*100)}% vs {h}" for h, v in holiness_bonuses.items()
+                        )
+                        detail += f" [arcane]({bonuses})[/arcane]"
                 elif isinstance(item, DungeonThrowable):
                     lo, hi = item.attack_range
                     detail = f" — Atk {item.base_attack} (+{lo}-{hi}), {item.accuracy}% acc, range {item.range}, x{item.count}"
                 elif isinstance(item, DungeonPotion):
                     detail = f" — heals +{item.hp_change} HP"
+                elif isinstance(item, DungeonArmour):
+                    from .classes.item_egos import ARMOUR_EGO_TABLE
+                    ego = getattr(item, "ego", None)
+                    ego_label = ARMOUR_EGO_TABLE[ego]["label"] if ego in ARMOUR_EGO_TABLE else ""
+                    extras = []
+                    if getattr(item, "resistances", {}):
+                        for r in item.resistances:
+                            extras.append(f"r{r[:2].title()}+")
+                    if getattr(item, "ev_bonus", 0):
+                        extras.append(f"+{item.ev_bonus} EV")
+                    if getattr(item, "sh_bonus", 0):
+                        extras.append(f"+{item.sh_bonus} SH")
+                    if getattr(item, "ranged_dmg_bonus", 0.0):
+                        extras.append(f"+{int(item.ranged_dmg_bonus*100)}% ranged")
+                    if getattr(item, "grant_see_invisible", False):
+                        extras.append("SInv")
+                    suffix = f" ({ego_label})" if ego_label else ""
+                    extra = f" [{', '.join(extras)}]" if extras else ""
+                    detail = f" — {item.slot.title()} AC {item.ac + getattr(item, 'enchant', 0)}{suffix}{extra}"
                 elif isinstance(item, DungeonScroll):
                     detail = f" — {item.effect.replace('_', ' ').title()}"
                 parts.append(f"[item]{item.symbol} {self.display_name(item)}[/item]{detail}")
@@ -1932,7 +2556,7 @@ class Dungeon:
             if d:
                 dy, dx = DIR_DELTA[d]
                 ny, nx = cursor[0] + dy, cursor[1] + dx
-                if self.map.in_bounds(ny, nx):
+                if self.map.in_bounds(ny, nx) and self._examine_reachable(ny, nx):
                     cursor = [ny, nx]
                     self._show_examine(cursor)
                     self.render()
@@ -1943,6 +2567,12 @@ class Dungeon:
         self.camera_override = tuple(cursor)
         desc = self._examine_description(cursor[0], cursor[1])
         self.message(f"[menu_header]Examine:[/menu_header] {desc}")
+
+    def _examine_reachable(self, y: int, x: int) -> bool:
+        """Cursor can only land on tiles the player can currently see or has seen."""
+        if (y, x) in self.map.visible:
+            return True
+        return self.map.matrix[y][x].explored
 
     def _clear_examine(self) -> None:
         self.examine_cursor = None
@@ -2018,9 +2648,14 @@ class Dungeon:
             return False
 
         for _ in range(1000):
-            if self.over or self.map.visible_enemies():
-                if self.map.visible_enemies():
-                    self.message("[warn]A monster comes into view.[/warn]")
+            # Check AFTER advance_world updates the FOV. visible_enemies already
+            # filters out dead enemies and summons.
+            if self.over:
+                break
+            visible = self.map.visible_enemies()
+            if visible:
+                name = visible[0].name
+                self.message(f"[warn]Auto-explore halted: a {style_text(name, 'enemy')} is in view.[/warn]")
                 break
 
             visible_before = frozenset(self.map.visible)
@@ -2030,9 +2665,10 @@ class Dungeon:
                 break
             ny, nx = path[0]
             direction = self._dir_to(ny, nx)
-            if direction is None or not self.player.move(direction):
+            move_cost = self.player.move(direction) if direction else 0
+            if not direction or move_cost <= 0:
                 break
-            self.spend_turn()
+            self.spend_turn(cost=move_cost)
             self.advance_world()
             self.render()
             time.sleep(0.03)
@@ -2094,9 +2730,12 @@ class Dungeon:
 
         self.message(f"[stairs]Travelling to {name}...[/stairs]")
         for _ in range(1000):
-            if self.over or self.map.visible_enemies():
-                if self.map.visible_enemies():
-                    self.message("[warn]A monster comes into view.[/warn]")
+            if self.over:
+                break
+            visible = self.map.visible_enemies()
+            if visible:
+                name = visible[0].name
+                self.message(f"[warn]Travel halted: a {style_text(name, 'enemy')} is in view.[/warn]")
                 break
             if self.player.location == coord:
                 break
@@ -2106,9 +2745,10 @@ class Dungeon:
                 break
             ny, nx = path[0]
             d = self._dir_to(ny, nx)
-            if d is None or not self.player.move(d):
+            move_cost = self.player.move(d) if d else 0
+            if d is None or move_cost <= 0:
                 break
-            self.spend_turn()
+            self.spend_turn(cost=move_cost)
             self.advance_world()
             self.render()
             time.sleep(0.03)
@@ -2195,11 +2835,13 @@ class Dungeon:
                 break
             self.render()
             key = keys.read_key()
-            if self.handle(key):
-                self.spend_turn()
+            cost = self.handle(key)
+            if cost > 0:
+                self.spend_turn(cost=cost)
 
-    def handle(self, key: str) -> bool:
-        """Dispatch one keypress. Returns True if the action spent a game turn."""
+    def handle(self, key: str) -> int:
+        """Dispatch one keypress. Returns the energy cost of the action (0 if no
+        turn was spent, TURN for a standard action, attack_cost for melee attacks)."""
         # Clear stair-view overlay on any key that isn't cycling stair views.
         if key not in ("[", "]") and self.camera_override is not None:
             self.camera_override = None
@@ -2211,70 +2853,67 @@ class Dungeon:
                 direction = random.choice(list(keys.MOVE_KEYS.values()))
             return self.player.move(direction)
         if key == "g":
-            return self.pickup()
+            return TURN if self.pickup() else 0
         if key == "A":
             self.menu.armor_ui()
-            return False
+            return 0
         if key in ("d", "i"):
             self.menu.pack()
-            return False
+            return 0
         if key == "f":
-            return self.fire()
+            return self.fire()  # fire() returns cost directly
         if key == "o":
             self.autoexplore()
-            return False
+            return 0
         if key == ">":
-            self.descend()
-            return False
+            return TURN if self.descend() else 0
         if key == "<":
-            self.ascend()
-            return False
+            return TURN if self.ascend() else 0
         if key == "G":
             self.goto_stairs_menu()
-            return False
+            return 0
         if key == "[":
             self.view_stair("up")
-            return False
+            return 0
         if key == "]":
             self.view_stair("down")
-            return False
+            return 0
         if key == "X":
             self.exclude_stair()
-            return False
+            return 0
         if key == "\\":
             self.auto_pickup_menu()
-            return False
+            return 0
         if key == "s":
             self.search()
-            return True
+            return TURN
         if key == "x":
             self.examine_mode()
-            return False
+            return 0
         if key == "S":
             self.save_game()
-            return False
+            return 0
         if key in (".", keys.SPACE):
             self.message("You wait.")
-            return True
+            return TURN
         if key == "m":
             self.menu.skills_ui()
-            return False
+            return 0
         if key == "z":
-            self.menu.spell_ui()
-            return False
+            return TURN if self.menu.spell_ui() else 0
         if key == "p":
             self.time.pause_menu()
-            return False
+            return 0
         if key == "~":
             self.godmode = not self.godmode
             if self.godmode:
                 self.map.reveal_all()
             self.message(f"[warn]Developer god mode {'ENABLED' if self.godmode else 'disabled'}.[/warn]")
-            return False
+            return 0
         if key == "?":
             self.manual_screen()
             self.render()
-            return False
+            return 0
         if key == keys.ESC:
             clear_screen()
             self.print(Panel(
@@ -2298,8 +2937,8 @@ class Dungeon:
                 print("Exiting [Dungeon]...")
                 sys.exit()
             self.render()
-            return False
-        return False
+            return 0
+        return 0
 
     def manual_screen(self) -> None:
         pages = {

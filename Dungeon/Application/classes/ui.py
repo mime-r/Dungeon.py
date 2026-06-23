@@ -7,6 +7,21 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ..config import config
+from .status import EFFECT_STYLE
+
+
+def _enemy_status_suffix(enemy) -> str:
+    """Return a comma-separated list of human status labels for an enemy.
+
+    Example: 'poisoned, slowed'. Returns '' when the enemy has no status.
+    Used in the sidebar to make slowed / poisoned / burning etc. visible at a glance.
+    """
+    names = []
+    for effect_name in enemy.status.effects:
+        entry = EFFECT_STYLE.get(effect_name)
+        label = entry[0] if entry else effect_name.title()
+        names.append(label.lower())
+    return ", ".join(names)
 
 
 class DungeonUI:
@@ -83,78 +98,69 @@ class DungeonUI:
     def _sidebar_panel(self, height: int | None = None) -> Panel:
         p = self.game.player
         ratio = p.health / p.max_health if p.max_health else 0
-        bar_w = 16
+        bar_w = 12
         filled = max(0, min(bar_w, round(ratio * bar_w)))
         bar_color = "hp_bar" if ratio > 0.33 else "hp_bar_low"
         bar = f"[{bar_color}]{'█' * filled}[/{bar_color}][grey23]{'░' * (bar_w - filled)}[/grey23]"
 
         shard_count = len(p.shards)
         if shard_count == 3:
-            objective = "[shard]Sigil complete! Escape to the surface.[/shard]\n[warn]Find up-stairs (<) on Depth 1.[/warn]"
+            objective = "[shard]Sigil: escape to the surface![/shard]"
         elif shard_count > 0:
-            objective = (
-                f"[shard]Sigil: {shard_count}/3 shards[/shard]\n"
-                f"[flavor]{', '.join(p.shards)}[/flavor]\n"
-                f"[stairs]More shards wait deeper.[/stairs]"
-            )
+            objective = f"[shard]Sigil: {shard_count}/3[/shard] [flavor]({', '.join(p.shards)})[/flavor]"
         else:
             objective = ""
 
-        full = len(p.inventory) >= p.max_inventory
-        shard_tag = f"  [shard]+{shard_count}★[/shard]" if shard_count > 0 else ""
-        pack_line = (
-            f"[inventory]Pack[/inventory]: {len(p.inventory)}/{p.max_inventory}"
-            + ("  [warn]FULL[/warn]" if full else "")
-            + shard_tag
-        )
+        inventory = getattr(p, "inventory", [])
+        full = len(inventory) >= p.max_inventory
         background = f" [flavor]{p.background}[/flavor]" if getattr(p, "background", None) else ""
-        mp_bar = ""
+        lines = [
+            f"[name]{p.name or 'Adventurer'}[/name]{background}",
+            f"[level]Lv {p.level}[/level] [xp_count]{p.xp}/{p.xp_next}xp[/xp_count] [depth]D{self.game.depth}[/depth] [coin]{p.coins}g[/coin]",
+            f"[health]HP[/health] {p.health}/{p.max_health} {bar}",
+        ]
         if getattr(p, "max_mp", 0) > 0:
             mp_ratio = p.mp / p.max_mp if p.max_mp else 0
             mp_filled = max(0, min(bar_w, round(mp_ratio * bar_w)))
             mp_bar = f"[haste]{'█' * mp_filled}[/haste][grey23]{'░' * (bar_w - mp_filled)}[/grey23]"
-
-        lines = [
-            f"[name]{p.name or 'Adventurer'}[/name]{background}",
-            f"[level]Level {p.level}[/level]  [xp_count]XP {p.xp}/{p.xp_next}[/xp_count]",
-            "",
-            f"[health]HP[/health] {p.health}/{p.max_health}",
-            bar,
-        ]
-        if getattr(p, "max_mp", 0) > 0:
-            lines.append(f"[haste]MP[/haste] {int(p.mp)}/{p.max_mp}")
-            lines.append(mp_bar)
-        lines += [
-            f"[coin]Gold[/coin]  {p.coins}",
-            f"[depth]Depth[/depth] {self.game.depth}",
-        ]
-        lines.append("")
-        lines.append("[warn]Status[/warn]:")
+            lines.append(f"[haste]MP[/haste] {int(p.mp)}/{p.max_mp} {mp_bar}")
         if p.status.any():
-            for label, style in p.status.summary():
-                lines.append(f"  [{style}]{label}[/{style}]")
-        else:
-            lines.append("  [flavor]clear[/flavor]")
-        weapon_tag = f"[weapons]Weapon[/weapons]: {self.game.display_name(p.equipped)}"
+            tags = ", ".join(f"[{s}]{lbl}[/{s}]" for lbl, s in p.status.summary())
+            lines.append(f"[warn]Status[/warn]: {tags}")
+        weapon_tag = f"[weapons]{self.game.display_name(p.equipped)}[/weapons]"
         if getattr(p.equipped, "ranged", False):
-            weapon_tag += f" [flavor](ranged {p.equipped.range})[/flavor]"
-        armour_tag = f"[armour]AC[/armour] {p.armor_class()}  [armour]EV[/armour] {p.evasion()}"
-        lines += ["", weapon_tag, armour_tag, pack_line, "", objective]
+            weapon_tag += f" [flavor](rng {p.equipped.range})[/flavor]"
+        lines.append(
+            f"{weapon_tag}  [armour]AC {p.armor_class()}[/armour]  [armour]EV {p.evasion()}[/armour]"
+        )
+        pack_str = f"[inventory]Pack[/inventory] {len(inventory)}/{p.max_inventory}"
+        if full:
+            pack_str += " [warn]FULL[/warn]"
+        if shard_count > 0:
+            pack_str += f"  [shard]+{shard_count}★[/shard]"
+        lines.append(pack_str)
+        if objective:
+            lines.append(objective)
 
         summons = self.game.map.visible_summons()
         if summons:
-            lines += ["", "[haste]Summons[/haste]:"]
-            for s in summons:
-                ttl = max(0, s.despawn_timer)
-                lines.append(f"  [{s.style}]{s.symbol} {s.name}[/{s.style}] {s.health}/{s.max_health} ({ttl}t)")
+            lines.append("[haste]Summons[/haste]: " + ", ".join(
+                f"[{s.style}]{s.name}[/{s.style}] {s.health}/{s.max_health}({max(0, s.despawn_timer)}t)"
+                for s in summons
+            ))
 
         enemies = self.game.map.visible_enemies()
         if enemies:
-            lines += ["", "[enemy]Threats in view[/enemy]:"]
+            threats = []
             for e in enemies[:6]:
-                lines.append(f"  [{e.style}]{e.symbol} {e.name}[/{e.style}] {e.health}/{e.max_health}")
+                t = f"[{e.style}]{e.name}[/{e.style}] {e.health}/{e.max_health}"
+                statuses = _enemy_status_suffix(e)
+                if statuses:
+                    t += f" [flavor]({statuses})[/flavor]"
+                threats.append(t)
+            lines.append("[enemy]Threats[/enemy]: " + " | ".join(threats))
             if len(enemies) > 6:
-                lines.append(f"  [flavor]+{len(enemies) - 6} more[/flavor]")
+                lines.append(f"[flavor]+{len(enemies) - 6} more[/flavor]")
 
         npcs = self.game.map.visible_npcs()
         if npcs:

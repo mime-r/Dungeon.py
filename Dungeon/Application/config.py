@@ -74,6 +74,12 @@ class StyleConfig:
     confusion: str = "#C77DFF"
     petrify: str = "#9E9E9E"
 
+    # --- damage / magic schools (for cast impact messages) ---
+    fire: str = "bold #FF6B3D"
+    ice: str = "bold #6BC8FF"
+    lightning: str = "bold #FFE74D"
+    arcane: str = "bold #C77DFF"
+
     # --- terrain scenery ---
     shallow_water: str = "#4fc3f7"
     deep_water: str = "bold #0d47a1"
@@ -267,7 +273,7 @@ class SpawnConfig:
     floor_weapons: int = 2
     floor_armour: int = 2
     floor_throwables: int = 2
-    floor_spellbooks: int = 1
+    floor_spellbooks: int = 2
     traps_base: int = 2             # +depth // 2
 
 

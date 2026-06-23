@@ -44,7 +44,12 @@ class DungeonTrader(DungeonPeople):
 
     def __init__(self, potential_sales, occupation: str = "trader", personality: str = "") -> None:
         super().__init__(occupation=occupation, personality=personality)
-        self.stuff = [sale.item for sale in potential_sales if random.randint(1, 100) <= sale.chance]
+        # Filter None items (defensive: handles missing-from-DB cases) and roll
+        # each sale's chance independently.
+        self.stuff = [
+            sale.item for sale in potential_sales
+            if sale.item is not None and random.randint(1, 100) <= sale.chance
+        ]
 
 
 class DungeonHealer(DungeonPeople):
@@ -65,9 +70,12 @@ class DungeonPeopleLoader:
 
     def _stock_item(self, name: str):
         """Resolve a sale by name; throwables get a fresh copy so their stack count
-        doesn't mutate the shared database singleton or other traders' stock."""
+        doesn't mutate the shared database singleton or other traders' stock.
+        Returns None if the item is missing from the DB — callers must filter."""
         from .items import DungeonThrowable
         item = self.game.db.item_db.search_item(name=name)
+        if item is None:
+            return None
         return copy.copy(item) if isinstance(item, DungeonThrowable) else item
 
     def load(self):
@@ -75,10 +83,11 @@ class DungeonPeopleLoader:
         if self.type == DungeonTrader:
             potential_sales = (
                 TraderSales(
-                    item=self._stock_item(sale_dict["item"]),
+                    item=stocked,
                     chance=sale_dict["chance"],
                 )
                 for sale_dict in people_data.potential_sales
+                if (stocked := self._stock_item(sale_dict["item"])) is not None
             )
             return DungeonTrader(
                 potential_sales=potential_sales,

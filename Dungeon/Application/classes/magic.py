@@ -2,6 +2,7 @@
 
 import math
 import random
+import time
 
 from ..config import config
 from ..utils import style_text
@@ -9,14 +10,15 @@ from ..utils import style_text
 
 # Configurable constants for the success formula
 class MagicConfig:
-    DIFFICULTY_PER_LEVEL = 10
+    DIFFICULTY_PER_LEVEL = 8   # was 10 — gentler scaling per spell tier
     SPELLCASTING_WEIGHT = 2
     SCHOOL_WEIGHT = 4
-    INT_WEIGHT = 2.0
-    BASE_FAILURE = 30
+    INT_WEIGHT = 3.0           # was 2.0 — INT now matters more
+    BASE_FAILURE = 30         # was 52 — much friendlier baseline
     STAFF_SKILL_BONUS = 4.0
     STAFF_DAMAGE_MULT = 0.05
     SEVERE_MISCAST_THRESHOLD = 30
+    CAST_PAUSE = 0.12  # seconds between cast announcement and impact
 
 
 _MAGIC_SCHOOLS = {
@@ -27,6 +29,22 @@ _MAGIC_SCHOOLS = {
     "Staff of Lightning": "Conjuration",
     "Magic Staff": "Spellcasting",
 }
+
+
+# Visual style + verb per damage type. The style is the rich markup tag used
+# to colour the impact message; the verb is shown in the cast text.
+_DAMAGE_STYLE = {
+    "fire": ("fire", "sears"),
+    "cold": ("ice", "freezes"),
+    "lightning": ("lightning", "shocks"),
+    "poison": ("poison", "corrodes"),
+    "force": ("arcane", "blasts"),
+}
+
+
+def _cast_pause() -> None:
+    """Brief pause between cast announcement and impact for a more dynamic feel."""
+    time.sleep(MagicConfig.CAST_PAUSE)
 
 
 def staff_school(weapon_name: str) -> str | None:
@@ -151,18 +169,25 @@ def _projectile(spell, player, game, target, mult):
         game.message("No target.")
         return
     en = style_text(target.name, "enemy")
+    style_tag, verb = _DAMAGE_STYLE.get(spell.damage_type, ("arcane", "strikes"))
+    game.message(f"[action]You cast {style_text(spell.name, 'item')}![/action]")
     if spell.damage:
         lo, hi = spell.damage
         raw = random.randint(lo, hi)
         dmg = max(1, int(raw * mult))
-        game.message(f"[action]You cast {style_text(spell.name, 'item')}! The {en} is hit by magical force.[/action]", drop=dmg)
+        _cast_pause()
+        game.message(
+            f"[{style_tag}]The {en} {verb}! ({dmg} {spell.damage_type} damage)[/{style_tag}]",
+            drop=dmg,
+        )
         target.health -= dmg
         if target.health <= 0:
             game.on_enemy_death(target)
         elif spell.status:
             target.status.add(spell.status["effect"], spell.status.get("duration", 4), spell.status.get("potency", 1))
     else:
-        game.message(f"[action]You cast {style_text(spell.name, 'item')}! The {en} is struck.[/action]")
+        _cast_pause()
+        game.message(f"[{style_tag}]The {en} is struck.[/{style_tag}]")
 
 
 def _touch(spell, player, game, target, mult):
@@ -170,19 +195,17 @@ def _touch(spell, player, game, target, mult):
         game.message("No target in range.")
         return
     en = style_text(target.name, "enemy")
-    dmg_text = {
-        "cold": "is frozen solid",
-        "fire": "is seared",
-        "lightning": "is electrocuted",
-        "poison": "is poisoned",
-        "force": "is blasted",
-    }
-    verb = dmg_text.get(spell.damage_type, "is struck")
+    style_tag, verb = _DAMAGE_STYLE.get(spell.damage_type, ("arcane", "strikes"))
     if spell.damage:
         lo, hi = spell.damage
         raw = random.randint(lo, hi)
         dmg = max(1, int(raw * mult))
-        game.message(f"[action]You cast {style_text(spell.name, 'item')}! The {en} {verb}.[/action]", drop=dmg)
+        game.message(f"[action]You reach for the {en} with {style_text(spell.name, 'item')}![/action]")
+        _cast_pause()
+        game.message(
+            f"[{style_tag}]The {en} {verb}! ({dmg} {spell.damage_type} damage)[/{style_tag}]",
+            drop=dmg,
+        )
         target.health -= dmg
         if target.health <= 0:
             game.on_enemy_death(target)
@@ -190,41 +213,79 @@ def _touch(spell, player, game, target, mult):
         target.status.add(spell.status["effect"], spell.status.get("duration", 4), spell.status.get("potency", 1))
         status_verb = {"slow": "slows to a crawl", "confusion": "reels in confusion", "poison": "is poisoned", "burn": "catches fire", "petrify": "begins to turn to stone"}
         sv = status_verb.get(spell.status["effect"], f"is afflicted by {spell.status['effect']}")
-        game.message(f"[action]The {en} {sv}![/action]")
+        game.message(f"[{style_tag}]The {en} {sv}![/{style_tag}]")
+
+
+def start_channel(spell, player, game, target) -> bool:
+    """Begin a new channeled spell: lock target, charge MP, roll miscast once, fire first tick."""
+    player._channel_targets[spell.name] = target
+    if not resolve_cast(spell, player, game, target):
+        player._channel_targets.pop(spell.name, None)
+        player._channeling.pop(spell.name, None)
+        return False
+    return True
+
+
+def continue_channel(spell, player, game) -> bool:
+    """Advance an active channel: no MP, no miscast, fires next tick on the locked target."""
+    if spell.name not in player._channeling:
+        return False
+    target = player._channel_targets.get(spell.name)
+    if target is None or getattr(target, "health", 0) <= 0:
+        player._channeling.pop(spell.name, None)
+        player._channel_targets.pop(spell.name, None)
+        game.message(f"[action]Your {style_text(spell.name, 'item')} snaps off — nothing to strike.[/action]")
+        return False
+    player.skills.record("Spellcasting")
+    for school in spell.schools:
+        player.skills.record(school)
+    mult = staff_damage_multiplier(spell, player)
+    _channel(spell, player, game, target, mult)
+    return True
 
 
 def _channel(spell, player, game, target, mult):
+    """Advance a channeled spell by one tick. Caller handles MP/miscast/start state."""
     key = spell.name
-    if key not in player._channeling:
-        player._channeling[key] = 1
-        game.message(f"[action]You begin channelling {style_text(spell.name, 'item')}...[/action]")
+    total = max(1, int(spell.extra.get("channel_turns", 3)))
+    tick = player._channeling.get(key, 0) + 1
+    player._channeling[key] = tick
+    if not target or not spell.damage:
+        if target is None and tick == 1:
+            game.message(f"[warn]{style_text(spell.name, 'item')} has nothing to strike.[/warn]")
         return
-    turns = player._channeling[key]
-    if turns >= spell.extra.get("channel_turns", 3):
+    en = style_text(target.name, "enemy")
+    style_tag, _verb = _DAMAGE_STYLE.get(spell.damage_type, ("arcane", "strikes"))
+    lo, hi = spell.damage
+    raw = random.randint(lo, hi)
+    bonus = tick - 1  # +0 on first tick, +1 on second, +2 on third
+    dmg = max(1, int((raw + bonus) * mult))
+    game.message(
+        f"[{style_tag}]The {style_text(spell.name, 'item')} sears the {en}! "
+        f"(tick {tick}/{total}, {dmg} damage)[/{style_tag}]",
+        drop=dmg,
+    )
+    target.health -= dmg
+    if target.health <= 0:
+        game.on_enemy_death(target)
+    if tick >= total:
         player._channeling.pop(key, None)
-        game.message(f"[action]The {style_text(spell.name, 'item')} fades.[/action]")
-        return
-    player._channeling[key] = turns + 1
-    if target and spell.damage:
-        en = style_text(target.name, "enemy")
-        lo, hi = spell.damage
-        raw = random.randint(lo, hi)
-        bonus = turns  # each turn adds +1 damage
-        dmg = max(1, int((raw + bonus) * mult))
-        game.message(f"[action]The {style_text(spell.name, 'item')} sears the {en}! (turn {turns + 1})[/action]", drop=dmg)
-        target.health -= dmg
-        if target.health <= 0:
-            game.on_enemy_death(target)
+        player._channel_targets.pop(key, None)
+        game.message(
+            f"[{style_tag}]{style_text(spell.name, 'item')} flares and releases its power.[/{style_tag}]"
+        )
 
 
 def _self_teleport(spell, player, game):
     py, px = player.location
     visible = [(y, x) for y, x in game.map.visible if game.map.matrix[y][x].walkable and (y, x) != (py, px)]
     if visible:
+        game.message(f"[action]You reach out with {style_text(spell.name, 'item')}![/action]")
+        _cast_pause()
         ny, nx = random.choice(visible)
         player.location = (ny, nx)
         game.map.update_fov()
-        game.message(f"[action]You cast {style_text(spell.name, 'item')}! You blink across the floor.[/action]")
+        game.message(f"[action]You fold space and step through a crack in reality.[/action]")
     else:
         game.message("[warn]Nowhere to blink to![/warn]")
 
@@ -294,7 +355,9 @@ def _summon(spell, player, game):
     summon.awake = True
     game.map.place_occupant(summon, ny, nx)
     game.map.summon.append(summon)
-    game.message(f"[action]You cast {style_text(spell.name, 'item')}! A {d.name} appears beside you.[/action]")
+    game.message(f"[action]You trace a summoning sigil; a small creature scurries into being.[/action]")
+    _cast_pause()
+    game.message(f"[action]A {style_text(d.name, 'enemy')} appears beside you.[/action]")
 
 
 def _ignite_flora(spell, player, game, mult):

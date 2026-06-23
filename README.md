@@ -17,19 +17,38 @@ floors, and escape back to the surface alive.
 - **Level & XP system** - kill monsters to gain XP, levels, more HP, and better attacks
 - **Ranged combat** - bows, crossbow, sling with an on-map aiming cursor
 - **Spellcasting** - 21 spells across 8 schools (Conjuration, Fire Magic, Ice Magic, Earth Magic, Poison Magic, Summoning, Translocation, Transmutation); staves boost matching schools
-- **Status effects** - poison, regeneration, might, haste, slow, confusion for player and monsters
+- **Attack delay** - DCSS-style swing times (Daggers swing twice as fast as Battleaxes); weapon skill reduces delay toward a per-weapon minimum
+- **Status effects** - poison, regeneration, might, haste, slow, confusion, silence, see-invisible, vulnerability, inner flame for player and monsters
 - **Traps** - hidden dart, poison, teleport, and alarm traps revealed by searching (`s`)
 - **Item identification** - potions and scrolls start unidentified; discover them by using
 - **Autoexplore** (`o`) - auto-walk until a monster appears
 - **Diagonal movement** - 8-direction player movement and monster pathfinding
 
+### ⚔️ Items, Brands & Enchantment
+- **15 weapon brands** with per-floor tier availability (Venom/Protection early → Flaming/Freezing/Electrocution mid → Vampiric/Spectral/Heavy late → Speed/Antimagic/Chaos endgame)
+- **7 armour egos** (Stealth, rF+, rC+, Will+, SInv, Archery, Parrying) - similar per-floor tier system
+- **Unified enchantment system** - weapons and armour spawn with +0 to +5 natural enchantment based on floor tier; +1 per scroll of enchant up to +9
+- **Scroll of Brand Weapon** applies a random brand to a chosen weapon (refuses magical staves and already-branded weapons)
+- **Sacred Scourge** - the holy flail that actually works: +50% damage vs undead, +25% vs demonic
+- **Holy Wrath brand** - +75% damage vs undead and demonic enemies
+- **Holiness tags** - Skeleton/Zombie/Wraith (undead), Imp/Demon (demonic); visible in the examine panel
+
+### 📜 19 Scrolls (DCSS-style)
+- **Very Common:** Identification
+- **Common:** Teleportation
+- **Uncommon:** Amnesia, Blinking, Butterflies, Enchant Armour, Enchant Weapon, Fear, Fog, Immolation, Noise, Revelation, Silence, Summoning, Vulnerability
+- **Rare:** Brand Weapon, Poison, Torment
+- **Very Rare:** Acquirement
+- All scrolls are unidentified until read; Scroll of Identification reveals an unknown item; reading a scroll consumes it (unless its target was impossible, in which case it's preserved)
+
 ### 🗺️ Dynamic World Generation
 - **Three level generators** - rooms-and-corridors, cellular automata caves, BSP layouts
 - **Variable map sizes** - floors average ~70×70 with scrolling player-centred view
 - **7 terrain types** with 3 floor features (shrubs, mushrooms, rubble)
-- **Biome themes** - each floor generates a unique AI-assisted setting (volcanic rift, fungal depths, sacred shrine, etc.)
+- **Biome themes** - each floor generates a unique AI-assisted setting (volcanic rift, fungal depths, sacred shrine, etc.) with hand-crafted fallback biomes when the LLM is disabled
 - **Secret doors** and **hidden vault rooms**
 - **Temples** - pillared chambers guarded by monsters but holding treasure
+- **Fog of war** - Scroll of Fog spreads a screen-blocking cloud
 
 ### 🤖 AI-Powered Features
 *All AI features are optional - the game runs perfectly without any configuration.*
@@ -42,13 +61,13 @@ floors, and escape back to the surface alive.
 Configure via `.env` (see [INSTRUCTIONS.md](INSTRUCTIONS.md) for details).
 
 ### 💾 Save & Restore
-- **Save anytime** with `S` — preserves full game state: player, inventory, equipment, all floors, enemies, NPCs, and floor themes
+- **Save anytime** with `S` — preserves full game state: player, inventory, equipment, all floors, enemies, NPCs, floor themes, brand/ego/enchant/holiness/silence/fog state
 - **Resume** on next launch by pressing `R` at the splash screen
-- Game state persists to `savegame.json`
+- Game state persists to `savegame.json` (v2 format; v1 saves gracefully rejected)
 
 ### 🏪 NPCs & Items
 - **4 NPC types** - Chemist, Blacksmith, Merchant, Healer with unique shops
-- **10+ weapons**, 4 staves, potions, scrolls, spellbooks, gold
+- **50+ weapons**, 5 staves, potions, scrolls, spellbooks, gold
 - **Hidden wares** - NPCs have a base stock plus randomised extra items
 
 ## How to play
@@ -61,6 +80,12 @@ At the start you choose a **class** from 12 options (Fighter, Hunter, Acolyte, W
 its own starting kit, spells, skills and health. Killing monsters grants **XP and levels** (more HP and
 better attacks).
 
+Items spawn with a natural enchantment level that scales with depth. Use Scrolls of Enchant
+Weapon/Armour strategically - early enchantments are wasted on weak bases; hoard them
+until you find a +3 or better base, then burn them all to hit the +9 cap. Scrolls of Brand
+Weapon ignore the tier system (use them on your endgame weapon to roll for Speed or
+Vampiric).
+
 | Key | Action |
 | --- | --- |
 | arrow keys or `h` `j` `k` `l` | move - walk into a monster to attack it |
@@ -71,16 +96,19 @@ better attacks).
 | `i` / `d` | use / equip / unequip / drink / read / drop items from your pack |
 | `>` / `<` | take stairs down / up |
 | `s` | search adjacent tiles for secret doors and traps |
+| `x` | examine mode (cursor over a tile to read full details) |
 | `S` | save game (`R` to restore on next launch) |
 | `.` or space | wait one turn |
 | `p` | pause · `?` | help · `esc` | quit |
-
+ 
 The dungeon is full of doors (`+`), gold (`$`), potions (`!`), scrolls (`?`), weapons
 (`)`), hidden vault rooms, **traps** (`^`), and traders - Chemists, Blacksmiths, Merchants
 and Healers - who can outfit you for the journey down. Potions and scrolls start
 **unidentified** until you use them; some potions grant status effects (Might, Speed,
-Regeneration, Curing) and some monsters poison or slow you. Combat resolves in the message
-log as you bump into foes; keep an eye on your HP bar and the status line.
+Regeneration, Curing) and some monsters poison or slow you. Weapons can be branded with
+elemental effects (Flaming, Freezing, Electrocution) and armour can spawn with ego
+properties (rF+, Stealth, SInv). Combat resolves in the message log as you bump into foes;
+keep an eye on your HP bar and the status line.
 
 ## Instructions
 

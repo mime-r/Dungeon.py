@@ -88,12 +88,14 @@ def generate_level(
     layout_hint: str = "any",
     structures: list | None = None,
     terrain_features: list | None = None,
+    water_density: str = "small",
 ) -> LevelLayout:
     """Pick a random generator and produce one floor.
 
     Deeper floors are more likely to use complex layouts and are slightly larger.
     layout_hint biases algorithm selection: "cave" | "rooms" | "bsp" | "any".
     structures / terrain_features are LLM-supplied biome hints passed to scenery generation.
+    water_density controls ambient pond size: "small" | "medium" | "large".
     """
     w = random.randint(config.map.min_width, config.map.max_width)
     h = random.randint(config.map.min_height, config.map.max_height)
@@ -104,16 +106,17 @@ def generate_level(
     choice = random.choices(list(weights.keys()), weights=list(weights.values()), k=1)[0]
 
     if choice == "cave":
-        return _generate_cave(w, h, is_last, structures=structures, terrain_features=terrain_features)
+        return _generate_cave(w, h, is_last, structures=structures, terrain_features=terrain_features, water_density=water_density)
     if choice == "bsp":
-        return _generate_bsp(w, h, is_last, structures=structures, terrain_features=terrain_features)
-    return _generate_rooms(w, h, is_last, structures=structures, terrain_features=terrain_features)
+        return _generate_bsp(w, h, is_last, structures=structures, terrain_features=terrain_features, water_density=water_density)
+    return _generate_rooms(w, h, is_last, structures=structures, terrain_features=terrain_features, water_density=water_density)
 
 
 # ------------------------------------------------------------ rooms & corridors
 
 def _generate_rooms(w: int, h: int, is_last: bool,
-                    structures=None, terrain_features=None) -> LevelLayout:
+                    structures=None, terrain_features=None,
+                    water_density: str = "small") -> LevelLayout:
     """Classic rooms-and-corridors with a mix of rectangular and oval rooms."""
     grid = [[T.WALL for _ in range(w)] for _ in range(h)]
     layout = LevelLayout(w, h)
@@ -142,14 +145,16 @@ def _generate_rooms(w: int, h: int, is_last: bool,
     layout.terrain = grid
     layout.rooms = rooms
     _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h,
-                            structures=structures, terrain_features=terrain_features)
+                            structures=structures, terrain_features=terrain_features,
+                            water_density=water_density)
     return layout
 
 
 # ---------------------------------------------------------- cellular automata
 
 def _generate_cave(w: int, h: int, is_last: bool,
-                   structures=None, terrain_features=None) -> LevelLayout:
+                   structures=None, terrain_features=None,
+                   water_density: str = "small") -> LevelLayout:
     """Organic cave system via cellular automata with noise caverns."""
     grid = [[T.WALL for _ in range(w)] for _ in range(h)]
     layout = LevelLayout(w, h)
@@ -215,7 +220,8 @@ def _generate_cave(w: int, h: int, is_last: bool,
 
     _place_cave_vault(layout, grid, interior_floor, is_last, w, h)
     _scatter_scenery(layout, grid, w, h,
-                     structures=structures, terrain_features=terrain_features)
+                     structures=structures, terrain_features=terrain_features,
+                     water_density=water_density)
     _build_floor_cells(layout, grid, w, h)
     return layout
 
@@ -231,7 +237,8 @@ class _BSPNode:
 
 
 def _generate_bsp(w: int, h: int, is_last: bool,
-                  structures=None, terrain_features=None) -> LevelLayout:
+                  structures=None, terrain_features=None,
+                  water_density: str = "small") -> LevelLayout:
     """BSP-based layout: tree of partitions generates varied, interlocking rooms."""
     grid = [[T.WALL for _ in range(w)] for _ in range(h)]
     layout = LevelLayout(w, h)
@@ -253,7 +260,8 @@ def _generate_bsp(w: int, h: int, is_last: bool,
     layout.terrain = grid
     layout.rooms = rooms
     _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h,
-                            structures=structures, terrain_features=terrain_features)
+                            structures=structures, terrain_features=terrain_features,
+                            water_density=water_density)
     return layout
 
 
@@ -323,7 +331,8 @@ def _bsp_leaf_center(node: _BSPNode) -> tuple[int, int] | None:
 # ------------------------------------------------------------ shared utilities
 
 def _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h,
-                            structures=None, terrain_features=None) -> None:
+                            structures=None, terrain_features=None,
+                            water_density: str = "small") -> None:
     if not rooms:
         return
     layout.stairs_up = rooms[0].center
@@ -359,7 +368,8 @@ def _place_stairs_and_vault(layout, grid, rooms, interior_floor, is_last, w, h,
             _carve_temple(layout, grid, random.choice(candidates))
 
     _scatter_scenery(layout, grid, w, h,
-                     structures=structures, terrain_features=terrain_features)
+                     structures=structures, terrain_features=terrain_features,
+                     water_density=water_density)
     _build_floor_cells(layout, grid, w, h)
 
 
@@ -497,6 +507,7 @@ def _scatter_scenery(
     h: int,
     structures: list | None = None,
     terrain_features: list | None = None,
+    water_density: str = "small",
 ) -> None:
     """Post-process the grid: add ponds, trees, grass/mud, floor features, then structures."""
     protected: set[tuple[int, int]] = set()
@@ -508,7 +519,7 @@ def _scatter_scenery(
     if layout.altar:
         protected.update(_near(layout.altar[0], layout.altar[1], 2, w, h))
 
-    _place_ponds(layout, grid, protected, w, h)
+    _place_ponds(layout, grid, protected, w, h, water_density=water_density)
     _place_trees(layout, grid, protected, w, h)
     _place_grass_and_mud(layout, grid, protected, w, h)
     _place_floor_features(layout, grid, protected, w, h)
@@ -528,14 +539,28 @@ def _near(cy: int, cx: int, r: int, w: int, h: int) -> set[tuple[int, int]]:
     }
 
 
-def _place_ponds(layout: LevelLayout, grid, protected: set, w: int, h: int) -> None:
-    """Carve small ponds inside qualifying rooms (never in corridors)."""
+def _place_ponds(layout: LevelLayout, grid, protected: set, w: int, h: int,
+                  water_density: str = "small") -> None:
+    """Carve ambient ponds inside qualifying rooms (never in corridors).
+
+    water_density controls the pool radius and deep-water extent:
+      - small  (default): 3x3, 1 deep center + 8 shallow ring
+      - medium          : 5x5, 3x3 deep center + shallow ring
+      - large           : 7x7, 3x3 deep center + 25-tile shallow ring
+    Larger densities require bigger rooms to fit the pool.
+    """
     if not layout.rooms:
         return  # Cave maps have no rooms; corridors are irregular — skip ponds
 
+    if water_density not in ("small", "medium", "large"):
+        water_density = "small"
+    # Larger pools need bigger rooms — guard against cramped placements.
+    # The room's 2-cell-margin interior is what the pool must fit inside.
+    min_w, min_h = {"small": (7, 5), "medium": (9, 7), "large": (11, 9)}[water_density]
+
     eligible = [
         r for r in layout.rooms
-        if r.w >= 9 and r.h >= 7 and (r.cy, r.cx) not in protected
+        if r.w >= min_w and r.h >= min_h and (r.cy, r.cx) not in protected
     ]
     if not eligible:
         return
@@ -551,17 +576,29 @@ def _place_ponds(layout: LevelLayout, grid, protected: set, w: int, h: int) -> N
             for x in range(room.x + 2, room.x + room.w - 2)
             if (y, x) not in protected and grid[y][x] == T.FLOOR
         }
-        _carve_room_pond(grid, room.cy, room.cx, inner)
+        _carve_room_pond(grid, room.cy, room.cx, inner, water_density)
 
 
-def _carve_room_pond(grid, cy: int, cx: int, inner: set) -> None:
-    """Replace cells in *inner* near (cy, cx) with deep/shallow water."""
+# (outer_shallow_radius, inner_deep_radius)
+_POND_GEOMETRY: dict[str, tuple[float, float]] = {
+    "small": (1.5, 0.5),
+    "medium": (2.5, 1.5),
+    "large": (3.5, 1.5),
+}
+
+
+def _carve_room_pond(grid, cy: int, cx: int, inner: set, size: str = "small") -> None:
+    """Replace cells in *inner* near (cy, cx) with deep/shallow water.
+
+    size: 'small' (3x3, 1 deep) | 'medium' (5x5, 9 deep) | 'large' (7x7, 9 deep)
+    """
+    outer_r, inner_r = _POND_GEOMETRY.get(size, (1.5, 0.5))
     for (ny, nx) in inner:
         dy, dx = ny - cy, nx - cx
         dist = math.sqrt(dy * dy + dx * dx)
-        if dist <= 0.5:
+        if dist <= inner_r:
             grid[ny][nx] = T.DEEP_WATER
-        elif dist <= 1.5:
+        elif dist <= outer_r:
             grid[ny][nx] = T.SHALLOW_WATER
 
 
@@ -940,24 +977,38 @@ def _place_structures(layout: LevelLayout, grid, protected: set, w: int, h: int,
 _TERRAIN_FEATURE_MAP: dict[str, str] = {
     "lava_pools": T.LAVA,
     "chasms": T.CHASM,
+    "water_pools": T.SHALLOW_WATER,
+}
+
+_POOL_GEOMETRY: dict[str, tuple[float, float]] = {
+    # feat -> (outer_shallow_radius, inner_deep_radius)
+    "lava_pools": (1.5, 0.0),
+    "chasms": (1.5, 0.0),
+    "water_pools": (3.5, 1.5),
 }
 
 
 def _apply_terrain_features(layout: LevelLayout, grid, protected: set, w: int, h: int,
                              terrain_features: list) -> None:
-    """Place lava pools or chasms in qualifying rooms per LLM terrain hints."""
+    """Place lava pools, chasms, or biome-scale water pools in qualifying rooms."""
     if not layout.rooms:
         return
     for feat in terrain_features:
         terrain_type = _TERRAIN_FEATURE_MAP.get(feat)
         if not terrain_type:
             continue
+        outer_r, inner_r = _POOL_GEOMETRY.get(feat, (1.5, 0.0))
         candidates = [
             r for r in layout.rooms
             if r.w >= 7 and r.h >= 6 and (r.cy, r.cx) not in protected
         ]
         if not candidates:
             continue
+        # Water pools need bigger rooms to fit a deeper pool
+        if feat == "water_pools":
+            wide = [r for r in candidates if r.w >= 10 and r.h >= 8]
+            if wide:
+                candidates = wide
         room = random.choice(candidates)
         cy, cx = room.cy, room.cx
         inner = {
@@ -967,7 +1018,11 @@ def _apply_terrain_features(layout: LevelLayout, grid, protected: set, w: int, h
             if (y, x) not in protected and grid[y][x] == T.FLOOR
         }
         for (ny, nx) in inner:
-            if math.sqrt((ny - cy) ** 2 + (nx - cx) ** 2) <= 1.5:
+            dist = math.sqrt((ny - cy) ** 2 + (nx - cx) ** 2)
+            if dist <= inner_r and inner_r > 0:
+                grid[ny][nx] = T.DEEP_WATER
+                protected.add((ny, nx))
+            elif dist <= outer_r:
                 grid[ny][nx] = terrain_type
                 protected.add((ny, nx))
 

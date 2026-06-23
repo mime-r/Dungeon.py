@@ -15,6 +15,12 @@ EFFECT_STYLE = {
     "slow": ("Slow", "slow", "Slo"),
     "confusion": ("Confused", "confusion", "Cnf"),
     "petrify": ("Petrified", "petrify", "Ptr"),
+    "silence": ("Silenced", "warn", "Sil"),
+    "fear": ("Afraid", "warn", "Afr"),
+    "inner_flame": ("Inner Flame", "fire", "Flam"),
+    "vulnerable": ("Vulnerable", "fail", "Vul"),
+    "see_invisible": ("See Invis", "haste", "Eye"),
+    "ac_buff": ("Warded", "haste", "Wrd"),
 }
 
 
@@ -73,6 +79,10 @@ class StatusSet:
                 actor.health -= dmg
                 if is_player:
                     game.message(f"[burn]You are seared for {dmg} fire damage.[/burn]")
+            elif name == "inner_flame":
+                # Inner Flame: detonates on death (handled in on_enemy_death /
+                # on_summon_death / on_player_death), not on the per-tick loop.
+                pass
             elif name == "regen":
                 healed = min(actor.max_health - actor.health, eff["potency"])
                 if healed > 0:

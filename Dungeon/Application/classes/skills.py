@@ -55,8 +55,12 @@ _WEAPON_SKILL_MAP = {
     "Quarterstaff": "Staves",
     "Training Staff": "Staves",
     "Lajatang": "Staves",
+    "Magic Staff": "Staves",
     "Staff of Earth": "Staves",
     "Staff of Flame": "Staves",
+    "Staff of Frost": "Staves",
+    "Staff of Venom": "Staves",
+    "Staff of Lightning": "Staves",
     "Staff of Air": "Staves",
     # Ranged
     "Sling": "Ranged",
@@ -75,6 +79,97 @@ _WEAPON_SKILL_MAP = {
 
 def skill_for_weapon(name: str) -> str | None:
     return _WEAPON_SKILL_MAP.get(name)
+
+
+# Default attack delay per weapon skill category (DCSS: higher = slower swing).
+# These are sensible midpoints that match DCSS feel without per-weapon JSON churn.
+_SKILL_DEFAULT_DELAY: dict[str | None, int] = {
+    None: 5,              # Fists — fast
+    "Short Blades": 8,    # Dagger, Quick Blade, Rapier
+    "Staves": 11,         # Quarterstaff, Lajatang
+    "Maces & Flails": 13, # Mace, Flail, Morningstar
+    "Long Blades": 14,    # Short Sword through Great Sword
+    "Axes": 15,           # Hand Axe through Battleaxe
+    "Polearms": 16,       # Spear, Trident, Halberd
+    "Ranged": 12,         # Bows + crossbows (varies by specific weapon)
+}
+
+
+def default_delay_for_weapon(name: str) -> int:
+    """Return a sensible default attack delay (in energy units) for a weapon by name.
+
+    Falls back to the skill category default, then 10 (TURN) as a last resort.
+    Special-case overrides apply for known outliers (Quick Blade, Rapier, etc.)
+    so the JSON doesn't have to be touched for every weapon.
+    """
+    # Per-weapon overrides (DCSS timing tuned for outliers).
+    overrides = {
+        "Fists": 5,
+        "Dagger": 8,
+        "Quick Blade": 7,
+        "Rapier": 10,
+        "Whip": 8,
+        "Demon Whip": 8,
+        "Short Sword": 11,
+        "Scimitar": 13,
+        "Long Sword": 14,
+        "Great Sword": 17,
+        "Double Sword": 16,
+        "Triple Sword": 19,
+        "Hand Axe": 13,
+        "Broad Axe": 15,
+        "Battleaxe": 17,
+        "War Axe": 16,
+        "Executioner's Axe": 19,
+        "Spear": 12,
+        "Trident": 13,
+        "Halberd": 15,
+        "Glaive": 17,
+        "Bardiche": 18,
+        "Partisan": 13,
+        "Trishula": 14,
+        "Sling": 10,
+        "Short Bow": 11,
+        "Long Bow": 13,
+        "Orcbow": 14,
+        "Crossbow": 15,
+        "Hand Crossbow": 13,
+        "Arbalest": 19,
+        "Hand Cannon": 23,
+        "Triple Crossbow": 25,
+        "Quarterstaff": 11,
+        "Lajatang": 13,
+        "Club": 13,
+        "Mace": 13,
+        "Flail": 14,
+        "Morningstar": 14,
+        "Dire Flail": 15,
+        "Eveningstar": 15,
+        "Great Mace": 16,
+        "Giant Club": 17,
+        "Giant Spiked Club": 19,
+        "Sacred Scourge": 12,
+        # Magical staves: slower than ordinary staves (DCSS ~12).
+        "Magic Staff": 12,
+        "Staff of Earth": 12,
+        "Staff of Flame": 12,
+        "Staff of Frost": 12,
+        "Staff of Venom": 12,
+        "Staff of Lightning": 12,
+        # Artefacts / uniques get tuned individually.
+        "Sword of Zot": 11,
+        "Demon Blade": 13,
+        "Eudemon Blade": 13,
+    }
+    if name in overrides:
+        return overrides[name]
+    skill = _WEAPON_SKILL_MAP.get(name)
+    return _SKILL_DEFAULT_DELAY.get(skill, 10)
+
+
+def default_min_delay(delay: int) -> int:
+    """DCSS minimum delay: max(0.7, delay/2). In our integer energy units."""
+    return max(3, delay // 2)
 
 
 class Skill:

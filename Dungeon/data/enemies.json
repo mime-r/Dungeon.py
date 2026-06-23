@@ -96,6 +96,7 @@
         "attack_base": 3,
         "attack_range": [0, 2],
         "accuracy": 60,
+        "holiness": "undead",
         "texts": {
             "hit": "The {} rakes you with bony claws.",
             "death": "The {} clatters into a heap of bones."
@@ -114,6 +115,7 @@
         "attack_range": [0, 3],
         "accuracy": 55,
         "speed": 6,
+        "holiness": "undead",
         "texts": {
             "hit": "The {} claws at you, reeking of rot.",
             "death": "The {} collapses into foul sludge."
@@ -187,6 +189,7 @@
         "attack_base": 4,
         "attack_range": [0, 3],
         "accuracy": 70,
+        "holiness": "undead",
         "on_hit": { "effect": "slow", "chance": 40, "duration": 6 },
         "texts": {
             "hit": "The {} drains the warmth from your bones.",
@@ -330,6 +333,48 @@
             "hit": "The {} tears at you with flashing teeth.",
             "missed_hit": "The {} snaps past your face.",
             "death": "The {} dissolves into shadow."
+        }
+    },
+    {
+        "name": "Imp",
+        "symbol": "i",
+        "tier": "mid",
+        "depth": [3, 6],
+        "spawn_weight": 6,
+        "health_range": [8, 14],
+        "coin_drop_range": [1, 4],
+        "xp_drop": 4,
+        "attack_base": 3,
+        "attack_range": [1, 4],
+        "accuracy": 65,
+        "holiness": "demonic",
+        "on_hit": { "effect": "burn", "chance": 35, "duration": 3, "potency": 1 },
+        "texts": {
+            "critical_hit": "The {} cackles as hellfire licks your skin!",
+            "hit": "The {}'s claws rake you, trailing embers.",
+            "missed_hit": "The {} darts back with a fiendish grin.",
+            "death": "The {} pops into a puff of brimstone."
+        }
+    },
+    {
+        "name": "Demon",
+        "symbol": "D",
+        "tier": "strong",
+        "depth": [5, 8],
+        "spawn_weight": 5,
+        "health_range": [18, 28],
+        "coin_drop_range": [3, 8],
+        "xp_drop": 9,
+        "attack_base": 5,
+        "attack_range": [1, 5],
+        "accuracy": 70,
+        "holiness": "demonic",
+        "on_hit": { "effect": "burn", "chance": 30, "duration": 4, "potency": 2 },
+        "texts": {
+            "critical_hit": "The {} tears into you, leaving a blazing wound!",
+            "hit": "The {} rends you with claws of black iron.",
+            "missed_hit": "The {}'s blow whistles past your head.",
+            "death": "The {} roars and crumbles into ash and cinder."
         }
     }
 ]

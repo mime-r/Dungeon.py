@@ -56,6 +56,7 @@ class DungeonEnemy:
         attack_distance: int = 1,
         on_hit: dict | None = None,
         speed: int = 10,
+        holiness: str = "natural",
     ) -> None:
         self.name = name
         self.symbol = symbol
@@ -78,6 +79,9 @@ class DungeonEnemy:
         self.status = StatusSet()
         self.energy = 0
         self.speed = speed
+        # "natural" | "undead" | "demonic" | "holy". Affects holy_wrath brand
+        # and the Sacred Scourge weapon.
+        self.holiness = holiness
 
     @property
     def y(self) -> int:
@@ -250,4 +254,5 @@ class DungeonEnemyLoader:
             attack_distance=getattr(d, "attack_distance", getattr(d, "range", 1)),
             on_hit=getattr(d, "on_hit", None),
             speed=getattr(d, "speed", 10),
+            holiness=getattr(d, "holiness", "natural"),
         )

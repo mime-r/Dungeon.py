@@ -1,0 +1,35 @@
+{
+  "skills": [
+    "Fighting",
+    "Maces & Flails",
+    "Axes",
+    "Long Blades",
+    "Short Blades",
+    "Polearms",
+    "Staves",
+    "Ranged",
+    "Throwing",
+    "Armour",
+    "Shields",
+    "Dodging",
+    "Stealth",
+    "Spellcasting",
+    "Conjuration",
+    "Fire Magic",
+    "Ice Magic",
+    "Earth Magic",
+    "Air Magic",
+    "Poison Magic",
+    "Transmutation",
+    "Translocation",
+    "Summoning"
+  ],
+  "cross_training": {
+    "Maces & Flails": ["Axes"],
+    "Axes": ["Maces & Flails"],
+    "Long Blades": ["Short Blades"],
+    "Short Blades": ["Long Blades"],
+    "Polearms": ["Staves"],
+    "Staves": ["Polearms"]
+  }
+}

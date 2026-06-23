@@ -23,7 +23,8 @@ def item_detail(item) -> str:
     if isinstance(item, DungeonWeapon):
         lo, hi = item.attack_range
         hands = f"{item.hands}-handed"
-        return f"Atk {item.base_attack} (+{lo}-{hi}), {item.accuracy}% acc, {hands}"
+        ench = getattr(item, "enchant", 0)
+        return f"Atk {item.base_attack + ench} (+{lo}-{hi}), {item.accuracy + ench}% acc, {hands}"
     if isinstance(item, DungeonPotion):
         return f"heals +{item.hp_change} HP"
     if isinstance(item, DungeonScroll):
@@ -31,7 +32,8 @@ def item_detail(item) -> str:
     if isinstance(item, DungeonInventory):
         return f"+{item.inventory} pack slots"
     if isinstance(item, DungeonArmour):
-        stat = f"SH {item.sh}" if item.slot == "shield" else f"AC {item.ac}"
+        ench = getattr(item, "enchant", 0)
+        stat = f"SH {item.sh + ench}" if item.slot == "shield" else f"AC {item.ac + ench}"
         enc = f", enc {item.encumbrance}" if item.encumbrance else ""
         return f"{stat}{enc} ({item.slot})"
     if isinstance(item, DungeonShard):
@@ -431,6 +433,149 @@ class DungeonMenu:
         idx = self._read_index(len(items))
         return None if idx is None else items[idx]
 
+    # --- amnesia (choose a memorised spell to forget) ------------------
+    def choose_spell_to_forget(self):
+        """Let the player pick one memorised spell to forget. Returns spell or None."""
+        game, player = self.game, self.game.player
+        spells = player.known_spells
+        if not spells:
+            return None
+        clear_screen()
+        game.print("[menu_header]Forget which spell?[/menu_header]\n", highlight=False)
+        table = Table(expand=False, border_style="grey37")
+        table.add_column("#", style="controls", justify="right")
+        table.add_column("Spell", style="item")
+        table.add_column("Schools", style="flavor")
+        table.add_column("Level", style="level", justify="right")
+        for i, sp in enumerate(spells, 1):
+            schools = " / ".join(sp.schools)
+            table.add_row(str(i), sp.name, schools, str(sp.level))
+        game.print(table)
+        game.print(f"\n{style_text('number', 'controls')} forget   "
+                   f"{style_text('esc', 'controls')} cancel", highlight=False)
+        idx = self._read_index(len(spells))
+        return None if idx is None else spells[idx]
+
+    # --- enchant weapon / enchant armour -------------------------------
+    def choose_enchantable_weapon(self, exclude=None):
+        """Pick a weapon in the player's pack. Returns weapon or None."""
+        game, player = self.game, self.game.player
+        items = [it for it in player.inventory
+                 if isinstance(it, DungeonWeapon) and it is not exclude]
+        if not items:
+            return None
+        clear_screen()
+        game.print("[menu_header]Enchant which weapon?[/menu_header]\n", highlight=False)
+        table = Table(expand=False, border_style="grey37")
+        table.add_column("#", style="controls", justify="right")
+        table.add_column("Item", style="item")
+        table.add_column("Enchant", style="level", justify="right")
+        for i, it in enumerate(items, 1):
+            ench = getattr(it, "enchant", 0)
+            ench_str = f"+{ench}" if ench >= 0 else str(ench)
+            table.add_row(str(i), self._name(it), ench_str)
+        game.print(table)
+        game.print(f"\n{style_text('number', 'controls')} select   "
+                   f"{style_text('esc', 'controls')} cancel", highlight=False)
+        idx = self._read_index(len(items))
+        return None if idx is None else items[idx]
+
+    def choose_enchantable_armour(self, exclude=None):
+        """Pick a body armour or shield in the player's pack."""
+        game, player = self.game, self.game.player
+        items = [it for it in player.inventory
+                 if isinstance(it, DungeonArmour)
+                 and it.slot in ("body", "shield")
+                 and it is not exclude]
+        if not items:
+            return None
+        clear_screen()
+        game.print("[menu_header]Enchant which armour?[/menu_header]\n", highlight=False)
+        table = Table(expand=False, border_style="grey37")
+        table.add_column("#", style="controls", justify="right")
+        table.add_column("Item", style="item")
+        table.add_column("Slot", style="flavor")
+        table.add_column("AC", style="armour", justify="right")
+        table.add_column("Enchant", style="level", justify="right")
+        for i, it in enumerate(items, 1):
+            ench = getattr(it, "enchant", 0)
+            ench_str = f"+{ench}" if ench >= 0 else str(ench)
+            table.add_row(str(i), self._name(it), it.slot, str(it.ac), ench_str)
+        game.print(table)
+        game.print(f"\n{style_text('number', 'controls')} select   "
+                   f"{style_text('esc', 'controls')} cancel", highlight=False)
+        idx = self._read_index(len(items))
+        return None if idx is None else items[idx]
+
+    # --- blinking target ------------------------------------------------
+    def choose_blink_target(self):
+        """Pick a walkable, unoccupied, in-sight tile to blink to."""
+        game, player = self.game, self.game.player
+        py, px = player.location
+        candidates = [
+            (y, x) for (y, x) in game.map.visible
+            if game.map.matrix[y][x].walkable
+            and game.map.matrix[y][x].occupant is None
+            and (y, x) != (py, px)
+        ]
+        if not candidates:
+            return None
+        cursor = list(player.location)
+        game._show_examine(cursor)
+        game.render()
+        while True:
+            key = keys.read_key()
+            if key in (keys.ESC, "q"):
+                game._clear_examine()
+                return None
+            if key in (keys.ENTER, "z"):
+                target = tuple(cursor)
+                game._clear_examine()
+                if target in candidates:
+                    return target
+                return None
+            d = keys.read_direction(key)
+            if d:
+                from .map import DIRS
+                dy, dx = DIRS[d]
+                ny, nx = cursor[0] + dy, cursor[1] + dx
+                if game.map.in_bounds(ny, nx) and game._examine_reachable(ny, nx):
+                    cursor = [ny, nx]
+                    game._show_examine(cursor)
+                    game.render()
+                continue
+
+    # --- acquirement: pick one of three offered items -----------------
+    def choose_acquirement(self, offerings: list):
+        """Let the player pick one of three offered items (or take gold)."""
+        game = self.game
+        clear_screen()
+        game.print("[menu_header]Acquirement[/menu_header]\n", highlight=False)
+        game.print("[flavor]Three items appear before you, drawn from the dungeon.[/flavor]\n",
+                   highlight=False)
+        table = Table(expand=False, border_style="grey37")
+        table.add_column("#", style="controls", justify="right")
+        table.add_column("Item", style="item")
+        table.add_column("Detail", style="flavor")
+        for i, (item, detail) in enumerate(offerings, 1):
+            table.add_row(str(i), self._name(item), detail)
+        table.add_row("g", "[coin]500 gold[/coin]", "[flavor]a pile of treasure[/flavor]")
+        game.print(table)
+        game.print(f"\n{style_text('number', 'controls')} take   "
+                   f"{style_text('g', 'controls')} gold   "
+                   f"{style_text('esc', 'controls')} cancel", highlight=False)
+        while True:
+            key = keys.read_key()
+            if key in (keys.ESC, "q"):
+                return ("cancel",)
+            if key == "g":
+                return ("gold", 500)
+            if key.isdigit():
+                n = int(key)
+                if 1 <= n <= len(offerings):
+                    return ("item", offerings[n - 1][0])
+        # unreachable
+
     # --- ranged: choose which thrown item to use -----------------------
     def choose_throwable(self, throwables: list):
         """Let the player pick which throwable stack to fire when more than one exists."""
@@ -633,8 +778,8 @@ class DungeonMenu:
                 game.message(f"The healer tends your wounds. [heal](+{affordable_hp} HP)[/heal]")
 
     # --- spells ----------------------------------------------------------
-    def spell_ui(self) -> None:
-        """DCSS-style spell library screen."""
+    def spell_ui(self) -> bool:
+        """DCSS-style spell library screen. Returns True if a turn was spent."""
         game, player = self.game, self.game.player
         spells = player.known_spells
         if not spells:
@@ -643,7 +788,7 @@ class DungeonMenu:
             game.print("\nYou have not memorised any spells.", highlight=False)
             game.print(f"\nPress {style_text('esc', 'controls')} to return.", highlight=False)
             keys.read_key()
-            return
+            return False
 
         letters = "abcdefghijklmnopqrstuvwxyz"
         while True:
@@ -679,34 +824,106 @@ class DungeonMenu:
             game.print(table)
             game.print(
                 f"\n{style_text('letter', 'controls')} cast   "
+                f"{style_text('l + letter', 'controls')} describe   "
                 f"{style_text('esc', 'controls')} exit",
                 highlight=False,
             )
             key = keys.read_key()
             if key in (keys.ESC, "q"):
-                return
+                return False
+            if key == "l":
+                sub = keys.read_key()
+                if sub in letters:
+                    idx = letters.index(sub)
+                    if idx < len(spells):
+                        self._describe_spell(spells[idx])
+                continue
             if key in letters:
                 idx = letters.index(key)
                 if idx < len(spells):
-                    self._cast_spell(spells[idx])
-                    return
+                    return self._cast_spell(spells[idx])
 
     def _max_spell_slots(self, player) -> int:
         spellcasting = player.skills.get_level("Spellcasting") if player.skills else 0.0
         return int(3 + spellcasting * 0.5 + player.level * 0.3)
 
-    def _cast_spell(self, spell):
+    def _describe_spell(self, spell) -> None:
+        """Show full details for a spell: description, damage, status, MP cost."""
         game, player = self.game, self.game.player
+        clear_screen()
+        game.print(f"[menu_header]{spell.name}[/menu_header]\n", highlight=False)
+        if spell.description:
+            game.print(f"[flavor]{spell.description}[/flavor]\n", highlight=False)
+        failure = calculate_failure(spell, player)
+        staff = player.equipped
+        boosted = False
+        if staff:
+            ss = staff_school(staff.name)
+            if ss and (ss in spell.schools or ss == "Spellcasting"):
+                boosted = True
+        table = Table(expand=False, border_style="grey37")
+        table.add_column("Stat", style="controls")
+        table.add_column("Value", style="item")
+        table.add_row("Level", str(spell.level))
+        table.add_row("Schools", " / ".join(spell.schools))
+        table.add_row("MP Cost", str(spell.mp_cost))
+        table.add_row("Range", str(spell.range) if spell.range else "self")
+        if spell.damage:
+            lo, hi = spell.damage
+            table.add_row("Damage", f"{lo}-{hi} {spell.damage_type}")
+        if spell.status:
+            eff = spell.status.get("effect", "")
+            dur = spell.status.get("duration", 0)
+            pot = spell.status.get("potency", 1)
+            table.add_row("Status", f"{eff} (dur {dur}, power {pot})")
+        if spell.effect == "channel":
+            total = max(1, int(spell.extra.get("channel_turns", 3)))
+            table.add_row("Channel", f"{total} ticks (grows stronger each turn)")
+        elif spell.effect == "self_teleport":
+            table.add_row("Effect", "Teleport to random visible tile")
+        elif spell.effect == "summon":
+            st = spell.extra.get("summon_type", "?")
+            dur = spell.extra.get("duration", 0)
+            table.add_row("Summon", f"{st} for {dur} turns")
+        elif spell.effect == "ignite_flora":
+            table.add_row("Effect", "Ignites all visible plants")
+        elif spell.effect == "expanding_aoe":
+            r = spell.extra.get("radius", 0)
+            table.add_row("AOE", f"expanding ring (radius {r})")
+        elif spell.effect == "explosion":
+            r = spell.extra.get("radius", 0)
+            table.add_row("AOE", f"radius {r}")
+        fail_str = f"{failure:.0f}%"
+        if boosted:
+            fail_str += " *Staff Boosted*"
+        table.add_row("Failure", fail_str)
+        game.print(table)
+        game.print(f"\nPress {style_text('enter', 'controls')} to return.", highlight=False)
+        keys.read_key()
+
+    def _cast_spell(self, spell) -> bool:
+        """Cast a spell. Returns True if a turn was spent (caller should spend_turn)."""
+        game, player = self.game, self.game.player
+
+        if spell.effect == "channel" and spell.name in player._channeling:
+            from .magic import continue_channel
+            return continue_channel(spell, player, game)
+
+        # Silence aura / status blocks magic.
+        if game.map.silence_aura > 0 or player.status.has("silence"):
+            game.message(f"[fail]A heavy silence swallows the {spell.name}. The magic fizzles.[/fail]")
+            return False
+
         if player.mp < spell.mp_cost:
             game.message(f"[warn]You do not have enough MP to cast {spell.name}.[/warn]")
-            return
+            return False
 
         # Target selection if needed
         target = None
         if spell.effect in ("projectile", "explosion", "channel", "status_chain"):
             target = self._choose_spell_target(spell)
             if target is None:
-                return
+                return False
         elif spell.effect == "touch":
             py, px = player.location
             # Check adjacent enemies
@@ -721,7 +938,19 @@ class DungeonMenu:
                 target = adj[0]
             else:
                 game.message("[warn]No adjacent enemy to touch.[/warn]")
-                return
+                return False
+
+        if spell.effect == "channel":
+            from .magic import start_channel
+            player.mp -= spell.mp_cost
+            if player.skills:
+                for school in spell.schools:
+                    player.skills.record(school)
+                player.skills.record("Spellcasting")
+            ok = start_channel(spell, player, game, target)
+            if ok and spell.cast_text:
+                game.message(f"[flavor]{spell.cast_text}[/flavor]")
+            return ok
 
         from .magic import resolve_cast
         player.mp -= spell.mp_cost
@@ -735,6 +964,7 @@ class DungeonMenu:
                 game.message(f"[flavor]{spell.cast_text}[/flavor]")
             else:
                 game.message(f"[action]You cast {spell.name}.[/action]")
+        return bool(success)
 
     def _choose_spell_target(self, spell):
         game = self.game

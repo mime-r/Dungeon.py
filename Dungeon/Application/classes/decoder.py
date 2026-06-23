@@ -59,13 +59,13 @@ class DungeonJSONDecoder:
         return [DungeonInventory(*data.values()) for data in self._load(DATA_DIR / "inventory.json")]
 
     def fetch_scrolls(self) -> list[DungeonScroll]:
-        return [DungeonScroll(*data.values()) for data in self._load(DATA_DIR / "scrolls.json")]
+        return [DungeonScroll(**data) for data in self._load(DATA_DIR / "scrolls.json")]
 
     def fetch_backgrounds(self) -> list[dict]:
         return self._load(DATA_DIR / "backgrounds.json")
 
-    def fetch_skills(self) -> dict:
-        return self._load(DATA_DIR / "skills.json")
+    def fetch_skill_defs(self) -> dict:
+        return self._load(DATA_DIR / "skill_defs.json")
 
     def fetch_spells(self) -> list[DungeonSpell]:
         return [DungeonSpell(**data) for data in self._load(DATA_DIR / "spells.json")]

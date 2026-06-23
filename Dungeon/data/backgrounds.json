@@ -8,7 +8,11 @@
         "start_weapon": "Short Sword",
         "start_armour": "Leather Armour",
         "start_items": ["Medium Healing Potion", "Medium Healing Potion"],
-        "start_skills": {"Fighting": 3.0, "Short Blades": 2.0, "Armour": 2.0, "Shields": 1.0, "Dodging": 1.0}
+        "start_skills": {"Fighting": 3.0, "Short Blades": 2.0, "Armour": 2.0, "Shields": 1.0, "Dodging": 1.0},
+        "aptitudes": {
+            "Fighting": 1, "Maces & Flails": 1, "Long Blades": 1, "Armour": 1,
+            "Shields": 1, "Spellcasting": -3, "Conjuration": -2
+        }
     },
     {
         "name": "Hunter",
@@ -18,7 +22,11 @@
         "max_mp": 2,
         "start_weapon": "Short Bow",
         "start_items": ["Weak Healing Potion", "Weak Healing Potion"],
-        "start_skills": {"Fighting": 2.0, "Ranged": 3.0, "Dodging": 2.0, "Stealth": 1.0}
+        "start_skills": {"Fighting": 2.0, "Ranged": 3.0, "Dodging": 2.0, "Stealth": 1.0},
+        "aptitudes": {
+            "Fighting": 0, "Ranged": 2, "Throwing": 1, "Dodging": 1,
+            "Stealth": 0, "Spellcasting": -2, "Conjuration": -1
+        }
     },
     {
         "name": "Acolyte",
@@ -28,9 +36,13 @@
         "max_mp": 8,
         "start_weapon": "Quarterstaff",
         "start_armour": "Robe",
-        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Potion of Curing"],
-        "start_spells": ["Magic Dart", "Stone Fist", "Sting"],
-        "start_skills": {"Spellcasting": 4.0, "Conjuration": 2.0, "Earth Magic": 1.0}
+        "start_items": ["Scroll of Revelation", "Scroll of Teleportation", "Potion of Curing"],
+        "start_spells": ["Magic Dart", "Stone Fist"],
+        "start_skills": {"Spellcasting": 4.0, "Conjuration": 2.0, "Earth Magic": 1.0},
+        "aptitudes": {
+            "Fighting": -1, "Staves": 1, "Dodging": 1, "Stealth": 1,
+            "Spellcasting": 2, "Conjuration": 1, "Transmutation": 1, "Translocation": 1
+        }
     },
     {
         "name": "Wanderer",
@@ -40,8 +52,12 @@
         "max_mp": 4,
         "start_weapon": "Dagger",
         "start_items": ["Weak Healing Potion", "Weak Healing Potion", "Scroll of Teleportation"],
-        "start_spells": ["Magic Dart"],
-        "start_skills": {"Fighting": 2.0, "Short Blades": 1.0, "Dodging": 1.0, "Stealth": 1.0, "Spellcasting": 1.0}
+        "start_spells": ["Magic Dart", "Blink"],
+        "start_skills": {"Fighting": 2.0, "Short Blades": 1.0, "Dodging": 1.0, "Stealth": 1.0, "Spellcasting": 1.0},
+        "aptitudes": {
+            "Fighting": 0, "Dodging": 0, "Stealth": 0,
+            "Spellcasting": 1, "Conjuration": 0, "Translocation": 1
+        }
     },
     {
         "name": "Pyrelord",
@@ -51,9 +67,13 @@
         "max_mp": 10,
         "start_weapon": "Staff of Flame",
         "start_armour": "Robe",
-        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Medium Healing Potion"],
-        "start_spells": ["Searing Ray", "Flame Wave", "Fireball"],
-        "start_skills": {"Spellcasting": 4.0, "Fire Magic": 4.0, "Conjuration": 2.0}
+        "start_items": ["Scroll of Revelation", "Scroll of Teleportation", "Medium Healing Potion"],
+        "start_spells": ["Magic Dart", "Searing Ray"],
+        "start_skills": {"Spellcasting": 4.0, "Fire Magic": 4.0, "Conjuration": 2.0},
+        "aptitudes": {
+            "Fighting": -1, "Staves": 2, "Dodging": 0, "Stealth": -1,
+            "Spellcasting": 1, "Conjuration": 1, "Fire Magic": 2, "Transmutation": 1
+        }
     },
     {
         "name": "Shaman",
@@ -64,8 +84,12 @@
         "start_weapon": "Staff of Earth",
         "start_armour": "Animal Skin",
         "start_items": ["Weak Healing Potion", "Potion of Curing", "Potion of Curing"],
-        "start_spells": ["Summon Small Mammal", "Petrify", "Ice Shard"],
-        "start_skills": {"Spellcasting": 3.0, "Summoning": 3.0, "Earth Magic": 2.0, "Ice Magic": 1.0}
+        "start_spells": ["Summon Small Mammal", "Stone Fist"],
+        "start_skills": {"Spellcasting": 3.0, "Summoning": 3.0, "Earth Magic": 2.0, "Ice Magic": 1.0},
+        "aptitudes": {
+            "Fighting": -1, "Staves": 2, "Dodging": 0, "Stealth": -1,
+            "Spellcasting": 1, "Conjuration": 1, "Earth Magic": 2, "Transmutation": 2
+        }
     },
     {
         "name": "Frostbringer",
@@ -76,8 +100,12 @@
         "start_weapon": "Staff of Frost",
         "start_armour": "Robe",
         "start_items": ["Potion of Curing", "Weak Healing Potion"],
-        "start_spells": ["Freeze", "Ice Shard", "Blizzard"],
-        "start_skills": {"Spellcasting": 3.0, "Ice Magic": 4.0}
+        "start_spells": ["Freeze", "Ice Shard"],
+        "start_skills": {"Spellcasting": 3.0, "Ice Magic": 4.0},
+        "aptitudes": {
+            "Fighting": -1, "Staves": 2, "Dodging": 0, "Stealth": -1,
+            "Spellcasting": 1, "Conjuration": 1, "Ice Magic": 2, "Transmutation": 1
+        }
     },
     {
         "name": "Venomancer",
@@ -88,8 +116,12 @@
         "start_weapon": "Staff of Venom",
         "start_armour": "Robe",
         "start_items": ["Potion of Curing", "Potion of Curing", "Weak Healing Potion"],
-        "start_spells": ["Sting", "Venom Bolt"],
-        "start_skills": {"Spellcasting": 3.0, "Poison Magic": 4.0}
+        "start_spells": ["Sting", "Blink"],
+        "start_skills": {"Spellcasting": 3.0, "Poison Magic": 4.0},
+        "aptitudes": {
+            "Fighting": -1, "Staves": 2, "Dodging": 0, "Stealth": -1,
+            "Spellcasting": 1, "Conjuration": 1, "Poison Magic": 2, "Transmutation": 1
+        }
     },
     {
         "name": "Stormcaller",
@@ -99,9 +131,13 @@
         "max_mp": 10,
         "start_weapon": "Staff of Lightning",
         "start_armour": "Robe",
-        "start_items": ["Scroll of Magic Mapping", "Scroll of Teleportation", "Weak Healing Potion"],
-        "start_spells": ["Static Touch", "Searing Ray", "Magic Dart"],
-        "start_skills": {"Spellcasting": 3.0, "Conjuration": 4.0, "Dodging": 1.0}
+        "start_items": ["Scroll of Revelation", "Scroll of Teleportation", "Weak Healing Potion"],
+        "start_spells": ["Magic Dart", "Static Touch"],
+        "start_skills": {"Spellcasting": 3.0, "Conjuration": 4.0, "Dodging": 1.0},
+        "aptitudes": {
+            "Fighting": -1, "Staves": 2, "Dodging": 1, "Stealth": -1,
+            "Spellcasting": 1, "Conjuration": 2, "Air Magic": 2
+        }
     },
     {
         "name": "Arcanist",
@@ -111,9 +147,13 @@
         "max_mp": 10,
         "start_weapon": "Magic Staff",
         "start_armour": "Robe",
-        "start_items": ["Scroll of Magic Mapping", "Potion of Curing"],
-        "start_spells": ["Magic Dart", "Phase Shift", "Blink"],
-        "start_skills": {"Spellcasting": 4.0, "Conjuration": 2.0, "Translocation": 2.0}
+        "start_items": ["Scroll of Revelation", "Potion of Curing"],
+        "start_spells": ["Magic Dart", "Blink"],
+        "start_skills": {"Spellcasting": 4.0, "Conjuration": 2.0, "Translocation": 2.0},
+        "aptitudes": {
+            "Fighting": -1, "Staves": 1, "Dodging": 1, "Stealth": 0,
+            "Spellcasting": 2, "Conjuration": 1, "Translocation": 2
+        }
     },
     {
         "name": "Shadowblade",
@@ -124,8 +164,12 @@
         "start_weapon": "Dagger",
         "start_armour": "Leather Armour",
         "start_items": ["Potion of Curing", "Potion of Curing", "Weak Healing Potion"],
-        "start_spells": ["Phase Shift"],
-        "start_skills": {"Fighting": 2.0, "Short Blades": 3.0, "Stealth": 3.0, "Dodging": 2.0, "Spellcasting": 1.0, "Translocation": 1.0}
+        "start_spells": ["Sting", "Blink"],
+        "start_skills": {"Fighting": 2.0, "Short Blades": 3.0, "Stealth": 3.0, "Dodging": 2.0, "Spellcasting": 1.0, "Translocation": 1.0},
+        "aptitudes": {
+            "Fighting": 0, "Short Blades": 2, "Dodging": 1, "Stealth": 2,
+            "Spellcasting": 0, "Conjuration": -1, "Poison Magic": 1, "Translocation": 1
+        }
     },
     {
         "name": "Crusader",
@@ -136,6 +180,10 @@
         "start_weapon": "Mace",
         "start_armour": "Ring Mail",
         "start_items": ["Medium Healing Potion"],
-        "start_skills": {"Fighting": 3.0, "Maces & Flails": 3.0, "Armour": 2.0, "Shields": 1.0, "Dodging": 1.0}
+        "start_skills": {"Fighting": 3.0, "Maces & Flails": 3.0, "Armour": 2.0, "Shields": 1.0, "Dodging": 1.0},
+        "aptitudes": {
+            "Fighting": 1, "Maces & Flails": 2, "Armour": 1,
+            "Shields": 2, "Dodging": 0, "Spellcasting": -3, "Conjuration": -2
+        }
     }
 ]

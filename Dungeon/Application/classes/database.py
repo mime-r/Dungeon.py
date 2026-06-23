@@ -18,7 +18,7 @@ class DungeonDatabase:
         self.enemy_db = DungeonEnemyDatabase(global_db=self)
         self.people_db = DungeonPeopleDatabase(global_db=self)
         self.backgrounds = self.decoder.fetch_backgrounds()
-        self.skills_data = self.decoder.fetch_skills()
+        self.skills_data = self.decoder.fetch_skill_defs()
 
 
 class DungeonEnemyDatabase:

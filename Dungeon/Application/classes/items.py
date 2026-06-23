@@ -38,6 +38,13 @@ class DungeonWeapon(DungeonItem):
         hands: str = "One",
         range: int = 1,
         on_hit: dict | None = None,
+        brand: str | None = None,
+        enchant: int = 0,
+        delay: int | None = None,
+        min_delay: int | None = None,
+        weapon_type: str | None = None,
+        magical_staff: bool = False,
+        dmg_pct_vs_holiness: dict | None = None,
     ) -> None:
         super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.EQUIP])
         self.type = type
@@ -49,6 +56,18 @@ class DungeonWeapon(DungeonItem):
         self.range = range
         self.ranged = (type == WeaponType.RANGED) or range > 1
         self.on_hit = on_hit or {}
+        self.brand = brand  # "flaming" | "freezing" | "venom" | "electrocution" | "pain" | "holy_wrath" | "draining" | None
+        self.enchant = enchant  # +N to base_attack, accumulated by Scroll of Enchant Weapon
+        # Attack delay (DCSS "delay"). Higher = slower swing. Defaults by name/skill.
+        from .skills import default_delay_for_weapon, default_min_delay
+        self.delay = delay if delay is not None else default_delay_for_weapon(name)
+        self.min_delay = min_delay if min_delay is not None else default_min_delay(self.delay)
+        self.weapon_type = weapon_type  # human-readable subtype, e.g. "short_blade"
+        self.magical_staff = magical_staff  # True for Staff of Flame/Frost/etc.
+        # Damage bonus vs a specific enemy holiness tag (e.g., Sacred Scourge
+        # vs undead = +50%). Keys: "undead" | "demonic" | "holy" | "natural".
+        # Values are added to the base damage roll (e.g., 0.5 = +50%).
+        self.dmg_pct_vs_holiness = dmg_pct_vs_holiness or {}
 
 
 class DungeonThrowable(DungeonItem):
@@ -77,6 +96,11 @@ class DungeonThrowable(DungeonItem):
         self.ranged = True
         self.on_hit = {}
         self.count = count
+        self.brand = None
+        self.enchant = 0
+        # Throwables throw instantly (cost = TURN).
+        self.delay = 10
+        self.min_delay = 10
 
 
 class DungeonInventory(DungeonItem):
@@ -108,9 +132,10 @@ class DungeonScroll(DungeonItem):
 
     symbol = "?"
 
-    def __init__(self, name: str, description: str, cost: int, effect: str) -> None:
+    def __init__(self, name: str, description: str, cost: int, effect: str, weight: int = 1) -> None:
         super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.USE])
         self.effect = effect
+        self.weight = max(1, weight)
 
 
 class ArmourSlot(str, Enum):
@@ -138,12 +163,22 @@ class DungeonArmour(DungeonItem):
         ac: int = 0,
         sh: int = 0,
         encumbrance: int = 0,
+        enchant: int = 0,
     ) -> None:
         super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.EQUIP])
         self.slot = slot
         self.ac = ac
         self.sh = sh
         self.encumbrance = encumbrance
+        self.enchant = enchant  # +N to ac, accumulated by Scroll of Enchant Armour
+        # Ego system: spawned with one of the DCSS-tier armour egos (Stealth, rF+,
+        # rC+, SInv, Will+, Parrying, Archery). Each ego grants one or more of:
+        self.ego: str | None = None
+        self.resistances: dict[str, int] = {}  # damage_type -> resistance level
+        self.ev_bonus: int = 0                  # +EV (Stealth)
+        self.sh_bonus: int = 0                  # +SH (Parrying)
+        self.ranged_dmg_bonus: float = 0.0      # +% ranged damage (Archery)
+        self.grant_see_invisible: bool = False  # helmet flag (SInv)
 
 
 class DungeonSpell:

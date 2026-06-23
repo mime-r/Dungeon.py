@@ -1,20 +1,135 @@
 [
     {
-        "name": "Scroll of Magic Mapping",
-        "description": "Reading this reveals the layout of the current floor.",
-        "cost": 14,
-        "effect": "magic_mapping"
+        "name": "Scroll of Identification",
+        "description": "Reveals the true nature of one unknown potion or scroll in your pack.",
+        "cost": 15,
+        "weight": 26,
+        "effect": "identify"
     },
     {
         "name": "Scroll of Teleportation",
-        "description": "Reading this whisks you to a random spot on the floor. A lifesaver in a pinch.",
-        "cost": 16,
+        "description": "Whisks you to a random walkable tile on the floor. A lifesaver in a pinch.",
+        "cost": 22,
+        "weight": 13,
         "effect": "teleport"
     },
     {
-        "name": "Scroll of Identification",
-        "description": "Reading this reveals the true nature of one unidentified item in your pack.",
-        "cost": 15,
-        "effect": "identify"
+        "name": "Scroll of Amnesia",
+        "description": "Lets you forget one memorised spell, freeing its slot for new learning.",
+        "cost": 30,
+        "weight": 5,
+        "effect": "amnesia"
+    },
+    {
+        "name": "Scroll of Blinking",
+        "description": "Teleports you to a chosen walkable tile in line of sight.",
+        "cost": 30,
+        "weight": 5,
+        "effect": "blinking"
+    },
+    {
+        "name": "Scroll of Butterflies",
+        "description": "Summons a swarm of friendly butterflies that push other creatures away.",
+        "cost": 35,
+        "weight": 5,
+        "effect": "butterflies"
+    },
+    {
+        "name": "Scroll of Enchant Armour",
+        "description": "Adds +1 to the enchantment of a chosen non-artefact armour piece or shield.",
+        "cost": 50,
+        "weight": 5,
+        "effect": "enchant_armour"
+    },
+    {
+        "name": "Scroll of Enchant Weapon",
+        "description": "Adds +1 to the enchantment of a chosen non-artefact weapon.",
+        "cost": 50,
+        "weight": 5,
+        "effect": "enchant_weapon"
+    },
+    {
+        "name": "Scroll of Fear",
+        "description": "Attempts to cause fear in all visible enemies, sending them fleeing.",
+        "cost": 35,
+        "weight": 5,
+        "effect": "fear"
+    },
+    {
+        "name": "Scroll of Fog",
+        "description": "Releases a spreading cloud of fog that blocks line of sight.",
+        "cost": 30,
+        "weight": 5,
+        "effect": "fog"
+    },
+    {
+        "name": "Scroll of Immolation",
+        "description": "Sets the inner flame alight in all visible creatures. They detonate on death.",
+        "cost": 40,
+        "weight": 5,
+        "effect": "immolation"
+    },
+    {
+        "name": "Scroll of Noise",
+        "description": "Makes a loud noise that awakens every monster on the floor.",
+        "cost": 20,
+        "weight": 5,
+        "effect": "noise"
+    },
+    {
+        "name": "Scroll of Poison",
+        "description": "Fills every unoccupied tile in your line of sight with a poisonous cloud.",
+        "cost": 45,
+        "weight": 2,
+        "effect": "poison_cloud"
+    },
+    {
+        "name": "Scroll of Revelation",
+        "description": "Reveals the entire floor's layout and grants a brief glimpse through walls.",
+        "cost": 35,
+        "weight": 5,
+        "effect": "revelation"
+    },
+    {
+        "name": "Scroll of Silence",
+        "description": "Cloaks the area in a silence aura, blocking spellcasting and scroll-reading.",
+        "cost": 40,
+        "weight": 5,
+        "effect": "silence"
+    },
+    {
+        "name": "Scroll of Summoning",
+        "description": "Summons a small host of creatures from the floor's native fauna.",
+        "cost": 35,
+        "weight": 5,
+        "effect": "summoning"
+    },
+    {
+        "name": "Scroll of Torment",
+        "description": "Torments all visible creatures — friend and foe alike — bypassing armour.",
+        "cost": 55,
+        "weight": 2,
+        "effect": "torment"
+    },
+    {
+        "name": "Scroll of Vulnerability",
+        "description": "Halves the willpower of all visible creatures, making them easier to afflict.",
+        "cost": 30,
+        "weight": 5,
+        "effect": "vulnerability"
+    },
+    {
+        "name": "Scroll of Brand Weapon",
+        "description": "Applies a random magical brand to a chosen non-artefact weapon.",
+        "cost": 80,
+        "weight": 2,
+        "effect": "brand_weapon"
+    },
+    {
+        "name": "Scroll of Acquirement",
+        "description": "Offers a choice of three items tailored to your skills, or a pile of gold.",
+        "cost": 120,
+        "weight": 1,
+        "effect": "acquirement"
     }
 ]
