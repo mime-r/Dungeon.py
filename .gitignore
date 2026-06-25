@@ -5,3 +5,4 @@ temp_venv.bat
 .env
 .claude/
 Reference-Resources/
+.opencode/
