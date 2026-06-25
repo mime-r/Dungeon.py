@@ -1,5 +1,136 @@
 # Changelog
 
+## 26/6/26 v2.7.1 — "Polish & Theme"
+
+**Themed Enemy Picker**
+- New `FLOOR_THEMES` data structure (8 floors × curated flavor pool + tier mix) so each floor spawns a thematically consistent mob mix instead of a uniform random sample
+  - Floor 1 "Surface Lair" — vermin, small reptiles, fungi (70% weak / 30% mid)
+  - Floor 2 "Early Dungeon" — goblinoids, hounds, imps (40/50/10)
+  - Floor 3 "Winding Depths" — snakes, ogres, wraiths (10/60/30)
+  - Floor 4 "Deep Halls" — manticores, nagas, liches (0/50/50)
+  - Floor 5 "Lair of Drakes" — drakes, bears, basilisks (0/30/70)
+  - Floor 6 "Murk & Brine" — nagas, jellies, oklob plants (0/20/80)
+  - Floor 7 "Vaults of Hell" — dragons, demonspawn, brimstone fiends (0/10/90)
+  - Floor 8 "Pandemonium" — hellbinders, eldritch, ancient horrors (0/0/100)
+- New `_pick_themed_enemy(depth, theme)` method on `Dungeon`:
+  - LLM `theme.enemy_bias` (up to 5 names) takes priority as a full-weight override
+  - Otherwise rolls a tier from the floor's `tier_mix`, then picks 70% from the flavor pool and 30% from the full depth pool (both filtered by the chosen tier)
+  - Falls back gracefully if the flavor pool has no candidates in the chosen tier
+- LLM `enemy_bias` validation now accepts any mob name valid at the current depth (was hardcoded to 12 names); prompt updated to reflect this and the new 0-5 cap
+- Bosses and `spawn_weight=0` mobs are skipped by the picker; boss-tier is reserved for the 3 guardians
+
+**Floor Introduction**
+- `enter_level` prints the floor's name and description in the message log on first entry (e.g. "Depth 6 — Murk & Brine. A flooded swamp of jellies, nagas, and slithering vines."), using the LLM-generated theme or the `FLOOR_THEMES` fallback
+
+**Item Spawn Display**
+- Weapons and armour now print a one-line announcement in the message log when they spawn with a brand or ego, showing enchantment + label + effect description
+  - Example: `[flavor]depth 3:[/flavor] +1 Sling (Flaming) — scorches for 2-5 dmg (50%)`
+  - Example: `[action]Vault:[/action] +4 Battleaxe (Heavy) — crushes for 3-6 dmg (60%); -3 swing speed; +60% base dmg`
+- New helpers in `item_egos.py`: `describe_brand()` produces a one-line effect text for any of the 15 brands (e.g. "summons a Spectral Weapon on hit", "+75% vs undead/demonic"); `describe_ego()` for any of the 7 egos (e.g. "rF+ (33% fire res)", "+20% ranged dmg"); `announce_spawn()` composes the full line
+- Items with no enchant, no brand, and no ego stay quiet (most early-floor drops)
+- Vault prefix `[action]Vault:[/action]` for items placed in vault rooms
+
+**Inventory Polish**
+- Equipped items are always shown as the first entries on every page, even before any sorting (preserves their relative order)
+- New `s` key in the pack screen triggers `_sort_inventory()` which reorders the underlying list by: equipped → weapon → armour → throwable → spellbook → potion → scroll → inventory bag → shard, then by name, then by enchantment (descending)
+- Pages now show a `-- equipped --` / `-- pack --` sub-header when the page straddles the boundary
+- Page-local selection (`1-9`) maps back to the real `player.inventory` index so drop/equip/unequip work unchanged
+- Footer updated: `[1-9] select item  [s] auto-sort  [,] prev  [.] next  [esc] exit`
+
+**Splash Screen**
+- Multi-colour ASCII banner (red→orange→yellow→cyan→purple)
+- Version display (`v2.7.0`) and tagline ("A turn-based roguelike in the spirit of Dungeon Crawl Stone Soup")
+- 5 feature bullets highlighting the new content (531 monsters, casters, breaths, etc.)
+- New `g` key opens the project on GitHub via `webbrowser.open(_GITHUB_URL, new=2, autoraise=True)`; re-renders the splash after the browser steals focus
+- Tip line with one-liner gameplay hint
+- `_GITHUB_URL` constant at the top of `wrapper.py` — easy to change
+
+**Spawn Count**
+- `enemies_base` 4 → 6, `enemies_per_depth` stays at 1
+- Per floor: 6, 7, 8, 9, 10, 11, 12, 13 (76 total per run, +27% from the original 60)
+- The thematic picker keeps the floor feel coherent despite the higher count
+
+## 25/6/26 v2.7 — "The Menagerie"
+
+**The Mob Expansion — 531 monsters (was 20)**
+- Data-driven roster: 511 new general mobs (non-uniques) added to `enemies.json`, all derived from the DCSS bestiary reference
+- Per-mob depth band, tier, and spawn weight tuned so each of the 8 floors feels distinct
+- Floor 1 (surface): rats, bats, quokkas, small lizards, early vermin
+- Floor 2-3 (entry): orcs, gnolls, hounds, wraiths, imps, nagas, first casters
+- Floor 4-5 (mid): deep trolls, drakes, liches, deep elves, spriggans, demonspawn, beholders
+- Floor 6 (swamp/snakes): nagas, anacondas, slime creatures, jellies, oklob plants, merfolk
+- Floor 7-8 (vaults/hell): dragons, liches, brimstone/ice fiends, pandemonium lords, eldritch horrors
+
+**New Status Effects (8)**
+- `paralysis` — target skips turns (sea snake, basilisk, orb spider, scorpion)
+- `blind` — accuracy penalty, expires (sun moth, spark wasp, glass eye, screaming refraction)
+- `bleed` — DoT, scales with mobility (warg, tyrant leech, warcries)
+- `drain_max_hp` — vampires, vampire mosquitoes, ancient liches
+- `drain_mp` — mana vipers, ghosts, mummy priests, soul eaters
+- `constricted` — player can't walk (snakes, nagas, kraken tentacles, oni incarcerators)
+- `invisible` — render as `?` unless player has see-invisible (shadows, phantasmal warriors, will-o-wisps, drudes)
+- `corrosion` — slowly degrades armour (yellow draconians, jellies, obsidian bats, caustic shrikes)
+
+**New Enemy Mechanics (data-driven, backwards-compatible)**
+- **Constriction**: snake/naga/kraken mobs grab the target; player can't move but can bump-attack; mob damages the held target each turn
+- **Invisibility**: invisible mobs don't appear on the map unless the player has see-invisible; mobs can't target the player when invisible
+- **Flight / Swimming / Amphibious**: passable terrain expanded for these mobs (dragons, harpies, kraken, frogs, electric eels)
+- **Death FX — Explosion**: AoE damage at the death tile (bombardier beetle, ball lightning, hellfire mortar, monarch bomb)
+- **Death FX — Spore Cloud**: lingering area effect + immediate status (toadstool, deathcap, caustic sporangium, wandering mushroom)
+- **Death FX — Split**: spawn smaller copies on death (jellies, endoplasm, slimes, pharaoh ants)
+- **Death FX — Shriek**: wake every monster on the floor one-shot (killer bee, queen bee, wailing wraith, doom howl, laughing skull, howler monkey)
+- **Death FX — Ally Buff**: buff nearby allies on death (Pikel haste, orc warlord might, wendigo haste)
+- **Death FX — Demon Spawn**: boss-tier mobs summon demon allies on death (Pandemonium Lord → Cacodemon/Hellwing, Cerebov → Balrug/Hellion, Asmodeus → Brimstone Fiend, Tiamat → 3 dragons)
+- **Death FX — Minion Spawn**: spawn a specific minion (Pikel → Pikel Minion, Pargi → splits into two)
+
+**Spellcasting AI (113 casters)**
+- New enemy infrastructure: `spells: list[str]` and `spell_chance: float` per mob
+- `pick_spell()` weighted random pick (off-cooldown): damage/control spells weighted 2.0, summons 1.5 if below cap, self_teleport 0 above 50% HP and 4.0 below (flee behaviour)
+- Per-spell cooldowns: 2 + min(5, level-1) turns
+- All 9 spell effect types implemented for enemies: projectile, touch, expanding_aoe, explosion, status_chain (Petrify), ignite_flora, self_teleport, summon, channel
+- Reuses the existing `DungeonSpell` pool — no new spell definitions needed
+- Enemies cast freely: no MP, no miscast
+- Casters inserted into `act()` ahead of melee/ranged decisions; stationary mobs (turrets, statues) skip movement
+
+**Cone Breath Weapons (39 mobs)**
+- New `breath_weapon: {type, damage, range, width, cooldown, status?}` field
+- 90-degree cone from caster toward the player; respects line-of-sight; respects player's `apply_resistance`
+- Element-keyed style: fire/cold/lightning/poison/steam/acid
+- Tagged on all 13 elemental dragons + Storm/Quicksilver/Mottled/Shadow/Bone variants + all drakes + elementals + salamander/wendigo line + cannons/mortars + crabbies
+- Cooldown 4-7 turns via existing `_breath_cd`; cone math reuses `bfs_path` Manhattan-style projection
+
+**Summoners & Broods**
+- `Summon Small Mammal`, `Summon Canine Familiar`, `Summon Spectral Wolf` reused for enemy casters
+- Per-summoner cap (`max_active`); summons tagged with `_summoned_by` so the same caster won't exceed cap
+- Broodmother: web/insect summon template
+- Pandemonium Lord, Cerebov, Asmodeus, Antaeus, Mnoleg, Lom Lobon, Gloorx Vloq, Ereshkigal, Tiamat, Geryon — all summon on death
+- Pikel pair: ally_buff on death + spawns a Pikel Minion
+- Parghit pair: Pargi splits into two on death
+
+**Floor Distribution & Balance**
+- Tiered tiers retuned: 83 weak / 205 mid / 239 strong / 3 boss
+- 8-floor identity: surface → dungeon → mid → lair → swamp → snake/slime → vaults → pandemonium
+- Early floors (1-3) restricted to weak/mid (no `atk_base >= 7` on floors 1-3)
+- Original 20 mobs preserved with their pre-Phase-0 depths and tiers (no regression)
+- 4 entries kept at `spawn_weight=0` to suppress from random pool (Training Dummy, Snake, Canine, Wolf) — they remain in the data for completeness
+
+**Save/Restore Compatibility**
+- `SAVE_VERSION` 2 → 3 (per-instance cooldowns/breath_cd/shrieked fields)
+- `_save_entity` writes: `cooldowns`, `breath_cd`, `shrieked`
+- `_load_entity` restores them; data-driven config (spells, breath, on_death, etc.) reloads from the DB on load — consistent with the existing pattern
+- Save/load roundtrip verified: Naga `constricts` + `on_hit` preserved, Fire Dragon `breath_weapon` reloaded + `breath_cd` restored, Lich `spells` + per-instance `cooldowns` restored, Pikel `on_death.ally_buff` preserved, summon `despawn_timer` preserved
+
+**Splash Screen**
+- Multi-colour banner (red→orange→yellow→cyan→purple)
+- Version display (`v2.7.0`) and tagline
+- 5 feature bullets highlighting the new content (531 monsters, casters, breaths, etc.)
+- New `g` key opens the project on GitHub via `webbrowser.open(_GITHUB_URL, new=2, autoraise=True)`
+- Re-renders the splash after the browser steals focus so the menu stays visible
+- Tip line with one-liner gameplay hint
+- `_GITHUB_URL` constant at the top of `wrapper.py` — easy to change
+
+**Status:** v2.7 → 531 enemies · 113 casters · 39 breath weapons · 0 unique mobs · 8 floors · save/load v3.
+
 ## 23/6/26 v2.6 — "Scrolls, Brands & Hands"
 
 **DCSS Scroll System (all 19 scrolls from DCSS)**

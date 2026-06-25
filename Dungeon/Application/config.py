@@ -265,7 +265,7 @@ class SpawnConfig:
     """How many of each thing to place per floor (scaled by depth where noted)."""
 
     enemies_base: int = 6           # +enemies_per_depth * (depth-1)
-    enemies_per_depth: int = 2
+    enemies_per_depth: int = 1
     npcs_per_floor: int = 2         # traders / healers (none on the Orb floor)
     floor_potions: int = 3
     floor_scrolls: int = 2

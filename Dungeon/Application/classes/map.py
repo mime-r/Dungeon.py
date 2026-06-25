@@ -379,6 +379,12 @@ class DungeonPlayer:
         game = self.game
         if not game.map.in_bounds(ny, nx):
             return 0
+        # Constriction: player can't walk away but can still bump-attack.
+        if self.status.has("constricted"):
+            cell = game.map.matrix[ny][nx]
+            if cell.occupant is None:
+                self.game.message("[fail]You are held fast and cannot move![/fail]")
+                return 0
         # Player cannot act on tiles they have never seen and cannot currently see.
         if (ny, nx) not in game.map.visible:
             dest_cell = game.map.matrix[ny][nx]
@@ -812,6 +818,9 @@ class DungeonMap:
             return config.symbols.player, "player"
         if visible and cell.occupant is not None:
             occ = cell.occupant
+            # Invisible mobs appear as '?' unless the player has see_invisible.
+            if getattr(occ, "invisible", False) and not self.game.player.has_see_invisible():
+                return "?", getattr(occ, "style", "enemy")
             return occ.symbol, getattr(occ, "style", "enemy")
         if cell.gold > 0:
             return config.symbols.gold, "gold"

@@ -21,6 +21,14 @@ EFFECT_STYLE = {
     "vulnerable": ("Vulnerable", "fail", "Vul"),
     "see_invisible": ("See Invis", "haste", "Eye"),
     "ac_buff": ("Warded", "haste", "Wrd"),
+    "paralysis": ("Paralysed", "petrify", "Par"),
+    "blind": ("Blinded", "warn", "Bli"),
+    "drain_max_hp": ("Draining", "fail", "Drn"),
+    "drain_mp": ("Mana Drain", "arcane", "MDr"),
+    "bleed": ("Bleeding", "fail", "Bld"),
+    "constricted": ("Held", "fail", "Hld"),
+    "invisible": ("Invisible", "haste", "Inv"),
+    "corrosion": ("Corroded", "fail", "Cor"),
 }
 
 
@@ -42,7 +50,11 @@ class StatusSet:
         self.effects.pop(name, None)
 
     def clear_harmful(self) -> list[str]:
-        harmful = [n for n in ("poison", "burn", "slow", "confusion", "petrify") if n in self.effects]
+        harmful = [
+            n for n in ("poison", "burn", "slow", "confusion", "petrify",
+                        "paralysis", "blind", "bleed", "corrosion", "constricted")
+            if n in self.effects
+        ]
         for n in harmful:
             del self.effects[n]
         return harmful
@@ -89,6 +101,33 @@ class StatusSet:
                     actor.health += healed
                     if is_player:
                         game.message(f"[regen]You regenerate {healed} HP.[/regen]")
+            elif name == "drain_max_hp":
+                # Vampires and similar reduce the actor's max HP.
+                if actor.max_health > 1:
+                    actor.max_health -= max(1, eff["potency"])
+                    if actor.health > actor.max_health:
+                        actor.health = actor.max_health
+                    if is_player:
+                        game.message(
+                            f"[fail]Your maximum life is drained! ({actor.max_health})[/fail]")
+            elif name == "drain_mp":
+                if is_player and getattr(actor, "max_mp", 0) > 0:
+                    actor.mp = max(0, actor.mp - max(1, eff["potency"]))
+            elif name == "bleed":
+                # Bleed damage scales lightly with potency; stationary actors bleed more.
+                from random import randint as _r
+                dmg = max(1, eff["potency"] + _r(0, 1))
+                actor.health -= dmg
+                if is_player:
+                    game.message(f"[fail]You bleed for {dmg} damage.[/fail]", drop=dmg)
+            elif name == "corrosion":
+                # Slowly degrades equipped armour (handled by a hook elsewhere);
+                # here we just tag the duration.
+                pass
+            elif name == "paralysis" or name == "constricted" \
+                    or name == "blind" or name == "invisible":
+                # Pure flag effects; expiry handled below.
+                pass
             eff["duration"] -= 1
             if eff["duration"] <= 0:
                 del self.effects[name]

@@ -3,3 +3,5 @@ logs/
 leaderboard.json
 temp_venv.bat
 .env
+.claude/
+Reference-Resources/

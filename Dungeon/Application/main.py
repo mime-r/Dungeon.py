@@ -36,7 +36,7 @@ from .llm import LLMClient
 
 SAVE_FILE_NAME = "savegame.json"
 SAVE_FILE = Path(__file__).resolve().parent.parent.parent / SAVE_FILE_NAME
-SAVE_VERSION = 2  # v2: brand/ego/enchant/fog/silence/holiness fields
+SAVE_VERSION = 3  # v3: per-instance cooldowns/breath_cd/shrieked fields
 
 print("Loading...")
 
@@ -408,6 +408,12 @@ def _save_entity(entity) -> dict:
         "status": _save_status(entity.status),
         "location": _coord_to_list(entity.location),
         "despawn_timer": int(getattr(entity, "despawn_timer", 0)),
+        # Phase 3+: per-instance spell cooldowns.
+        "cooldowns": dict(getattr(entity, "cooldowns", {})),
+        # Phase 4+: breath weapon cooldown.
+        "breath_cd": int(getattr(entity, "_breath_cd", 0)),
+        # Phase 2: one-shot shriek tracker.
+        "shrieked": bool(getattr(entity, "_shrieked", False)),
     }
     # Holiness (added with the Sacred Scourge / holy_wrath system).
     holiness = getattr(entity, "holiness", "natural")
@@ -482,6 +488,16 @@ def _load_entity(data: dict, game):
     entity.energy = int(data.get("energy", 0))
     entity.status = _load_status(data.get("status", {}))
     entity.location = _list_to_coord(data.get("location")) or (0, 0)
+    # Phase 3+: per-instance spell cooldowns.
+    cooldowns = data.get("cooldowns")
+    if cooldowns is not None and hasattr(entity, "cooldowns"):
+        entity.cooldowns = {str(k): int(v) for k, v in cooldowns.items()}
+    # Phase 4+: breath weapon cooldown.
+    if "breath_cd" in data and hasattr(entity, "_breath_cd"):
+        entity._breath_cd = int(data["breath_cd"])
+    # Phase 2: shriek tracker.
+    if "shrieked" in data and hasattr(entity, "_shrieked"):
+        entity._shrieked = bool(data["shrieked"])
     if kind == "summon":
         entity.is_enemy = False
         entity.is_summon = True
@@ -599,6 +615,133 @@ _VALID_STRUCTURES = {
     "frozen_pond", "campsite", "poison_marsh", "standing_stones",
 }
 _VALID_TERRAIN_FEATURES = {"lava_pools", "chasms", "water_pools"}
+
+# --- Per-floor flavour pools + tier mix -----------------------------------
+#
+# Each floor has:
+#   name         - a short label printed in flavour messages
+#   description  - one-line flavour text
+#   flavor       - a list of mob names that strongly fit the floor
+#   tier_mix     - {tier: weight} for the picker; controls common-vs-rare mix
+#                  (weak common, boss rare on early floors; the opposite on late)
+#
+# The picker (`_pick_themed_enemy`) uses 70% flavor / 30% full pool, with the
+# LLM's `theme.enemy_bias` overriding the flavor at full weight when present.
+FLOOR_THEMES: dict[int, dict] = {
+    1: {
+        "name": "Surface Lair",
+        "description": "Vermin, small reptiles, and fungi lurk in the underbrush.",
+        "flavor": [
+            "Rat", "Bat", "Quokka", "Jackal", "Hound", "Warg", "Hog", "Hell Hog",
+            "Frilled Lizard", "Iguana", "Adder", "Water Moccasin", "Ball Python",
+            "Cane Toad", "Bullfrog", "Torpor Snail", "Giant Spider",
+            "Killer Bee", "Hornet", "Vampire Mosquito", "Wolf Spider", "Jumping Spider",
+            "Pharaoh Ant", "Radrroach", "Clockroach", "Wandering Mushroom",
+            "Toadstool", "Fungus", "Burstshroom", "Plant", "Bush", "Shrub",
+            "Boulder", "Rock Fish", "Endoplasm", "Jelly", "Star Jelly",
+        ],
+        "tier_mix": {"weak": 7, "mid": 3, "strong": 0, "boss": 0},
+    },
+    2: {
+        "name": "Early Dungeon",
+        "description": "A warren of goblinoid dens and fresh graves.",
+        "flavor": [
+            "Kobold", "Kobold Slinger", "Kobold Brigand", "Goblin", "Goblin Rider",
+            "Hobgoblin", "Orc", "Orc Warrior", "Gnoll", "Gnoll Bouda",
+            "Hell Rat", "Crimson Imp", "White Imp", "Cerulean Imp",
+            "Skeleton", "Zombie", "Necrophage", "Ghoul",
+            "Demonic Crawler", "Fire Bat", "Tyrant Leech",
+        ],
+        "tier_mix": {"weak": 4, "mid": 5, "strong": 1, "boss": 0},
+    },
+    3: {
+        "name": "Winding Depths",
+        "description": "Snake pits, ogre lairs, and lurking wraiths.",
+        "flavor": [
+            "Black Mamba", "Adder", "Water Moccasin", "Centipede", "Naga",
+            "Ogre", "Ettin", "Cyclops", "Wraith", "Wight", "Flayed Ghost",
+            "Skeletal Warrior", "Zombie", "Orc Warrior", "Orc Priest",
+            "Imp", "Crimson Imp", "Hell Hound", "Warg", "Hound", "Giant Spider",
+            "Tarantella", "Emperor Scorpion", "Komodo Dragon", "Basilisk",
+        ],
+        "tier_mix": {"weak": 1, "mid": 6, "strong": 3, "boss": 0},
+    },
+    4: {
+        "name": "Deep Halls",
+        "description": "Manticores, nagas, and the first liches stir in the dark.",
+        "flavor": [
+            "Naga", "Naga Warrior", "Naga Mage", "Centaur", "Centaur Warrior",
+            "Ogre", "Ogre Mage", "Two-headed Ogre", "Ettin", "Cyclops",
+            "Wraith", "Wight", "Freezing Wraith", "Curse Skull", "Lost Soul",
+            "Mummy", "Mummy Priest", "Skeletal Warrior", "Vampire", "Vampire Bat",
+            "Orc Wizard", "Orc Sorcerer", "Crimson Imp", "Hell Hound",
+            "Hellwing", "Hell Hog", "Boggart", "Crocodile", "Alligator",
+            "Black Bear", "Polar Bear", "Alligator Snapping Turtle", "Hydra",
+        ],
+        "tier_mix": {"weak": 0, "mid": 5, "strong": 4, "boss": 0},
+    },
+    5: {
+        "name": "Lair of Drakes",
+        "description": "Drakes hunt amid the bones of giant mammals.",
+        "flavor": [
+            "Rime Drake", "Swamp Drake", "Wind Drake", "Death Drake", "Wyvern",
+            "Lindwurm", "Basilisk", "Komodo Dragon", "Black Mamba", "Anaconda",
+            "Manticore", "Hippogriff", "Hydra", "Dire Elephant", "Hellephant",
+            "Salamander", "Salamander Mystic", "Fire Crab",
+            "Alligator Snapping Turtle", "Emperor Scorpion", "Tarantella",
+            "Ironbound Convoker", "Ironbound Preserver",
+        ],
+        "tier_mix": {"weak": 0, "mid": 3, "strong": 6, "boss": 0},
+    },
+    6: {
+        "name": "Murk & Brine",
+        "description": "A flooded swamp of jellies, nagas, and slithering vines.",
+        "flavor": [
+            "Naga", "Naga Warrior", "Naga Mage", "Nagaraja", "Guardian Serpent",
+            "Anaconda", "Black Mamba", "Sea Snake", "Slime Creature",
+            "Azure Jelly", "Jelly", "Colossal Amoeba", "Acid Blob",
+            "Oklob Plant", "Oklob Sapling", "Briarpatch", "Thorn Hunter",
+            "Snaplasher Vine", "Vine Stalker", "Shambling Mangrove",
+            "Swamp Worm", "Electric Eel", "Swamp Drake", "Crocodile",
+            "Water Nymph", "Merfolk", "Merfolk Siren", "Merfolk Impaler",
+        ],
+        "tier_mix": {"weak": 0, "mid": 2, "strong": 7, "boss": 0},
+    },
+    7: {
+        "name": "Vaults of Hell",
+        "description": "Dragons, demonspawn, and bound convokers war for territory.",
+        "flavor": [
+            "Fire Dragon", "Ice Dragon", "Acid Dragon", "Swamp Dragon",
+            "Steam Dragon", "Storm Dragon", "Shadow Dragon", "Bone Dragon",
+            "Quicksilver Dragon", "Iron Dragon", "Pearl Dragon", "Golden Dragon",
+            "Mottled Dragon", "Wyrmhole", "Manticore", "Hippogriff", "Hydra",
+            "Iron Golem", "Crystal Guardian", "Platinum Paragon",
+            "Ironbound Convoker", "Ironbound Preserver", "Ironbound Mechanist",
+            "Ironbound Frostheart", "Ironbound Thunderhulk", "Ironbound Beastmaster",
+            "Brimstone Fiend", "Ice Fiend", "Hell Sentinel", "Hellbinder",
+            "Demonologist", "Wendigo", "Apocalypse Crab", "Starcursed Mass",
+        ],
+        "tier_mix": {"weak": 0, "mid": 1, "strong": 8, "boss": 0},
+    },
+    8: {
+        "name": "Pandemonium",
+        "description": "Hellbinders, eldritch horrors, and the bones of ancient gods.",
+        "flavor": [
+            "Tiamat", "Asmodeus", "Dispater", "Antaeus", "Cerebov",
+            "Gloorx Vloq", "Ereshkigal", "Geryon", "Mnoleg", "Lom Lobon",
+            "Pandemonium Lord", "Brimstone Fiend", "Ice Fiend", "Hell Sentinel",
+            "Hellsphinx", "Hellbinder", "Executioner", "Tormentor", "Hellion",
+            "Cacodemon", "Balrug", "Sun Demon", "Green Death", "Blizzard Demon",
+            "Reaper", "Soul Eater", "Lich", "Ancient Lich", "Dread Lich",
+            "Orb of Destruction", "Globe of Annihilation", "Boundless Tesseract",
+            "Shadow Dragon", "Quicksilver Dragon", "Bone Dragon",
+            "Tentacled Starspawn", "Eldritch Tentacle", "Tentacled Monstrosity",
+            "Starcursed Mass", "Wretched Star", "Ancient Zyme",
+            "Lurking Horror", "Thrashing Horror", "Nameless Horror",
+        ],
+        "tier_mix": {"weak": 0, "mid": 0, "strong": 9, "boss": 1},
+    },
+}
 
 # Pre-defined biomes used when the LLM is disabled. Each tuple:
 #   (name, description, water_density, structures, terrain_features)
@@ -1191,7 +1334,8 @@ class Dungeon:
                 "Output ONLY a single valid JSON object with exactly these keys: "
                 "name (string), description (string), "
                 "layout_bias (exactly one of: cave rooms bsp any), "
-                f"enemy_bias (JSON array of 0-3 names chosen ONLY from: {', '.join(_VALID_BIAS_ENEMIES)}), "
+                "enemy_bias (JSON array of 0-5 mob names; pick the most thematically fitting ones for this floor — "
+                "any name in the 'Enemies available' list below is valid), "
                 "trap_type (exactly one of: dart poison teleport alarm any), "
                 "trap_density (exactly one of: low normal high), "
                 "loot_bias (exactly one of: potions scrolls weapons gold balanced), "
@@ -1243,7 +1387,8 @@ class Dungeon:
             name=str(data.get("name", "")),
             description=str(data.get("description", "")),
             layout_bias=data.get("layout_bias", "any") if data.get("layout_bias") in _valid_layout else "any",
-            enemy_bias=[e for e in (data.get("enemy_bias") or []) if e in _VALID_BIAS_ENEMIES],
+            enemy_bias=[e for e in (data.get("enemy_bias") or [])
+                        if isinstance(e, str) and e in valid_at_depth][:5],
             trap_type=data.get("trap_type", "any") if data.get("trap_type") in _valid_trap else "any",
             trap_density=data.get("trap_density", "normal") if data.get("trap_density") in _valid_density else "normal",
             loot_bias=data.get("loot_bias", "balanced") if data.get("loot_bias") in _valid_loot else "balanced",
@@ -1255,6 +1400,49 @@ class Dungeon:
         if theme.name:
             self._theme_history.append(f"{theme.name}: {theme.description}")
         return theme
+
+    def _pick_themed_enemy(self, depth: int, theme) -> object | None:
+        """Pick a mob loader for this floor using theme + tier mix.
+
+        Order of preference:
+        1. LLM `theme.enemy_bias` — explicit picks at full weight.
+        2. Per-floor `FLOOR_THEMES[depth].flavor` — 70 % of the time, the pick
+           comes from this curated list (filtered by the rolled tier).
+        3. Full depth pool — 30 % of the time, picks from any mob valid at this
+           depth, filtered by the rolled tier.
+
+        The tier is rolled from `tier_mix` (e.g. floor 1 = 70 % weak / 30 % mid,
+        floor 8 = 90 % strong / 10 % boss). Boss-tier is reserved for the
+        guardian floors and is never picked here.
+        """
+        floor_theme = FLOOR_THEMES.get(depth, FLOOR_THEMES[1])
+        # 1. LLM override.
+        if theme and theme.enemy_bias:
+            loader = self.db.enemy_db.random_biased(depth, theme.enemy_bias)
+            if loader:
+                return loader
+        # 2 & 3. Roll a tier, then pick from flavor or full pool.
+        tier_mix = floor_theme["tier_mix"]
+        tiers = [t for t, w in tier_mix.items() if w > 0]
+        if not tiers:
+            return self.db.enemy_db.random_for_depth(depth)
+        weights = [tier_mix[t] for t in tiers]
+        chosen_tier = random.choices(tiers, weights=weights, k=1)[0]
+        depth_pool = self.db.enemy_db.all_for_depth(depth)
+        # Bosses and spawn_weight=0 mobs are skipped.
+        depth_pool = [l for l in depth_pool
+                      if l.data.tier == chosen_tier
+                      and getattr(l.data, "spawn_weight", 0) > 0]
+        if not depth_pool:
+            return self.db.enemy_db.random_for_depth(depth)
+        if random.random() < 0.7:
+            flavor = set(floor_theme["flavor"])
+            candidates = [l for l in depth_pool if l.data.name in flavor]
+        else:
+            candidates = depth_pool
+        if not candidates:
+            candidates = depth_pool
+        return random.choice(candidates)
 
     def _populate(self, level: DungeonMap, depth: int, is_last: bool, theme=None) -> None:
         pool = list(level.floor_cells)
@@ -1268,13 +1456,10 @@ class Dungeon:
                     return (y, x)
             return None
 
-        # Monsters (count scales with depth); biased towards theme enemies when theme present.
+        # Monsters: count scales with depth; picker is theme + tier-mix aware.
         count = config.spawn.enemies_base + config.spawn.enemies_per_depth * (depth - 1)
         for _ in range(count):
-            if theme and theme.enemy_bias and random.random() < 0.6:
-                loader = self.db.enemy_db.random_biased(depth, theme.enemy_bias)
-            else:
-                loader = self.db.enemy_db.random_for_depth(depth)
+            loader = self._pick_themed_enemy(depth, theme)
             spot = far_cell()
             if loader and spot:
                 enemy = loader.load()
@@ -1327,11 +1512,17 @@ class Dungeon:
             from .classes.item_egos import maybe_brand_weapon
             maybe_brand_weapon(weapon, depth, vault_bonus=0)
             self._scatter(level, weapon)
+            note = self._announce_item_spawn(weapon, depth)
+            if note:
+                self.message(note)
         for _ in range(config.spawn.floor_armour):
             armour = copy.copy(random.choice(self.db.item_db.armour))
             from .classes.item_egos import maybe_ego_armour
             maybe_ego_armour(armour, depth, vault_bonus=0)
             self._scatter(level, armour)
+            note = self._announce_item_spawn(armour, depth)
+            if note:
+                self.message(note)
         for _ in range(config.spawn.floor_throwables):
             self._scatter(level, copy.copy(random.choice(self.db.item_db.throwables)))
         for _ in range(config.spawn.floor_spellbooks):
@@ -1406,12 +1597,30 @@ class Dungeon:
                 weapon = copy.copy(weapon)
                 maybe_brand_weapon(weapon, depth, vault_bonus=VAULT_BONUS)
             level.matrix[wy][wx].items.append(weapon)
+            if weapon is not None:
+                note = self._announce_item_spawn(weapon, depth, vault=True)
+                if note:
+                    self.message(f"[arcane]Vault:[/arcane] {note}")
             if cells:
                 gy, gx = cells.pop()
                 level.matrix[gy][gx].gold += random.randint(15, 30 + depth * 5)
             if cells:
                 py, px = cells.pop()
                 level.matrix[py][px].items.append(self.db.item_db.search_item(name="Strong Healing Potion"))
+
+    def _announce_item_spawn(self, item, depth: int, vault: bool = False) -> str:
+        """Compose a one-line announcement for a freshly spawned item.
+
+        Returns "" if the item has nothing notable (no enchant, brand, or ego).
+        Otherwise returns a string ready to drop into the message log.
+        """
+        from .classes.item_egos import announce_spawn
+        note = announce_spawn(item)
+        if not note:
+            return ""
+        depth_label = f"depth {depth}" if depth > 1 else "the surface"
+        prefix = "[action]Vault:[/action] " if vault else f"[flavor]{depth_label}:[/flavor] "
+        return prefix + note
 
     def _fill_temple(self, level, depth: int) -> None:
         if not level.temple_cells:
@@ -1447,7 +1656,8 @@ class Dungeon:
                 self.on_summon_death(s)
         self.player._channeling.clear()
         self.player._channel_targets.clear()
-        if depth not in self.levels:
+        is_new = depth not in self.levels
+        if is_new:
             self.levels[depth] = self._new_level(depth)
         self.depth = depth
         self.map = self.levels[depth]
@@ -1455,6 +1665,17 @@ class Dungeon:
             self.player.location = self.map.stairs_down
         else:
             self.player.location = self.map.stairs_up
+        # Show the floor's theme on first entry so the player knows what biome
+        # they're in (LLM-generated name + FLOOR_THEMES fallback).
+        if is_new:
+            theme = self._floor_themes.get(depth)
+            label = theme.name if theme and theme.name else FLOOR_THEMES.get(depth, {}).get("name", "")
+            desc = (theme.description if theme and theme.description
+                    else FLOOR_THEMES.get(depth, {}).get("description", ""))
+            if label:
+                self.message(f"[flavor]Depth {depth} \u2014 {label}.[/flavor]")
+            if desc:
+                self.message(f"[flavor]{desc}[/flavor]")
         self.player.energy = TURN  # ready to act immediately on arrival
         self.map.update_fov()
         if mode == "down":
@@ -1566,6 +1787,9 @@ class Dungeon:
             e.energy += e.effective_speed()
         for e in list(self.map.enemies):
             if e.health > 0:
+                # Phase 0+: per-mob flat HP regen.
+                if getattr(e, "regen", 0) > 0 and e.health < e.max_health:
+                    e.health = min(e.max_health, e.health + e.regen)
                 e.status.tick(e, self)
                 if e.health <= 0:
                     self.on_enemy_death(e)
@@ -1616,6 +1840,13 @@ class Dungeon:
         # Scroll of Immolation: a dying enemy with inner_flame detonates for fire damage.
         if enemy.status.has("inner_flame"):
             self._detonate_inner_flame(enemy)
+        # Phase 0+: per-mob death FX (shriek, explode, spore, split, ally buff).
+        try:
+            die = getattr(enemy, "_die_extra", None)
+            if callable(die):
+                enemy._die_extra()
+        except Exception:
+            pass
         self.player.gain_xp(enemy.xp_drop)
         if self.player.skills:
             leveled = self.player.skills.distribute(enemy.xp_drop)
@@ -2445,7 +2676,12 @@ class Dungeon:
                 if occ.status.any():
                     short_map = {"poison": "Psn", "burn": "Brn", "regen": "Reg",
                                  "might": "Mgt", "haste": "Hst", "slow": "Slo",
-                                 "confusion": "Cnf"}
+                                 "confusion": "Cnf", "paralysis": "Par",
+                                 "blind": "Bli", "bleed": "Bld",
+                                 "constricted": "Hld", "invisible": "Inv",
+                                 "silence": "Sil", "fear": "Afr",
+                                 "drain_max_hp": "Drn", "drain_mp": "MDr",
+                                 "corrosion": "Cor", "vulnerable": "Vul"}
                     tags = [short_map.get(n, n[:3].upper()) for n in occ.status.effects]
                     status_tags = f" [flavor]({'/'.join(tags)})[/flavor]"
                 parts.append(f"[enemy]{occ.symbol} {occ.name}[/enemy] {occ.health}/{occ.max_health}HP{status_tags}")
@@ -2842,6 +3078,10 @@ class Dungeon:
     def handle(self, key: str) -> int:
         """Dispatch one keypress. Returns the energy cost of the action (0 if no
         turn was spent, TURN for a standard action, attack_cost for melee attacks)."""
+        # Phase 0+: paralysis skips the player's turn but still consumes time.
+        if self.player.status.has("paralysis") and key not in ("?", "!"):
+            self.message("[petrify]You are paralysed and cannot act![/petrify]")
+            return TURN
         # Clear stair-view overlay on any key that isn't cycling stair views.
         if key not in ("[", "]") and self.camera_override is not None:
             self.camera_override = None

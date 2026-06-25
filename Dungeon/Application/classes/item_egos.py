@@ -229,6 +229,139 @@ def apply_armour_ego(armour: "DungeonArmour", ego_name: str) -> None:
         armour.resistances[dmg_type] = max(armour.resistances.get(dmg_type, 0), level)
 
 
+# --- Spawn-time description text -------------------------------------------
+#
+# These helpers produce a short, in-message-log line announcing a freshly
+# generated item: its enchantment level, the brand or ego, and what the
+# effect does in plain language. Used by _populate in main.py.
+
+# Lazy import to avoid a hard dependency at module-load time.
+def _brand_spec(brand_name: str) -> dict | None:
+    try:
+        from .brands import BRAND_TABLE_REF
+    except Exception:
+        return None
+    return BRAND_TABLE_REF.get(brand_name)
+
+
+def _pct(p: float) -> str:
+    return f"{int(round(p * 100))}%"
+
+
+def describe_brand(brand_name: str) -> str:
+    """One-line flavour text for a brand's effect, e.g. "scorches for 2-5 fire dmg (50%)"."""
+    spec = _brand_spec(brand_name) or {}
+    verb = spec.get("verb", brand_name)
+    parts: list[str] = []
+    dmg = spec.get("dmg")
+    dmg_chance = spec.get("dmg_chance", 0.0)
+    if dmg and dmg != (0, 0):
+        dmg_str = f"{dmg[0]}-{dmg[1]}" if dmg[0] != dmg[1] else str(dmg[0])
+        dtype = spec.get("damage_type", "")
+        if dtype and dtype not in ("arcane", "force"):
+            dmg_label = f"{dtype} dmg"
+        else:
+            dmg_label = "dmg"
+        parts.append(f"{verb} for {dmg_str} {dmg_label} ({_pct(dmg_chance)})")
+    # Holy Wrath-style: extra damage vs holiness.
+    holiness_bonus = spec.get("dmg_pct_vs_holiness") or {}
+    if holiness_bonus:
+        tags = "/".join(holiness_bonus.keys())
+        bonus = int(round(list(holiness_bonus.values())[0] * 100))
+        parts.append(f"+{bonus}% vs {tags}")
+    # On-hit status effect.
+    status_chance = spec.get("status_chance", 0.0)
+    if status_chance > 0 and "status" in spec:
+        status_name = spec["status"]
+        st_verb = spec.get("status_verb", status_name)
+        parts.append(f"{st_verb} ({_pct(status_chance)})")
+    # Special brands: surface the on-hit callback name. Applies whether or
+    # not a damage roll is present.
+    if "on_hit" in spec:
+        label = {
+            "_brand_antimagic":  "disrupts spellcasting on hit",
+            "_brand_chaos":      "warps reality on hit (random effect)",
+            "_brand_distortion": "distorts space on hit (translocates/banishes)",
+            "_brand_protection": "shields the wielder on hit",
+            "_brand_spectral":   "summons a Spectral Weapon on hit",
+            "_brand_vampiric":   "drains life on hit (heals the wielder)",
+        }.get(spec["on_hit"], spec["on_hit"])
+        if label not in parts:
+            parts.append(label)
+    # Speed / Heavy mods.
+    if "speed_mod" in spec:
+        sm = spec["speed_mod"]
+        if sm > 0:
+            parts.append(f"+{sm} swing speed")
+        elif sm < 0:
+            parts.append(f"{sm} swing speed")
+    if "accuracy_mod" in spec:
+        parts.append(f"{spec['accuracy_mod']:+d}% accuracy")
+    if "damage_pct" in spec:
+        pct = int(round(spec["damage_pct"] * 100))
+        if pct > 0:
+            parts.append(f"+{pct}% base dmg")
+        elif pct < 0:
+            parts.append(f"{pct}% base dmg")
+    if not parts:
+        return brand_name
+    return "; ".join(parts)
+
+
+def describe_ego(ego_name: str) -> str:
+    """One-line flavour text for an armour ego, e.g. "+5 EV; rF+ (33% fire res)"."""
+    spec = ARMOUR_EGO_TABLE.get(ego_name, {})
+    parts: list[str] = []
+    if spec.get("ev_bonus"):
+        parts.append(f"+{spec['ev_bonus']} EV")
+    if spec.get("sh_bonus"):
+        parts.append(f"+{spec['sh_bonus']} SH")
+    if spec.get("ranged_dmg_bonus"):
+        pct = int(round(spec["ranged_dmg_bonus"] * 100))
+        parts.append(f"+{pct}% ranged dmg")
+    if spec.get("grant_see_invisible"):
+        parts.append("see invisible")
+    for dmg_type, level in (spec.get("resistances") or {}).items():
+        # Per existing apply_resistance, r+ = 33% reduction.
+        pct = int(round(level * 33))
+        if pct:
+            parts.append(f"r{dmg_type[:1].upper()}+ ({pct}% {dmg_type} res)")
+        else:
+            parts.append(f"r{dmg_type[:1].upper()}+")
+    if not parts:
+        return ego_name
+    return "; ".join(parts)
+
+
+def announce_spawn(item) -> str:
+    """Build the in-message-log line announcing a freshly spawned item.
+
+    Returns a single line: enchantment + (brand | ego) + effect. Returns "" if
+    the item has nothing worth announcing (no enchant, no brand, no ego).
+    """
+    name = getattr(item, "name", "")
+    enchant = getattr(item, "enchant", 0) or 0
+    brand = getattr(item, "brand", None)
+    ego = getattr(item, "ego", None)
+    if not enchant and not brand and not ego:
+        return ""
+    head = f"+{enchant} {name}" if enchant else name
+    if brand:
+        spec_label = brand.replace("_", " ").title()
+        head += f" ({spec_label})"
+    elif ego:
+        spec = ARMOUR_EGO_TABLE.get(ego, {})
+        head += f" ({spec.get('label', ego)})"
+    body = ""
+    if brand:
+        body = describe_brand(brand)
+    elif ego:
+        body = describe_ego(ego)
+    if body:
+        return f"{head} \u2014 {body}"
+    return head
+
+
 # --- Public-facing generation (used by _populate) -------------------------
 
 def maybe_brand_weapon(weapon: "DungeonWeapon", floor: int, vault_bonus: int = 0,

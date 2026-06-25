@@ -78,17 +78,66 @@ class DungeonMenu:
     # --- pack (use / equip / unequip / drop) ---------------------------
     _PAGE_SIZE = 9
 
+    # Item-type rank for the auto-sort. Lower number = shown first.
+    _ITEM_SORT_RANK = {
+        "DungeonWeapon":     0,
+        "DungeonArmour":     1,
+        "DungeonThrowable":  2,
+        "DungeonSpellBook":  3,
+        "DungeonPotion":     4,
+        "DungeonScroll":     5,
+        "DungeonInventory":  6,
+        "DungeonShard":      7,
+    }
+
+    def _sort_inventory(self) -> None:
+        """Permanently reorder the inventory: equipped first, then by type,
+        then by name, then by enchantment (descending). Uses stable sort so
+        the existing within-bucket order is preserved."""
+        player = self.game.player
+
+        def sort_key(it):
+            cls = type(it).__name__
+            is_worn = isinstance(it, DungeonArmour) and player.armour.get(it.slot) is it
+            equipped = (it is player.equipped) or is_worn
+            # Equipped items get a small negative bonus so they bubble to the top.
+            eq_rank = 0 if equipped else 1
+            type_rank = self._ITEM_SORT_RANK.get(cls, 99)
+            name = getattr(it, "name", "")
+            ench = getattr(it, "enchant", 0)
+            # Negate enchantment so higher enchantment comes first within a name.
+            return (eq_rank, type_rank, name.lower(), -ench)
+
+        player.inventory.sort(key=sort_key)
+
     def pack(self) -> None:
         game, player = self.game, self.game.player
         page = 0
         while True:
             inv = player.inventory
             total = len(inv)
-            pages = max(1, (total + self._PAGE_SIZE - 1) // self._PAGE_SIZE)
+            # Equipped items always shown first, even before any auto-sort.
+            # Build a view: equipped items, then the rest in original order.
+            eq_set = {id(player.equipped)}
+            for slot, piece in player.armour.items():
+                if piece is not None:
+                    eq_set.add(id(piece))
+            eq_idx = [i for i, it in enumerate(inv) if id(it) in eq_set]
+            other_idx = [i for i, it in enumerate(inv) if id(it) not in eq_set]
+            view_idx = eq_idx + other_idx
+            view_total = len(view_idx)
+            pages = max(1, (view_total + self._PAGE_SIZE - 1) // self._PAGE_SIZE)
             page = max(0, min(page, pages - 1))
             start = page * self._PAGE_SIZE
-            end = min(start + self._PAGE_SIZE, total)
-            page_items = inv[start:end]
+            end = min(start + self._PAGE_SIZE, view_total)
+            page_view = view_idx[start:end]  # real indices into player.inventory
+            page_items = [inv[i] for i in page_view]
+            # True if every item on this page is equipped.
+            page_all_eq = bool(page_items) and all(
+                it is player.equipped
+                or (isinstance(it, DungeonArmour) and player.armour.get(it.slot) is it)
+                for it in page_items
+            )
 
             clear_screen()
             full_flag = total >= player.max_inventory
@@ -115,16 +164,26 @@ class DungeonMenu:
             table.add_column("Item", style="item")
             table.add_column("Details", style="flavor")
             table.add_column("", style="success")
+            # Sub-header row when the page is entirely equipped items.
+            if page_all_eq and page_items:
+                table.add_row("", f"[success]-- equipped --[/success]", "", "")
+            prev_was_eq = page_all_eq and bool(page_items)
             for i, it in enumerate(page_items, 1):
                 is_worn = isinstance(it, DungeonArmour) and player.armour.get(it.slot) is it
-                equipped = "equipped" if (it is player.equipped or is_worn) else ""
+                equipped_now = (it is player.equipped or is_worn)
+                # Drop the equipped sub-header when the first unequipped item appears.
+                if prev_was_eq and not equipped_now:
+                    table.add_row("", f"[flavor]-- pack --[/flavor]", "", "")
+                    prev_was_eq = False
+                equipped = "equipped" if equipped_now else ""
                 table.add_row(str(i), self._name(it), self._detail(it), equipped)
             game.print(table)
             nav = ""
             if pages > 1:
                 nav = f"  {style_text(',', 'controls')} prev  {style_text('.', 'controls')} next"
-            game.print(f"\n{style_text('1-9', 'controls')} select item{nav}"
-                       f"  {style_text('esc', 'controls')} exit.", highlight=False)
+            game.print(f"\n{style_text('1-9', 'controls')} select item  "
+                       f"{style_text('s', 'controls')} auto-sort"
+                       f"{nav}  {style_text('esc', 'controls')} exit.", highlight=False)
             key = keys.read_key()
             if key in (keys.ESC, "q"):
                 return
@@ -134,10 +193,16 @@ class DungeonMenu:
             if key == "." and page < pages - 1:
                 page += 1
                 continue
+            if key in ("s", "S"):
+                self._sort_inventory()
+                page = 0
+                game.message("[success]Pack auto-sorted.[/success]")
+                continue
             if key.isdigit():
                 n = int(key)
                 if 1 <= n <= len(page_items):
-                    idx = page * self._PAGE_SIZE + (n - 1)
+                    # Map the page-local position back to the real inventory index.
+                    idx = page_view[n - 1]
                     if self._item_actions(idx):
                         return
 
