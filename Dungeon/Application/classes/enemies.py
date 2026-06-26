@@ -702,7 +702,7 @@ class DungeonEnemy:
         elif spell.effect == "summon":
             self._enemy_summon(spell, game)
         elif spell.effect == "channel":
-            # Sustained beam — handled as a one-shot projectile for AI.
+            # Sustained beam - handled as a one-shot projectile for AI.
             self._enemy_projectile(spell, target, game)
         else:
             return False
@@ -934,7 +934,7 @@ class DungeonEnemy:
             sum_texts = EnemyTexts(
                 raw_texts["critical_hit"], raw_texts["hit"],
                 raw_texts["missed_hit"], raw_texts["death"], d.name)
-            # Stats — slightly buffed.
+            # Stats - slightly buffed.
             base_hp = (d.health_range[0] + d.health_range[1]) // 2
             summon = DungeonEnemy(
                 name=d.name, symbol=d.symbol, tier=getattr(d, "tier", "weak"),
@@ -1101,7 +1101,7 @@ class DungeonEnemyLoader:
             on_hit=getattr(d, "on_hit", None),
             speed=getattr(d, "speed", 10),
             holiness=getattr(d, "holiness", "natural"),
-            # Phase 0+ forwards — all default-safe.
+            # Phase 0+ forwards - all default-safe.
             spells=getattr(d, "spells", None),
             spell_chance=getattr(d, "spell_chance", 0.0),
             ai=getattr(d, "ai", "chase"),

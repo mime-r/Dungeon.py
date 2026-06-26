@@ -106,6 +106,8 @@ def _save_item(item) -> dict | None:
             data["brand"] = item.brand
         if getattr(item, "enchant", 0):
             data["enchant"] = item.enchant
+        if getattr(item, "cost", None) is not None:
+            data["cost"] = item.cost
         if getattr(item, "magical_staff", False):
             data["magical_staff"] = True
         if getattr(item, "dmg_pct_vs_holiness", None):
@@ -116,6 +118,8 @@ def _save_item(item) -> dict | None:
             data["ego"] = item.ego
         if getattr(item, "enchant", 0):
             data["enchant"] = item.enchant
+        if getattr(item, "cost", None) is not None:
+            data["cost"] = item.cost
         if getattr(item, "resistances", None):
             data["resistances"] = dict(item.resistances)
         if getattr(item, "ev_bonus", 0):
@@ -155,6 +159,8 @@ def _load_item(data: dict, game):
         if item is not None:
             item.brand = data.get("brand")
             item.enchant = int(data.get("enchant", 0))
+            if data.get("cost") is not None:
+                item.cost = int(data["cost"])
             if data.get("magical_staff"):
                 item.magical_staff = True
             if data.get("dmg_pct_vs_holiness"):
@@ -166,6 +172,8 @@ def _load_item(data: dict, game):
         if item is not None:
             item.ego = data.get("ego")
             item.enchant = int(data.get("enchant", 0))
+            if data.get("cost") is not None:
+                item.cost = int(data["cost"])
             if data.get("resistances"):
                 item.resistances = dict(data["resistances"])
             if data.get("ev_bonus"):
@@ -297,6 +305,7 @@ def _save_player(player) -> dict:
         "known_spells": [spell.name for spell in player.known_spells],
         "channeling": player._channeling,
         "skills": _save_skills(player.skills),
+        "regen_counter": player.regen_counter,
     }
 
 
@@ -329,6 +338,7 @@ def _load_player(data: dict, game) -> DungeonPlayer:
     player.known_spells = [s for s in player.known_spells if s is not None]
     player._channeling = {name: int(turns) for name, turns in data.get("channeling", {}).items()}
     player._channel_targets = {}
+    player.regen_counter = int(data.get("regen_counter", 0))
     player.skills = _load_skills(data.get("skills"))
     if player.skills:
         player.skills.recent_actions = list(data.get("skills", {}).get("recent_actions", []))
@@ -603,7 +613,7 @@ class FloorTheme:
     ambient: str = ""
     structures: list = field(default_factory=list)        # 0-2 names from STRUCTURE_CATALOG
     terrain_features: list = field(default_factory=list)  # 0-2 from _VALID_TERRAIN_FEATURES
-    water_density: str = "small"  # small | medium | large — size of ambient ponds
+    water_density: str = "small"  # small | medium | large - size of ambient ponds
 
 _THEME_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 _VALID_BIAS_ENEMIES = [
@@ -857,7 +867,7 @@ class Dungeon:
                 time.sleep(1.2)
 
             self.enter_level(1, mode="down")
-            self.message(f"[flavor]You descend into the dungeon. Three shards of a Broken Sigil lie scattered in the depths — find them all.[/flavor]")
+            self.message(f"[flavor]You descend into the dungeon. Three shards of a Broken Sigil lie scattered in the depths - find them all.[/flavor]")
             if self.llm.enabled:
                 self.message(f"[flavor]The dungeon breathes with strange intelligence. ({self.llm.status})[/flavor]")
             elif self.llm.status != "disabled":
@@ -1192,7 +1202,7 @@ class Dungeon:
         return [
             {"role": "system", "content": (
                 "You are the narrator of a dark fantasy roguelike. "
-                "Output ONLY one short atmospheric sentence — no thinking, no explanation, "
+                "Output ONLY one short atmospheric sentence - no thinking, no explanation, "
                 "no quotation marks. Maximum 15 words. Pure flavor, no gameplay advice."
             )},
             {"role": "user", "content": (
@@ -1217,7 +1227,7 @@ class Dungeon:
         return [
             {"role": "system", "content": (
                 "You write item lore for a dark fantasy game. "
-                "Output ONLY one sentence of grim backstory — no thinking, no explanation, "
+                "Output ONLY one sentence of grim backstory - no thinking, no explanation, "
                 "no quotation marks. Specific and evocative."
             )},
             {"role": "user", "content": (
@@ -1245,7 +1255,7 @@ class Dungeon:
             return
         rec = self.ident.get(name)
         if rec and not rec["identified"]:
-            return  # unidentified consumable — identify() will handle it when used
+            return  # unidentified consumable - identify() will handle it when used
         self._lore_futures[name] = self.llm.complete_async(self._build_lore_prompt(item))
 
     # --- item identification -------------------------------------------
@@ -1269,6 +1279,9 @@ class Dungeon:
         ench = getattr(item, "enchant", 0)
         if ench > 0:
             name = f"{name} +{ench}"
+        brand = getattr(item, "brand", None)
+        if brand:
+            name = f"{name} of {brand.replace('_', ' ').title()}"
         return name
 
     def identify(self, item, announce: bool = True) -> None:
@@ -1334,7 +1347,7 @@ class Dungeon:
                 "Output ONLY a single valid JSON object with exactly these keys: "
                 "name (string), description (string), "
                 "layout_bias (exactly one of: cave rooms bsp any), "
-                "enemy_bias (JSON array of 0-5 mob names; pick the most thematically fitting ones for this floor — "
+                "enemy_bias (JSON array of 0-5 mob names; pick the most thematically fitting ones for this floor - "
                 "any name in the 'Enemies available' list below is valid), "
                 "trap_type (exactly one of: dart poison teleport alarm any), "
                 "trap_density (exactly one of: low normal high), "
@@ -1343,9 +1356,9 @@ class Dungeon:
                 "structures (JSON array of 0-2 names chosen ONLY from: "
                 "shrine mushroom_grove overgrown_room ruined_hall frozen_pond campsite poison_marsh standing_stones), "
                 "terrain_features (JSON array of 0-2 names chosen ONLY from: lava_pools chasms water_pools), "
-                "water_density (exactly one of: small medium large — size of ambient water pools; use large for flooded/sunken/drowned themes, small for dry/normal themes). "
+                "water_density (exactly one of: small medium large - size of ambient water pools; use large for flooded/sunken/drowned themes, small for dry/normal themes). "
                 "Choose structures, terrain_features, and water_density that match the theme's name and description. "
-                "No markdown fences, no explanation, no thinking — pure JSON only."
+                "No markdown fences, no explanation, no thinking - pure JSON only."
             )},
             {"role": "user", "content": (
                 f"Depth {depth} of {config.depth.floors}. "
@@ -1405,10 +1418,10 @@ class Dungeon:
         """Pick a mob loader for this floor using theme + tier mix.
 
         Order of preference:
-        1. LLM `theme.enemy_bias` — explicit picks at full weight.
-        2. Per-floor `FLOOR_THEMES[depth].flavor` — 70 % of the time, the pick
+        1. LLM `theme.enemy_bias` - explicit picks at full weight.
+        2. Per-floor `FLOOR_THEMES[depth].flavor` - 70 % of the time, the pick
            comes from this curated list (filtered by the rolled tier).
-        3. Full depth pool — 30 % of the time, picks from any mob valid at this
+        3. Full depth pool - 30 % of the time, picks from any mob valid at this
            depth, filtered by the rolled tier.
 
         The tier is rolled from `tier_mix` (e.g. floor 1 = 70 % weak / 30 % mid,
@@ -1783,6 +1796,11 @@ class Dungeon:
         if p.health <= 0:
             self.game_over("dead")
             return
+        if p.health < p.max_health:
+            p.regen_counter += max(1, p.max_health // 25)
+            if p.regen_counter >= 100:
+                p.health = min(p.max_health, p.health + 1)
+                p.regen_counter -= 100
         for e in self.map.enemies:
             e.energy += e.effective_speed()
         for e in list(self.map.enemies):
@@ -1866,7 +1884,7 @@ class Dungeon:
                 "hp": self.player.health, "max_hp": self.player.max_health,
             })
         if enemy.tier == "boss":
-            self.message("[success]The guardian falls! The shard lies unguarded — take it.[/success]")
+            self.message("[success]The guardian falls! The shard lies unguarded - take it.[/success]")
             self._queue_hint(f"boss_{enemy.name}", {
                 "trigger": f"player just slew the {enemy.name}, a powerful boss guardian",
                 "depth": self.depth, "background": self.player.background,
@@ -1900,7 +1918,7 @@ class Dungeon:
                 # Move toward target
                 self._summon_step(s, target.y, target.x)
         else:
-            # No enemies — roam near player (~2 tiles avg)
+            # No enemies - roam near player (~2 tiles avg)
             pdist = max(abs(s.y - self.player.y), abs(s.x - self.player.x))
             if pdist > 3:
                 self._summon_step(s, self.player.y, self.player.x)  # keep up
@@ -1997,7 +2015,7 @@ class Dungeon:
             count = len(self.player.shards)
             self.message(f"[shard]You seize the {item.name}! ({count}/3 sigil shards)[/shard]")
             if count == 3:
-                self.message("[warn]The Broken Sigil is whole. The dungeon shudders — flee to the surface![/warn]")
+                self.message("[warn]The Broken Sigil is whole. The dungeon shudders - flee to the surface![/warn]")
                 self.awaken_floor()
                 self._queue_hint("all_shards", {
                     "trigger": "player assembled the complete Broken Sigil and must now flee to the surface",
@@ -2057,7 +2075,7 @@ class Dungeon:
             else:
                 missing = 3 - len(self.player.shards)
                 self.message(
-                    f"[warn]You cannot leave — {missing} shard{'s' if missing > 1 else ''} "
+                    f"[warn]You cannot leave - {missing} shard{'s' if missing > 1 else ''} "
                     f"of the Broken Sigil still lie in the depths.[/warn]"
                 )
         else:
@@ -2091,7 +2109,7 @@ class Dungeon:
         effect_text = f" {', '.join(parts)}." if parts else ""
         real = style_text(pot.name, "item")
         if was_unknown:
-            self.message(f"You quaff the {style_text(appearance, 'item')} — "
+            self.message(f"You quaff the {style_text(appearance, 'item')} - "
                          f"it is [success]{real}[/success]!{effect_text}")
         else:
             self.message(f"You quaff the {real}.{effect_text}")
@@ -2101,7 +2119,7 @@ class Dungeon:
         was_unknown = appearance != scroll.name
         self.identify(scroll, announce=False)  # learned by reading; named in the message below
         real = style_text(scroll.name, "item")
-        read = (f"You read the {style_text(appearance, 'item')} — it is [success]{real}[/success]!"
+        read = (f"You read the {style_text(appearance, 'item')} - it is [success]{real}[/success]!"
                 if was_unknown else f"You read the {real}.")
         # Silence blocks both spells and scrolls. Check the aura + per-actor status.
         if self.map.silence_aura > 0 or self.player.status.has("silence"):
@@ -2113,7 +2131,7 @@ class Dungeon:
             self.message(read)
             target = self.menu.choose_unidentified(exclude=scroll)
             if target is None:
-                self.message("[warn]You stop before the incantation — nothing to identify.[/warn]")
+                self.message("[warn]You stop before the incantation - nothing to identify.[/warn]")
                 return False  # don't waste the scroll
             self.identify(target)
             return True
@@ -2147,7 +2165,7 @@ class Dungeon:
                 return False
             self.player.location = target
             self.map.update_fov()
-            self.message("[action]Space folds around you — you reappear in a chosen spot.[/action]")
+            self.message("[action]Space folds around you - you reappear in a chosen spot.[/action]")
             return True
         if effect == "butterflies":
             self.message(read)
@@ -2163,14 +2181,14 @@ class Dungeon:
             if getattr(weapon, "magical_staff", False):
                 self.message(
                     f"[fail]The {style_text(weapon.name, 'weapons')} resists the enchantment "
-                    f"— magical staves cannot be enchanted.[/fail]"
+                    f"- magical staves cannot be enchanted.[/fail]"
                 )
                 return False
             # Cap at +9 (DCSS max). Preserve the scroll on refusal.
             if getattr(weapon, "enchant", 0) >= 9:
                 self.message(
                     f"[warn]The {style_text(weapon.name, 'weapons')} cannot be enchanted further "
-                    f"— it has reached the maximum of +9.[/warn]"
+                    f"- it has reached the maximum of +9.[/warn]"
                 )
                 return False
             weapon.enchant = getattr(weapon, "enchant", 0) + 1
@@ -2190,7 +2208,7 @@ class Dungeon:
             if getattr(armour, "enchant", 0) >= 9:
                 self.message(
                     f"[warn]The {style_text(armour.name, 'armour')} cannot be enchanted further "
-                    f"— it has reached the maximum of +9.[/warn]"
+                    f"- it has reached the maximum of +9.[/warn]"
                 )
                 return False
             armour.enchant = getattr(armour, "enchant", 0) + 1
@@ -2263,7 +2281,7 @@ class Dungeon:
             # Magical staves cannot be branded (DCSS rule).
             if getattr(weapon, "magical_staff", False):
                 self.message(
-                    f"[fail]The {style_text(weapon.name, 'weapons')} rejects the brand — "
+                    f"[fail]The {style_text(weapon.name, 'weapons')} rejects the brand - "
                     f"magical staves cannot be branded.[/fail]"
                 )
                 return False
@@ -2547,7 +2565,7 @@ class Dungeon:
         p = self.player
         p.health = p.max_health
         p.status.add("regen", 15, 2)
-        self.message("[success]You kneel at the ancient altar. Warmth floods you — "
+        self.message("[success]You kneel at the ancient altar. Warmth floods you - "
                      "fully healed and blessed with [regen]Regeneration[/regen].[/success]")
 
     # --- ranged combat --------------------------------------------------
@@ -2703,7 +2721,7 @@ class Dungeon:
                 if isinstance(item, DungeonWeapon):
                     lo, hi = item.attack_range
                     enchant = getattr(item, "enchant", 0)
-                    detail = f" — Atk {item.base_attack + enchant} (+{lo}-{hi}), {item.accuracy + enchant}% acc, {item.hands}-handed"
+                    detail = f" - Atk {item.base_attack + enchant} (+{lo}-{hi}), {item.accuracy + enchant}% acc, {item.hands}-handed"
                     if enchant:
                         detail += f" [level]+{enchant}[/level]"
                     brand = getattr(item, "brand", None)
@@ -2717,9 +2735,9 @@ class Dungeon:
                         detail += f" [arcane]({bonuses})[/arcane]"
                 elif isinstance(item, DungeonThrowable):
                     lo, hi = item.attack_range
-                    detail = f" — Atk {item.base_attack} (+{lo}-{hi}), {item.accuracy}% acc, range {item.range}, x{item.count}"
+                    detail = f" - Atk {item.base_attack} (+{lo}-{hi}), {item.accuracy}% acc, range {item.range}, x{item.count}"
                 elif isinstance(item, DungeonPotion):
-                    detail = f" — heals +{item.hp_change} HP"
+                    detail = f" - heals +{item.hp_change} HP"
                 elif isinstance(item, DungeonArmour):
                     from .classes.item_egos import ARMOUR_EGO_TABLE
                     ego = getattr(item, "ego", None)
@@ -2738,9 +2756,9 @@ class Dungeon:
                         extras.append("SInv")
                     suffix = f" ({ego_label})" if ego_label else ""
                     extra = f" [{', '.join(extras)}]" if extras else ""
-                    detail = f" — {item.slot.title()} AC {item.ac + getattr(item, 'enchant', 0)}{suffix}{extra}"
+                    detail = f" - {item.slot.title()} AC {item.ac + getattr(item, 'enchant', 0)}{suffix}{extra}"
                 elif isinstance(item, DungeonScroll):
-                    detail = f" — {item.effect.replace('_', ' ').title()}"
+                    detail = f" - {item.effect.replace('_', ' ').title()}"
                 parts.append(f"[item]{item.symbol} {self.display_name(item)}[/item]{detail}")
 
         # Gold
@@ -2860,6 +2878,34 @@ class Dungeon:
             self.player.inventory.remove(weapon)
 
     # --- autoexplore ----------------------------------------------------
+    def rest(self) -> None:
+        """Rest until HP and MP are full, or interrupted by danger."""
+        if self.player.health >= self.player.max_health and self.player.mp >= self.player.max_mp:
+            self.message("[flavor]You are already fully rested.[/flavor]")
+            return
+        self.message("[flavor]You begin to rest...[/flavor]")
+        for _ in range(5000):
+            if self.over:
+                break
+            if self.player.health <= 0:
+                self.game_over("dead")
+                return
+            visible = self.map.visible_enemies()
+            if visible:
+                name = visible[0].name
+                self.message(f"[warn]Rest interrupted: a {style_text(name, 'enemy')} is in view.[/warn]")
+                return
+            self.spend_turn(TURN)
+            self.advance_world()
+            if self.player.health >= self.player.max_health and self.player.mp >= self.player.max_mp:
+                self.message("[success]You are fully healed.[/success]")
+                return
+            self.render()
+            time.sleep(0.01)
+            if _ % 50 == 0:
+                self.message("[flavor]You continue to rest...[/flavor]")
+        self.message("[warn]You finish resting, though not fully recovered.[/warn]")
+
     def autoexplore(self) -> None:
         def passable(y, x):
             c = self.map.matrix[y][x]
@@ -3136,6 +3182,9 @@ class Dungeon:
         if key in (".", keys.SPACE):
             self.message("You wait.")
             return TURN
+        if key == "5":
+            self.rest()
+            return 0
         if key == "m":
             self.menu.skills_ui()
             return 0
@@ -3196,7 +3245,7 @@ class Dungeon:
         while True:
             clear_screen()
             lines = [
-                "[menu_header]Dungeon.py — Manual[/menu_header]\n",
+                "[menu_header]Dungeon.py - Manual[/menu_header]\n",
                 f"  {style_text('0', 'controls')}  Controls (keybindings)",
                 f"  {style_text('1', 'controls')}  Game Objective",
                 f"  {style_text('2', 'controls')}  Combat",
@@ -3226,12 +3275,12 @@ class Dungeon:
             "[controls]f[/controls]  fire a ranged weapon or throw (aim, [controls]f[/controls]/[controls]enter[/controls]; [controls]tab[/controls] cycle targets)\n"
             "[controls]o[/controls]  autoexplore (pauses on enemy or new staircase)\n"
             "[controls]g[/controls]  pick up items (choose which, or take all)\n"
-            "[controls]i[/controls] / [controls]d[/controls]  open pack — use, equip, unequip, drop\n"
+            "[controls]i[/controls] / [controls]d[/controls]  open pack - use, equip, unequip, drop\n"
             "[controls]A[/controls]  armour management\n"
             "[controls]m[/controls]  skills overview\n"
             "[controls]z[/controls]  spellcasting\n"
             "[controls]>[/controls] / [controls]<[/controls]  descend / ascend stairs\n"
-            "[controls]G[/controls]  goto stairs — [controls]<[/controls] or [controls]>[/controls] walks to nearest staircase\n"
+            "[controls]G[/controls]  goto stairs - [controls]<[/controls] or [controls]>[/controls] walks to nearest staircase\n"
             "[controls][[/controls] / [controls]][/controls]  pan view to known up/down-stairs\n"
             "[controls]X[/controls]  exclude stair under you from auto-explore\n"
             "[controls]\\\\[/controls]  auto-pickup settings\n"
@@ -3239,6 +3288,7 @@ class Dungeon:
             "[controls]s[/controls]  search for secret doors and traps\n"
             "[controls]S[/controls]  save game to disk\n"
             "[controls].[/controls] or [controls]space[/controls]  wait one turn\n"
+            "[controls]5[/controls]  rest until fully healed (interrupted by enemies)\n"
             "[controls]?[/controls]  this manual    [controls]p[/controls]  pause    [controls]esc[/controls] quit\n"
             "[controls]~[/controls]  toggle god mode (dev)\n\n"
             f"Press {style_text('any key', 'controls')} to return.",
@@ -3304,8 +3354,8 @@ class Dungeon:
             "[controls]Use[/controls] (quaff/read) an item to discover its true name.\n"
             "Identified items show their real name in future drops.\n\n"
             "Effects can be helpful or harmful. Quaffing a random potion\n"
-            "might heal you — or poison you. Reading an unknown scroll\n"
-            "might reveal the map — or summon monsters.\n\n"
+            "might heal you - or poison you. Reading an unknown scroll\n"
+            "might reveal the map - or summon monsters.\n\n"
             "Risk vs reward: use items when you need them, or wait until\n"
             "you can identify safely (e.g. in a cleared room).\n\n"
             "Some NPCs may sell identified items at a premium.\n\n"
@@ -3319,7 +3369,7 @@ class Dungeon:
             "[controls]m[/controls] opens the skills screen. Skills improve as you use them\n"
             "(e.g. swinging a mace trains Maces & Flails).\n\n"
             "Skill levels boost: damage, accuracy, spell success rate.\n"
-            "Aptitudes vary by class — some learn faster in certain skills.\n\n"
+            "Aptitudes vary by class - some learn faster in certain skills.\n\n"
             "[controls]z[/controls] opens the spellcasting screen. Select a known spell\n"
             "to cast it. Spells cost [controls]MP[/controls] (magic points).\n\n"
             "MP recovers over time. Intelligence boosts max MP.\n"
@@ -3392,11 +3442,11 @@ class Dungeon:
             "[menu_header]Tips[/menu_header]\n\n"
             "[controls]•[/controls] Search ([controls]s[/controls]) frequently near walls to find secrets.\n"
             "[controls]•[/controls] Use autoexplore ([controls]o[/controls]) to map floors quickly.\n"
-            "[controls]•[/controls] Identify potions/scrolls early — knowledge is power.\n"
+            "[controls]•[/controls] Identify potions/scrolls early - knowledge is power.\n"
             "[controls]•[/controls] Save gold for Healers and Blacksmiths.\n"
             "[controls]•[/controls] Stairs are one-way until you find the up-stairs.\n"
             "[controls]•[/controls] Kite tough enemies through doors or around corners.\n"
-            "[controls]•[/controls] Don't fight multiple enemies at once — use doorways.\n"
+            "[controls]•[/controls] Don't fight multiple enemies at once - use doorways.\n"
             "[controls]•[/controls] Check every floor for hidden vault rooms.\n"
             "[controls]•[/controls] Two-handed weapons trade accuracy for damage.\n"
             "[controls]•[/controls] Save the game ([controls]S[/controls]) before risky fights.\n"
@@ -3426,7 +3476,7 @@ class Dungeon:
             self.print("[flavor]No one has escaped with the Orb yet. Be the first.[/flavor]", highlight=False)
         for i, e in enumerate(winners[:10]):
             here = style_text("you", "success") if e["session_id"] == self.session_id else e["name"]
-            self.print(f"{i + 1}. {here} — {e['time']}s, {e['moves']} turns", highlight=False)
+            self.print(f"{i + 1}. {here} - {e['time']}s, {e['moves']} turns", highlight=False)
 
     def game_over(self, how: str) -> None:
         self.over = True

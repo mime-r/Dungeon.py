@@ -106,7 +106,7 @@
     },
     {
         "name": "Scroll of Torment",
-        "description": "Torments all visible creatures — friend and foe alike — bypassing armour.",
+        "description": "Torments all visible creatures - friend and foe alike - bypassing armour.",
         "cost": 55,
         "weight": 2,
         "effect": "torment"

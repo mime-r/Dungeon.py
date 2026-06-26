@@ -193,6 +193,7 @@ class DungeonPlayer:
         self.known_spells: list[DungeonSpell] = []
         self._channeling: dict = {}  # spell_name -> current tick (1..N)
         self._channel_targets: dict = {}  # spell_name -> locked target object
+        self.regen_counter = 0  # HP regen accumulator (100 = 1 HP)
 
     def effective_speed(self) -> int:
         s = self.speed

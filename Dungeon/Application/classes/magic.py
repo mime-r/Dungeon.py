@@ -10,11 +10,11 @@ from ..utils import style_text
 
 # Configurable constants for the success formula
 class MagicConfig:
-    DIFFICULTY_PER_LEVEL = 8   # was 10 — gentler scaling per spell tier
+    DIFFICULTY_PER_LEVEL = 10  # per spell level
     SPELLCASTING_WEIGHT = 2
     SCHOOL_WEIGHT = 4
-    INT_WEIGHT = 3.0           # was 2.0 — INT now matters more
-    BASE_FAILURE = 30         # was 52 — much friendlier baseline
+    INT_WEIGHT = 3.0
+    BASE_FAILURE = 69
     STAFF_SKILL_BONUS = 4.0
     STAFF_DAMAGE_MULT = 0.05
     SEVERE_MISCAST_THRESHOLD = 30
@@ -53,8 +53,8 @@ def staff_school(weapon_name: str) -> str | None:
 
 def virtual_skill(actual: float, has_staff: bool) -> float:
     if not has_staff:
-        return actual
-    return actual + MagicConfig.STAFF_SKILL_BONUS
+        return max(0.0, actual)
+    return max(0.0, actual) + MagicConfig.STAFF_SKILL_BONUS
 
 
 def calculate_failure(spell, player) -> float:
@@ -75,10 +75,11 @@ def calculate_failure(spell, player) -> float:
     spellcasting = skills.get_level("Spellcasting") if skills else 0.0
     if staff_s == "Spellcasting":
         spellcasting += MagicConfig.STAFF_SKILL_BONUS
+    int_val = getattr(player, "intelligence", 8)
     skill_power = (
         spellcasting * MagicConfig.SPELLCASTING_WEIGHT
         + avg_skill * MagicConfig.SCHOOL_WEIGHT
-        + player.intelligence * MagicConfig.INT_WEIGHT
+        + int_val * MagicConfig.INT_WEIGHT
     )
 
     raw = MagicConfig.BASE_FAILURE + difficulty - skill_power
@@ -234,7 +235,7 @@ def continue_channel(spell, player, game) -> bool:
     if target is None or getattr(target, "health", 0) <= 0:
         player._channeling.pop(spell.name, None)
         player._channel_targets.pop(spell.name, None)
-        game.message(f"[action]Your {style_text(spell.name, 'item')} snaps off — nothing to strike.[/action]")
+        game.message(f"[action]Your {style_text(spell.name, 'item')} snaps off - nothing to strike.[/action]")
         return False
     player.skills.record("Spellcasting")
     for school in spell.schools:

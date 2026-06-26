@@ -1,9 +1,9 @@
 """Thin LLM client for Dungeon.py.
 
 Supports three OpenAI-compatible providers configured via .env:
-  lm_studio    — local LM Studio at http://127.0.0.1:1234
-  openai       — api.openai.com
-  opencode_zen — OpenCode Zen (configurable base URL)
+  lm_studio    - local LM Studio at http://127.0.0.1:1234
+  openai       - api.openai.com
+  opencode_zen - OpenCode Zen (configurable base URL)
 
 All public methods return None on any error; callers never need to handle exceptions.
 """
@@ -21,7 +21,7 @@ _log = logging.getLogger("dungeon.llm")
 
 
 def _load_dotenv(path: Path) -> None:
-    """Minimal .env loader — no external dependency required."""
+    """Minimal .env loader - no external dependency required."""
     try:
         with open(path, encoding="utf-8") as f:
             for line in f:
@@ -117,7 +117,7 @@ class LLMClient:
         """Synchronous chat completion. Returns stripped text or None on any failure.
 
         max_tokens is high to give reasoning models enough budget to think and still
-        produce a response. content is preferred over reasoning_content — we never
+        produce a response. content is preferred over reasoning_content - we never
         display raw internal monologue.
         """
         if not self.enabled:
@@ -141,7 +141,7 @@ class LLMClient:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 msg = data["choices"][0]["message"]
-                # Use content only — reasoning_content is internal monologue we never show.
+                # Use content only - reasoning_content is internal monologue we never show.
                 text = (msg.get("content") or "").strip()
                 return text or None
         except urllib.error.HTTPError as e:

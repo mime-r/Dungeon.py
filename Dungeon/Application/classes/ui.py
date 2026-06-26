@@ -79,7 +79,7 @@ class DungeonUI:
         return Text.from_markup(
             f"[game_header]DUNGEON.PY[/game_header]   "
             f"[depth]Depth {g.depth}/{config.depth.floors}[/depth]"
-            + (f" [flavor]— {_t.name}[/flavor]" if (_t := getattr(g, '_floor_themes', {}).get(g.depth)) and _t.name else "")
+            + (f" [flavor]- {_t.name}[/flavor]" if (_t := getattr(g, '_floor_themes', {}).get(g.depth)) and _t.name else "")
             + "   "
             f"[move_count]Turn {g.moves}[/move_count]   "
             f"[time_count]{elapsed:.1f}s[/time_count]{god}"
@@ -200,6 +200,7 @@ class DungeonUI:
             "[controls]S[/controls] save",
             "[flavor]restart to restore[/flavor]",
             "[controls].[/controls] wait",
+            "[controls]5[/controls] rest",
             "[controls]?[/controls] help",
             "[controls]esc[/controls] quit",
         ]

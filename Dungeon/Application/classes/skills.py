@@ -84,7 +84,7 @@ def skill_for_weapon(name: str) -> str | None:
 # Default attack delay per weapon skill category (DCSS: higher = slower swing).
 # These are sensible midpoints that match DCSS feel without per-weapon JSON churn.
 _SKILL_DEFAULT_DELAY: dict[str | None, int] = {
-    None: 5,              # Fists — fast
+    None: 5,              # Fists - fast
     "Short Blades": 8,    # Dagger, Quick Blade, Rapier
     "Staves": 11,         # Quarterstaff, Lajatang
     "Maces & Flails": 13, # Mace, Flail, Morningstar

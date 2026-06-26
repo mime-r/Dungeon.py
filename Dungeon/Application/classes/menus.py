@@ -24,7 +24,16 @@ def item_detail(item) -> str:
         lo, hi = item.attack_range
         hands = f"{item.hands}-handed"
         ench = getattr(item, "enchant", 0)
-        return f"Atk {item.base_attack + ench} (+{lo}-{hi}), {item.accuracy + ench}% acc, {hands}"
+        brand = getattr(item, "brand", None)
+        base = f"Atk {item.base_attack + ench} (+{lo}-{hi}), {item.accuracy + ench}% acc, {hands}"
+        if brand:
+            try:
+                from .item_egos import describe_brand
+                desc = describe_brand(brand)
+                return f"{base}, {brand.replace('_', ' ').title()} ({desc})"
+            except Exception:
+                return f"{base}, {brand.replace('_', ' ').title()}"
+        return base
     if isinstance(item, DungeonPotion):
         return f"heals +{item.hp_change} HP"
     if isinstance(item, DungeonScroll):
@@ -227,7 +236,7 @@ class DungeonMenu:
             verb = "use"
         rec = game.ident.get(getattr(item, "name", None))
         unidentified = bool(rec and not rec["identified"])
-        desc = "An unidentified item — use it to discover what it does." if unidentified else item.description
+        desc = "An unidentified item - use it to discover what it does." if unidentified else item.description
         lore = rec.get("lore") if rec else None
         lore_line = f"\n[flavor]{lore}[/flavor]" if lore else ""
         clear_screen()
@@ -358,7 +367,7 @@ class DungeonMenu:
                 sh = str(piece.sh) if piece.sh else "-"
                 enc = str(piece.encumbrance) if piece.encumbrance else "-"
             else:
-                name = "[flavor]—[/flavor]"
+                name = "[flavor]-[/flavor]"
                 ac = sh = enc = "-"
             table.add_row(slot_label, name, ac, sh, enc)
         game.print(table)
@@ -716,7 +725,7 @@ class DungeonMenu:
         messages = [
             {"role": "system", "content": (
                 f"You are {npc.name}, a {npc.occupation} in a dungeon. {personality} "
-                f"Reply with ONLY the spoken dialogue — 1-2 sentences, no thinking"
+                f"Reply with ONLY the spoken dialogue - 1-2 sentences, no thinking"
                 f"no stage directions, no quotation marks, no internal monologue."
             )},
             {"role": "user", "content": (
@@ -731,7 +740,7 @@ class DungeonMenu:
         # Show NPC header + animated spinner while the LLM generates
         clear_screen()
         game.print(
-            f"{style_text(npc.name, 'name')} — {style_text(npc.occupation, 'occupation')}",
+            f"{style_text(npc.name, 'name')} - {style_text(npc.occupation, 'occupation')}",
             highlight=False,
         )
         with Live(console=game.rich_console, refresh_per_second=10) as live:
@@ -753,7 +762,7 @@ class DungeonMenu:
             stock = trader.stuff
             clear_screen()
             self.game.print(
-                f"{style_text(trader.name, 'name')} — {style_text(trader.occupation, 'occupation')}"
+                f"{style_text(trader.name, 'name')} - {style_text(trader.occupation, 'occupation')}"
                 f"   (your gold: [coin]{self.game.player.coins}[/coin])", highlight=False)
             if greeting:
                 self.game.print(f"[flavor]\"{greeting}\"[/flavor]\n", highlight=False)
@@ -817,7 +826,7 @@ class DungeonMenu:
             full_cost = missing * rate
             affordable_hp = min(missing, player.coins // rate) if rate else missing
             self.game.print(
-                f"{style_text(healer.name, 'name')} — {style_text('Healer', 'occupation')}"
+                f"{style_text(healer.name, 'name')} - {style_text('Healer', 'occupation')}"
                 f"   (your gold: [coin]{player.coins}[/coin])", highlight=False)
             if greeting:
                 self.game.print(f"[flavor]\"{greeting}\"[/flavor]\n", highlight=False)

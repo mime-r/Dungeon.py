@@ -157,7 +157,7 @@
     },
     {
         "name": "Shadowblade",
-        "description": "Trained in the dark guilds of the underworld. A poisoned dagger and a talent for silence — they strike and fade before the mark hits the ground.",
+        "description": "Trained in the dark guilds of the underworld. A poisoned dagger and a talent for silence - they strike and fade before the mark hits the ground.",
         "hp_bonus": 2,
         "intelligence": 8,
         "max_mp": 2,

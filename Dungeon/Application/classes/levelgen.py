@@ -1,13 +1,13 @@
-"""Procedural dungeon level generator — multi-algorithm, variable-size floors.
+"""Procedural dungeon level generator - multi-algorithm, variable-size floors.
 
 Produces a terrain grid plus structural metadata (rooms, stairs, a hidden vault, and
 the list of spawnable floor cells) that :class:`DungeonMap` turns into live cells and
 that the game populates with monsters, items and NPCs.
 
 Three layout algorithms are randomly chosen each floor:
-  * ``rooms`` — enhanced rooms-and-corridors with rectangular and oval rooms
-  * ``cave``  — cellular-automata caverns for organic, winding spaces
-  * ``bsp``   — binary space partition for structured, interlocking rooms
+  * ``rooms`` - enhanced rooms-and-corridors with rectangular and oval rooms
+  * ``cave``  - cellular-automata caverns for organic, winding spaces
+  * ``bsp``   - binary space partition for structured, interlocking rooms
 """
 
 import math
@@ -550,11 +550,11 @@ def _place_ponds(layout: LevelLayout, grid, protected: set, w: int, h: int,
     Larger densities require bigger rooms to fit the pool.
     """
     if not layout.rooms:
-        return  # Cave maps have no rooms; corridors are irregular — skip ponds
+        return  # Cave maps have no rooms; corridors are irregular - skip ponds
 
     if water_density not in ("small", "medium", "large"):
         water_density = "small"
-    # Larger pools need bigger rooms — guard against cramped placements.
+    # Larger pools need bigger rooms - guard against cramped placements.
     # The room's 2-cell-margin interior is what the pool must fit inside.
     min_w, min_h = {"small": (7, 5), "medium": (9, 7), "large": (11, 9)}[water_density]
 
@@ -569,7 +569,7 @@ def _place_ponds(layout: LevelLayout, grid, protected: set, w: int, h: int,
     num_ponds = random.randint(0, min(2, len(eligible)))
 
     for room in eligible[:num_ponds]:
-        # Inner area with 2-cell margin from room walls — pond stays fully interior
+        # Inner area with 2-cell margin from room walls - pond stays fully interior
         inner = {
             (y, x)
             for y in range(room.y + 2, room.y + room.h - 2)
@@ -616,7 +616,7 @@ def _place_trees(layout: LevelLayout, grid, protected: set, w: int, h: int) -> N
     for cy, cx in candidates:
         if len(placed) >= num_trees:
             break
-        # All 4 cardinal neighbours must be floor — eliminates corridors and junctions
+        # All 4 cardinal neighbours must be floor - eliminates corridors and junctions
         if not all(
             0 <= cy + dy < h and 0 <= cx + dx < w
             and grid[cy + dy][cx + dx] == T.FLOOR
@@ -677,7 +677,7 @@ def _place_floor_features(layout: LevelLayout, grid, protected: set, w: int, h: 
     random.shuffle(candidates)
     taken: set[tuple[int, int]] = set()
 
-    # Shrubs — prefer cells with open neighbours
+    # Shrubs - prefer cells with open neighbours
     for cy, cx in candidates:
         if len([f for f in layout.scenery_features if f[2] == "shrub"]) >= random.randint(3, 8):
             break
@@ -692,7 +692,7 @@ def _place_floor_features(layout: LevelLayout, grid, protected: set, w: int, h: 
             layout.scenery_features.append((cy, cx, "shrub"))
             taken.add((cy, cx))
 
-    # Mushrooms — prefer corners with few open neighbours
+    # Mushrooms - prefer corners with few open neighbours
     for cy, cx in candidates:
         if len([f for f in layout.scenery_features if f[2] == "mushroom"]) >= random.randint(2, 5):
             break
@@ -707,7 +707,7 @@ def _place_floor_features(layout: LevelLayout, grid, protected: set, w: int, h: 
             layout.scenery_features.append((cy, cx, "mushroom"))
             taken.add((cy, cx))
 
-    # Rubble — rare, scattered anywhere
+    # Rubble - rare, scattered anywhere
     remaining = [(y, x) for (y, x) in candidates if (y, x) not in taken]
     random.shuffle(remaining)
     for cy, cx in remaining[:random.randint(1, 3)]:

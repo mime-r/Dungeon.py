@@ -64,11 +64,11 @@ class GameWrapper:
         )
         # Feature highlights.
         self.print(
-            "  [success]•[/success] [name]531 monsters[/name] — dragons, demons, liches, slimes, and more\n"
-            "  [success]•[/success] [name]Spell-casting AI[/name] — oracles, pyromancers, liches, summoners\n"
-            "  [success]•[/success] [name]Cone breath weapons[/name] — fire, ice, lightning, poison, acid, steam\n"
+            "  [success]•[/success] [name]531 monsters[/name] - dragons, demons, liches, slimes, and more\n"
+            "  [success]•[/success] [name]Spell-casting AI[/name] - oracles, pyromancers, liches, summoners\n"
+            "  [success]•[/success] [name]Cone breath weapons[/name] - fire, ice, lightning, poison, acid, steam\n"
             "  [success]•[/success] [name]21 spells, 15 brands, 7 armour egos, 19 scrolls[/name]\n"
-            "  [success]•[/success] [name]Optional AI features[/name] — biome themes, DM hints, item lore\n",
+            "  [success]•[/success] [name]Optional AI features[/name] - biome themes, DM hints, item lore\n",
             highlight=False,
         )
 

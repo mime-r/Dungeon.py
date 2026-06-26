@@ -76,7 +76,7 @@
     "summon_type": "small_mammal",
     "duration": 81,
     "max_active": 2,
-    "description": "Conjure a weak animal ally — rat, bat, or snake.",
+    "description": "Conjure a weak animal ally - rat, bat, or snake.",
     "cast_text": "You trace a summoning sigil; a small creature scurries into being."
   },
   {
