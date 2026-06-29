@@ -1,5 +1,49 @@
 # Changelog
 
+## 29/6/26 v2.7.5 - "Autoexplore Cancellation"
+
+**Autoexplore**
+- Autoexplore (`o` key) now stops as soon as any key is pressed - previously you had to wait for the loop to hit a halt condition (enemy in view, stairs spotted, nothing left, or 1000-step cap)
+- New `key_pressed()` non-blocking input check in `input.py` (Windows `msvcrt.kbhit`, Unix `select.select`, scripted-mode passthrough)
+- The pressed key is consumed and a `[flavor]Auto-explore cancelled.[/flavor]` message is logged
+
+## 29/6/26 v2.7.4 - "Spell Audit & Balance"
+
+**Spell Damage Resistance (B1)**
+- `bypass_mr` field on spells (`Iron Shot`, `Lehudib's Crystal Spear`, `Chain Lightning`) now actually works - previously parsed but never read
+- All spell damage (player->enemy and enemy->player) now applies target's damage-type resistance by default, with 33% reduction per resistance level matching the `apply_resistance` convention
+- `bypass_mr: true` skips the resistance check (full damage)
+- Affected handlers: `_projectile`, `_touch`, `_channel`, `_expanding_aoe`, `_explosion`, `_ignite_flora` in `magic.py`; `_enemy_projectile`, `_enemy_touch`, `_enemy_aoe`, `_enemy_explosion` in `enemies.py`
+
+**Caster AI (B2, B6)**
+- Enemy spellcasting now requires line of sight (`_pick_spell_target` checks `_line_of_sight` for ranged and touch spells) - casters can no longer phase spells through walls
+- Removed redundant `tick_cooldowns()` calls after a successful cast (was double-ticking per turn, off-by-1)
+
+**Summon System (B3, S1)**
+- Player summons (`Summon Small Mammal`, `Summon Canine Familiar`, `Summon Spectral Wolf`) now use **per-spell** caps: e.g. you can have 2 small mammals AND 1 spectral wolf simultaneously (previously the cap was shared globally, effectively limiting the player to one summon spell at a time when any summon was active)
+- Each player summon is tagged with `_summoned_by` (player object) and `_summon_spell_name` for accurate per-spell cap enforcement
+- When a caster enemy dies, all summons it owns dissolve immediately (DCSS-authentic behavior; previously they persisted and turned hostile)
+
+**Channeling Save/Load (B5)**
+- `_channel_targets` dict is now saved as a position map and resolved on load by finding the enemy at the saved coordinates
+- Channels whose target no longer exists (killed, despawned, moved off-map) are silently dropped from the active channel set
+- Fixes `AttributeError: 'NoneType' object has no attribute 'health'` crash on load when player was mid-channel (e.g. Searing Ray)
+
+**Blink (B4)**
+- `Blink` and `Phase Shift` now exclude occupied tiles from the teleport candidate set - prevents overlapping with enemies or summons
+
+**Ignite Flora (B7)**
+- Cleaned up the nested burnable-tile check (was checking terrain and feature inconsistently)
+- Now also applies target resistance to enemies caught in the flames
+
+**Scroll of Summoning (S4)**
+- Player scrolls of Summoning now spawn **allied** summons (tagged with `is_enemy=False`, `is_summon=True`, `_summoned_by=player`) that despawn after 80 turns - matching `Summon Small Mammal` behavior
+- Previously spawned hostile enemies adjacent to the player (almost never useful)
+- Message updated: "answer your summons" instead of "claw their way into being"
+
+**Save Migration**
+- Saves from v2.7.3 are forward-compatible: missing `channel_targets` field is treated as empty dict
+
 ## 29/6/26 v2.7.3 - "Fixed Pack & MP Display"
 
 **Inventory System**

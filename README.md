@@ -7,10 +7,20 @@ floors, and escape back to the surface alive.
 
 <p align="center"><img src="/resources/Dungeon.gif?raw=true"/></p>
 
-## What's new in v2.7.3
+## What's new in v2.7.5
 
-- **Fixed inventory size** - pack capacity is now static (no more `DungeonInventory` bag drops); the item, its data file, and all its plumbing are gone
-- **MP HUD fix** - max MP renders as `10` instead of `10.0` for saves that round-tripped through `float()`
+- **Autoexplore cancellation** - press any key during `o` to stop immediately (previously you had to wait for a halt condition)
+
+For prior release notes, see [CHANGELOG.md](CHANGELOG.md).
+
+## What's new in v2.7.4
+
+- **Spell resistance** - `bypass_mr` now actually works; all spell damage applies target's damage-type resistance (33% per level) by default
+- **Caster LOS** - enemy casters can no longer cast through walls
+- **Per-spell summon caps** - player summons cap per spell (e.g. 2 small mammals + 1 wolf) instead of globally
+- **Caster death despawns summons** - kill a lich, its demons dissolve (DCSS authentic)
+- **Channel save/load** - Searing Ray resumes after loading the game
+- **Scroll of Summoning** - now spawns allied summons (80-turn duration) instead of hostile mobs
 
 For prior release notes, see [CHANGELOG.md](CHANGELOG.md).
 

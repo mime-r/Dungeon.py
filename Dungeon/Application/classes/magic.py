@@ -176,6 +176,15 @@ def _projectile(spell, player, game, target, mult):
         lo, hi = spell.damage
         raw = random.randint(lo, hi)
         dmg = max(1, int(raw * mult))
+        if not spell.extra.get("bypass_mr"):
+            res = target.resistances.get(spell.damage_type, 0)
+            if res <= 0:
+                pass
+            else:
+                dmg = max(1, int(dmg * (1.0 - 0.33 * res)))
+                if dmg <= 0:
+                    game.message(f"[{style_tag}]The {en} resists the {spell.damage_type}.[/{style_tag}]")
+                    return
         _cast_pause()
         game.message(
             f"[{style_tag}]The {en} {verb}! ({dmg} {spell.damage_type} damage)[/{style_tag}]",
@@ -201,6 +210,13 @@ def _touch(spell, player, game, target, mult):
         lo, hi = spell.damage
         raw = random.randint(lo, hi)
         dmg = max(1, int(raw * mult))
+        if not spell.extra.get("bypass_mr"):
+            res = target.resistances.get(spell.damage_type, 0)
+            if res > 0:
+                dmg = max(1, int(dmg * (1.0 - 0.33 * res)))
+                if dmg <= 0:
+                    game.message(f"[{style_tag}]The {en} resists the {spell.damage_type}.[/{style_tag}]")
+                    return
         game.message(f"[action]You reach for the {en} with {style_text(spell.name, 'item')}![/action]")
         _cast_pause()
         game.message(
@@ -261,6 +277,10 @@ def _channel(spell, player, game, target, mult):
     raw = random.randint(lo, hi)
     bonus = tick - 1  # +0 on first tick, +1 on second, +2 on third
     dmg = max(1, int((raw + bonus) * mult))
+    if not spell.extra.get("bypass_mr"):
+        res = target.resistances.get(spell.damage_type, 0)
+        if res > 0:
+            dmg = max(1, int(dmg * (1.0 - 0.33 * res)))
     game.message(
         f"[{style_tag}]The {style_text(spell.name, 'item')} sears the {en}! "
         f"(tick {tick}/{total}, {dmg} damage)[/{style_tag}]",
@@ -279,7 +299,10 @@ def _channel(spell, player, game, target, mult):
 
 def _self_teleport(spell, player, game):
     py, px = player.location
-    visible = [(y, x) for y, x in game.map.visible if game.map.matrix[y][x].walkable and (y, x) != (py, px)]
+    visible = [(y, x) for y, x in game.map.visible
+               if game.map.matrix[y][x].walkable
+               and (y, x) != (py, px)
+               and game.map.matrix[y][x].occupant is None]
     if visible:
         game.message(f"[action]You reach out with {style_text(spell.name, 'item')}![/action]")
         _cast_pause()
@@ -310,10 +333,15 @@ def _summon(spell, player, game):
         "wolf": "Wolf",
     }
     mob_name = mob_map.get(summon_type, "Canine")
-    # Enforce max active summons for this spell
+    # Enforce max active summons for THIS spell (per-spell cap, per-caster).
     max_active = spell.extra.get("max_active", 99)
     if max_active < 99:
-        active = sum(1 for s in game.map.summon if s.health > 0)
+        active = sum(
+            1 for s in game.map.summon
+            if s.health > 0
+            and getattr(s, "_summoned_by", None) is player
+            and getattr(s, "_summon_spell_name", None) == spell.name
+        )
         if active >= max_active:
             game.message(f"[warn]You can't maintain any more {style_text(spell.name, 'item')} summons.[/warn]")
             return
@@ -354,6 +382,8 @@ def _summon(spell, player, game):
     summon.is_summon = True
     summon.despawn_timer = duration
     summon.awake = True
+    summon._summoned_by = player
+    summon._summon_spell_name = spell.name
     game.map.place_occupant(summon, ny, nx)
     game.map.summon.append(summon)
     game.message(f"[action]You trace a summoning sigil; a small creature scurries into being.[/action]")
@@ -366,18 +396,24 @@ def _ignite_flora(spell, player, game, mult):
     duration = spell.extra.get("duration", 5)
     for y, x in game.map.visible:
         cell = game.map.matrix[y][x]
-        if cell.terrain in ("grass", "tree", "shrub") or cell.feature == "altar":
-            if cell.terrain in ("grass", "tree") or cell.feature in ("shrub",):
-                cell.feature = "burning"
-                game.map.burning_cells[(y, x)] = duration
-                burned += 1
-                if cell.occupant and getattr(cell.occupant, "is_enemy", False) and spell.damage:
-                    lo, hi = spell.damage
-                    dmg = max(1, int(random.randint(lo, hi) * mult))
-                    cell.occupant.health -= dmg
-                    game.message(f"[fire]{style_text(cell.occupant.name, 'enemy')} is caught in the blaze![/fire]", drop=dmg)
-                    if cell.occupant.health <= 0:
-                        game.on_enemy_death(cell.occupant)
+        burnable = (cell.terrain in ("grass", "tree")) or (cell.feature == "shrub")
+        if not burnable:
+            continue
+        if cell.terrain in ("grass", "tree"):
+            cell.feature = "burning"
+        game.map.burning_cells[(y, x)] = duration
+        burned += 1
+        if cell.occupant and getattr(cell.occupant, "is_enemy", False) and spell.damage:
+            lo, hi = spell.damage
+            dmg = max(1, int(random.randint(lo, hi) * mult))
+            if not spell.extra.get("bypass_mr"):
+                res = cell.occupant.resistances.get(spell.damage_type, 0)
+                if res > 0:
+                    dmg = max(1, int(dmg * (1.0 - 0.33 * res)))
+            cell.occupant.health -= dmg
+            game.message(f"[fire]{style_text(cell.occupant.name, 'enemy')} is caught in the blaze![/fire]", drop=dmg)
+            if cell.occupant.health <= 0:
+                game.on_enemy_death(cell.occupant)
     if burned:
         game.message(f"[fire]You cast {style_text(spell.name, 'item')}! {burned} tiles burst into flame.[/fire]")
     else:
@@ -388,6 +424,7 @@ def _expanding_aoe(spell, player, game, mult):
     py, px = player.location
     r = spell.extra.get("radius", 3)
     dmg = spell.damage
+    bypass = spell.extra.get("bypass_mr", False)
     for y in range(max(0, py - r), min(game.map.max_y, py + r) + 1):
         for x in range(max(0, px - r), min(game.map.max_x, px + r) + 1):
             if (y - py) ** 2 + (x - px) ** 2 > r * r:
@@ -398,6 +435,10 @@ def _expanding_aoe(spell, player, game, mult):
                 lo, hi = dmg
                 raw = random.randint(lo, hi)
                 damage = max(1, int(raw * mult))
+                if not bypass:
+                    res = target.resistances.get(spell.damage_type, 0)
+                    if res > 0:
+                        damage = max(1, int(damage * (1.0 - 0.33 * res)))
                 target.health -= damage
                 game.message(f"[action]The {style_text(target.name, 'enemy')} is caught in the blast.[/action]", drop=damage)
                 if target.health <= 0:
@@ -413,6 +454,7 @@ def _explosion(spell, player, game, target, mult):
         return
     ty, tx = target
     r = spell.extra.get("radius", 1)
+    bypass = spell.extra.get("bypass_mr", False)
     for y in range(max(0, ty - r), min(game.map.max_y, ty + r) + 1):
         for x in range(max(0, tx - r), min(game.map.max_x, tx + r) + 1):
             if (y - ty) ** 2 + (x - tx) ** 2 > r * r:
@@ -423,6 +465,10 @@ def _explosion(spell, player, game, target, mult):
                 lo, hi = spell.damage
                 raw = random.randint(lo, hi)
                 damage = max(1, int(raw * mult))
+                if not bypass:
+                    res = enemy.resistances.get(spell.damage_type, 0)
+                    if res > 0:
+                        damage = max(1, int(damage * (1.0 - 0.33 * res)))
                 enemy.health -= damage
                 game.message(f"[action]The explosion engulfs the {style_text(enemy.name, 'enemy')}.[/action]", drop=damage)
                 if enemy.health <= 0:

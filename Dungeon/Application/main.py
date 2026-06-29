@@ -299,6 +299,11 @@ def _save_player(player) -> dict:
         "intelligence": player.intelligence,
         "known_spells": [spell.name for spell in player.known_spells],
         "channeling": player._channeling,
+        "channel_targets": {
+            name: [getattr(t, "y", None), getattr(t, "x", None)]
+            for name, t in player._channel_targets.items()
+            if t is not None and getattr(t, "y", None) is not None
+        },
         "skills": _save_skills(player.skills),
         "regen_counter": player.regen_counter,
     }
@@ -332,7 +337,23 @@ def _load_player(data: dict, game) -> DungeonPlayer:
     player.known_spells = [game.db.item_db.search_spell(name) for name in data.get("known_spells", [])]
     player.known_spells = [s for s in player.known_spells if s is not None]
     player._channeling = {name: int(turns) for name, turns in data.get("channeling", {}).items()}
+    # Resolve channel targets by saved position; drop channels whose target
+    # no longer exists (killed, despawned, or moved off-map).
     player._channel_targets = {}
+    for name, pos in (data.get("channel_targets", {}) or {}).items():
+        if name not in player._channeling or not pos or pos[0] is None:
+            continue
+        ty, tx = pos[0], pos[1]
+        target = None
+        if game.map is not None:
+            for e in game.map.enemies:
+                if e.health > 0 and e.y == ty and e.x == tx:
+                    target = e
+                    break
+        if target is not None:
+            player._channel_targets[name] = target
+        else:
+            player._channeling.pop(name, None)
     player.regen_counter = int(data.get("regen_counter", 0))
     player.skills = _load_skills(data.get("skills"))
     if player.skills:
@@ -2254,8 +2275,8 @@ class Dungeon:
             return True
         if effect == "summoning":
             self.message(read)
-            count = self._summon_random_enemies(2 + self.depth // 3)
-            self.message(f"[action]{count} creature{'s' if count != 1 else ''} claw their way into being.[/action]")
+            count = self._summon_random_enemies(2 + self.depth // 3, ally=True)
+            self.message(f"[action]{count} creature{'s' if count != 1 else ''} answer your summons.[/action]")
             return True
         if effect == "torment":
             self.message(read)
@@ -2402,8 +2423,11 @@ class Dungeon:
                     and self.map.matrix[fy][fx].occupant is None:
                 self.map.move_occupant(occ, fy, fx)
 
-    def _summon_random_enemies(self, n: int) -> int:
-        """Spawn n random native enemies adjacent to or near the player."""
+    def _summon_random_enemies(self, n: int, ally: bool = False) -> int:
+        """Spawn n random native enemies adjacent to or near the player.
+
+        If `ally` is True, the summons are friendly and despawn after 80 turns.
+        """
         from .classes.enemies import DungeonEnemy
         spawned = 0
         depth = self.depth
@@ -2431,8 +2455,17 @@ class Dungeon:
                 break
             enemy = loader.load()
             ny, nx = candidates.pop()
+            if ally:
+                enemy.is_enemy = False
+                enemy.is_summon = True
+                enemy._summoned_by = self.player
+                enemy._summon_spell_name = "Scroll of Summoning"
+                enemy.despawn_timer = 80
+                enemy.awake = True
+                self.map.summon.append(enemy)
+            else:
+                self.map.enemies.append(enemy)
             self.map.place_occupant(enemy, ny, nx)
-            self.map.enemies.append(enemy)
             spawned += 1
         return spawned
 
@@ -2928,6 +2961,11 @@ class Dungeon:
             # Check AFTER advance_world updates the FOV. visible_enemies already
             # filters out dead enemies and summons.
             if self.over:
+                break
+            # Player input aborts autoexplore immediately (consumes the key).
+            if keys.key_pressed():
+                keys.read_key()
+                self.message("[flavor]Auto-explore cancelled.[/flavor]")
                 break
             visible = self.map.visible_enemies()
             if visible:

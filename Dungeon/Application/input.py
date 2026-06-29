@@ -104,6 +104,38 @@ def read_key() -> str:
     return _read_key_unix()
 
 
+def key_pressed() -> bool:
+    """Return True if a keypress is available without blocking.
+
+    Lets long-running loops (e.g. auto-explore) abort as soon as the player
+    taps a key. Drains nothing; the next :func:`read_key` will still return it.
+    """
+    if _scripted is not None:
+        # Peek the scripted iterator without consuming.
+        from itertools import chain
+        if isinstance(_scripted, chain):
+            return True  # may be empty; harmless if caller still reads
+        try:
+            peek = _scripted.__next__
+        except AttributeError:
+            return False
+        # Can't peek generators without consuming - just return True and
+        # accept the cost of one false positive on exhaustion.
+        return True
+    if sys.platform == "win32":
+        try:
+            import msvcrt
+            return msvcrt.kbhit()
+        except Exception:
+            return False
+    try:
+        import select
+        rlist, _, _ = select.select([sys.stdin], [], [], 0)
+        return bool(rlist)
+    except Exception:
+        return False
+
+
 def read_direction(key: str) -> str | None:
     """Return the compass direction (e.g. "n"/"se") for a movement key, else None."""
     return MOVE_KEYS.get(key)

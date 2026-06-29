@@ -253,7 +253,6 @@ class DungeonEnemy:
             if self.spells and self.spell_chance > 0 and random.random() < self.spell_chance:
                 sp = self.pick_spell()
                 if sp is not None and self.cast_spell(sp, self.game):
-                    self.tick_cooldowns()
                     return
             if self.ranged and self.game.map._line_of_sight(self.y, self.x, player.y, player.x):
                 self.attack_player(ranged=True)
@@ -278,7 +277,6 @@ class DungeonEnemy:
         if self.spells and self.spell_chance > 0 and random.random() < self.spell_chance:
             sp = self.pick_spell()
             if sp is not None and self.cast_spell(sp, self.game):
-                self.tick_cooldowns()
                 return
         # Choose closest target (player or summon); player wins ties
         closest_summon, sdist = self._closest_summon()
@@ -538,6 +536,11 @@ class DungeonEnemy:
                         game.message(
                             f"[warn]A {minion_name} scrambles out from "
                             f"where {self.name} fell![/warn]")
+            # DCSS behaviour: caster's summons dissolve when the caster dies.
+            for s in list(game.map.summon):
+                if getattr(s, "_summoned_by", None) is self and s.health > 0:
+                    s.health = 0
+                    game.on_summon_death(s)
 
     def _aoe_damage(self, cy: int, cx: int, radius: int, damage: int, dmg_type: str = "") -> None:
         """Deal `damage` to all valid targets within Chebyshev `radius` of (cy,cx)."""
@@ -717,7 +720,7 @@ class DungeonEnemy:
         p = self.game.player
         if spell.range > 0:
             dist = max(abs(p.y - self.y), abs(p.x - self.x))
-            if dist <= spell.range:
+            if dist <= spell.range and self.game.map._line_of_sight(self.y, self.x, p.y, p.x):
                 return p
             return None
         # Self-range spells (Blink, Ignite Flora) have no target.
@@ -726,7 +729,7 @@ class DungeonEnemy:
         # Touch range: must be adjacent.
         if spell.effect == "touch":
             dist = max(abs(p.y - self.y), abs(p.x - self.x))
-            if dist <= 1:
+            if dist <= 1 and self.game.map._line_of_sight(self.y, self.x, p.y, p.x):
                 return p
             return None
         return p
@@ -744,6 +747,11 @@ class DungeonEnemy:
         if spell.damage:
             lo, hi = spell.damage
             dmg = max(1, random.randint(lo, hi))
+            if not spell.extra.get("bypass_mr"):
+                dmg = max(1, target.apply_resistance(spell.damage_type, dmg))
+                if dmg <= 0:
+                    game.message(f"[{style_tag}]You resist the {spell.damage_type}![/{style_tag}]")
+                    return
             game.message(
                 f"[{style_tag}]{en} is struck by {spell.name} for {dmg}![/{style_tag}]",
                 drop=dmg,
@@ -768,6 +776,11 @@ class DungeonEnemy:
         if spell.damage:
             lo, hi = spell.damage
             dmg = max(1, random.randint(lo, hi))
+            if not spell.extra.get("bypass_mr"):
+                dmg = max(1, target.apply_resistance(spell.damage_type, dmg))
+                if dmg <= 0:
+                    game.message(f"[{style_tag}]You resist the {spell.damage_type}![/{style_tag}]")
+                    return
             game.message(
                 f"[{style_tag}]{self.name} reaches out and freezes {en} for {dmg}![/{style_tag}]",
                 drop=dmg,
@@ -804,6 +817,7 @@ class DungeonEnemy:
         if not spell.damage:
             return
         lo, hi = spell.damage
+        bypass = spell.extra.get("bypass_mr", False)
         for y in range(max(0, cy - r), min(game.map.max_y, cy + r) + 1):
             for x in range(max(0, cx - r), min(game.map.max_x, cx + r) + 1):
                 if (y - cy) ** 2 + (x - cx) ** 2 > r * r:
@@ -811,6 +825,10 @@ class DungeonEnemy:
                 cell = game.map.matrix[y][x]
                 if cell.occupant is game.player:
                     dmg = max(1, random.randint(lo, hi))
+                    if not bypass:
+                        dmg = max(1, cell.occupant.apply_resistance(spell.damage_type, dmg))
+                        if dmg <= 0:
+                            continue
                     cell.occupant.health -= dmg
                     game.message(
                         f"[{style_tag}]{spell.name} washes over you for {dmg}![/{style_tag}]",
@@ -834,6 +852,7 @@ class DungeonEnemy:
         if not spell.damage:
             return
         lo, hi = spell.damage
+        bypass = spell.extra.get("bypass_mr", False)
         for y in range(max(0, ty - r), min(game.map.max_y, ty + r) + 1):
             for x in range(max(0, tx - r), min(game.map.max_x, tx + r) + 1):
                 if (y - ty) ** 2 + (x - tx) ** 2 > r * r:
@@ -841,6 +860,10 @@ class DungeonEnemy:
                 cell = game.map.matrix[y][x]
                 if cell.occupant is game.player:
                     dmg = max(1, random.randint(lo, hi))
+                    if not bypass:
+                        dmg = max(1, cell.occupant.apply_resistance(spell.damage_type, dmg))
+                        if dmg <= 0:
+                            continue
                     cell.occupant.health -= dmg
                     game.message(
                         f"[{style_tag}]{spell.name} detonates on you for {dmg}![/{style_tag}]",
@@ -851,6 +874,8 @@ class DungeonEnemy:
                         return
                 elif cell.occupant and getattr(cell.occupant, "is_summon", False):
                     dmg = max(1, random.randint(lo, hi))
+                    if not bypass and getattr(cell.occupant, "_summoned_by", None) is game.player:
+                        dmg = max(1, cell.occupant.apply_resistance(spell.damage_type, dmg))
                     cell.occupant.health -= dmg
                     if cell.occupant.health <= 0:
                         game.on_summon_death(cell.occupant)
