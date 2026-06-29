@@ -1,7 +1,7 @@
 import random
 
 from .items import (
-    DungeonItem, DungeonWeapon, DungeonPotion, DungeonInventory, DungeonScroll,
+    DungeonItem, DungeonWeapon, DungeonPotion, DungeonScroll,
     DungeonThrowable, DungeonArmour, DungeonSpell, DungeonSpellBook,
 )
 from .people import DungeonPeople, DungeonTrader, DungeonHealer
@@ -100,20 +100,18 @@ class DungeonItemDatabase:
         self.potions: list[DungeonPotion] = self.global_db.decoder.fetch_potions()
         self.weapons: list[DungeonWeapon] = self.global_db.decoder.fetch_weapons()
         self.throwables: list[DungeonThrowable] = self.global_db.decoder.fetch_throwables()
-        self.inventory: list[DungeonInventory] = self.global_db.decoder.fetch_inventory()
         self.scrolls: list[DungeonScroll] = self.global_db.decoder.fetch_scrolls()
         self.armour: list[DungeonArmour] = self.global_db.decoder.fetch_armour()
         self.spells: list[DungeonSpell] = self.global_db.decoder.fetch_spells()
         self.spellbooks: list[DungeonSpellBook] = self.global_db.decoder.fetch_spellbooks()
         self.items: list[DungeonItem] = (
-            self.potions + self.weapons + self.throwables + self.inventory
+            self.potions + self.weapons + self.throwables
             + self.scrolls + self.armour + self.spellbooks
         )
 
     def search_item(self, name: str, type=DungeonItem):
         search_list = {
             DungeonItem: self.items,
-            DungeonInventory: self.inventory,
             DungeonPotion: self.potions,
             DungeonWeapon: self.weapons,
             DungeonThrowable: self.throwables,

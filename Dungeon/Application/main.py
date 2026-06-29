@@ -21,7 +21,7 @@ from .classes.map import DungeonMap, DungeonPlayer, DIRS
 from .classes.menus import DungeonMenu
 from .classes.items import (
     DungeonShard, DungeonPotion, DungeonScroll, DungeonThrowable,
-    DungeonArmour, DungeonSpellBook, DungeonWeapon, DungeonInventory,
+    DungeonArmour, DungeonSpellBook, DungeonWeapon,
     DungeonSpell,
 )
 from .classes.database import DungeonDatabase
@@ -94,8 +94,6 @@ def _save_item(item) -> dict | None:
     data = {"kind": type(item).__name__, "name": item.name}
     if isinstance(item, DungeonThrowable):
         data["count"] = item.count
-    if isinstance(item, DungeonInventory):
-        data["inventory"] = item.inventory
     if isinstance(item, DungeonArmour):
         data["slot"] = item.slot
     if isinstance(item, DungeonSpellBook):
@@ -185,9 +183,6 @@ def _load_item(data: dict, game):
             if data.get("grant_see_invisible"):
                 item.grant_see_invisible = True
         return item
-    if kind == "DungeonInventory":
-        item = game.db.item_db.search_item(name=name, type=DungeonInventory)
-        return copy.copy(item) if item else None
     if kind == "DungeonSpellBook":
         item = game.db.item_db.search_item(name=name, type=DungeonSpellBook)
         return copy.copy(item) if item else None

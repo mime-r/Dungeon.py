@@ -7,6 +7,13 @@ floors, and escape back to the surface alive.
 
 <p align="center"><img src="/resources/Dungeon.gif?raw=true"/></p>
 
+## What's new in v2.7.3
+
+- **Fixed inventory size** - pack capacity is now static (no more `DungeonInventory` bag drops); the item, its data file, and all its plumbing are gone
+- **MP HUD fix** - max MP renders as `10` instead of `10.0` for saves that round-tripped through `float()`
+
+For prior release notes, see [CHANGELOG.md](CHANGELOG.md).
+
 ## What's new in v2.7.1
 
 - **531 monsters** (was 20) - dragons, demons, liches, slimes, beholders, and a menagerie from the DCSS bestiary

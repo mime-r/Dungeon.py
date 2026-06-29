@@ -103,16 +103,6 @@ class DungeonThrowable(DungeonItem):
         self.min_delay = 10
 
 
-class DungeonInventory(DungeonItem):
-    """An inventory bag that expands carrying capacity."""
-
-    symbol = "("
-
-    def __init__(self, name: str, description: str, cost: int, inventory: int) -> None:
-        super().__init__(name=name, description=description, cost=cost, actions=[ItemUseType.EQUIP])
-        self.inventory = inventory
-
-
 class DungeonPotion(DungeonItem):
     """A consumable potion: heals HP and/or applies a status effect."""
 

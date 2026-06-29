@@ -1,5 +1,17 @@
 # Changelog
 
+## 29/6/26 v2.7.3 - "Fixed Pack & MP Display"
+
+**Inventory System**
+- Removed `inventory.json` data file and the `DungeonInventory` pack item class - inventory capacity is now fixed (set by `config.player.max_inventory` and class background) with no in-game way to expand it
+- Affected files: `data/inventory.json` (deleted), `classes/items.py`, `classes/decoder.py`, `classes/database.py`, `classes/map.py`, `classes/menus.py`, `main.py`
+
+**HUD Display**
+- MP HUD bar (`ui.py:126`) now wraps `p.max_mp` in `int()` so the denominator renders as `10` instead of `10.0` (the `float()` coercion in `main.py:330` made `max_mp` round-trip as a float for old saves)
+
+**Save Migration**
+- Saves from v2.7.2 that contained a `DungeonInventory` pack in the player's inventory will silently drop the pack on load (its `_load_item` branch now returns `None`); `max_mp` and other stats are unaffected
+
 ## 26/6/26 v2.7.2 - "Mob Texts & Magic Tuning"
 
 **Mob Description Texts**

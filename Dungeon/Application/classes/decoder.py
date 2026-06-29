@@ -3,7 +3,7 @@ import types
 from pathlib import Path
 
 from .items import (
-    DungeonItem, DungeonWeapon, DungeonPotion, DungeonInventory, DungeonScroll,
+    DungeonItem, DungeonWeapon, DungeonPotion, DungeonScroll,
     DungeonThrowable, DungeonArmour, DungeonSpell, DungeonSpellBook,
 )
 from .weapons import DungeonWeaponTexts
@@ -54,9 +54,6 @@ class DungeonJSONDecoder:
 
     def fetch_armour(self) -> list[DungeonArmour]:
         return [DungeonArmour(**data) for data in self._load(DATA_DIR / "armour.json")]
-
-    def fetch_inventory(self) -> list[DungeonInventory]:
-        return [DungeonInventory(*data.values()) for data in self._load(DATA_DIR / "inventory.json")]
 
     def fetch_scrolls(self) -> list[DungeonScroll]:
         return [DungeonScroll(**data) for data in self._load(DATA_DIR / "scrolls.json")]

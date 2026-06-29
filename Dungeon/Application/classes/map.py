@@ -13,7 +13,7 @@ from ..utils import style_text
 from ..config import config
 from .items import (
     DungeonWeapon, DungeonPotion, DungeonScroll, DungeonThrowable,
-    DungeonInventory, DungeonArmour, DungeonShard, DungeonSpellBook,
+    DungeonArmour, DungeonShard, DungeonSpellBook,
 )
 from .status import StatusSet
 from .skills import SkillSet, skill_for_weapon
@@ -438,7 +438,7 @@ class DungeonPlayer:
             _AUTO_KIND = {
                 "DungeonPotion": "potion", "DungeonScroll": "scroll",
                 "DungeonWeapon": "weapon", "DungeonThrowable": "throwable",
-                "DungeonInventory": "bag", "DungeonArmour": "armour",
+                "DungeonArmour": "armour",
                 "DungeonSpellBook": "spellbook",
             }
             auto_types = getattr(game, "auto_pickup_types", set())

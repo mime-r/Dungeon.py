@@ -9,7 +9,7 @@ from rich.text import Text
 from .. import input as keys
 from ..utils import style_text, clear_screen
 from .items import (
-    DungeonWeapon, DungeonInventory, DungeonPotion, DungeonScroll, DungeonShard,
+    DungeonWeapon, DungeonPotion, DungeonScroll, DungeonShard,
     DungeonThrowable, DungeonArmour, DungeonSpellBook,
 )
 from .skills import SkillState
@@ -38,8 +38,6 @@ def item_detail(item) -> str:
         return f"heals +{item.hp_change} HP"
     if isinstance(item, DungeonScroll):
         return item.effect.replace("_", " ").title()
-    if isinstance(item, DungeonInventory):
-        return f"+{item.inventory} pack slots"
     if isinstance(item, DungeonArmour):
         ench = getattr(item, "enchant", 0)
         stat = f"SH {item.sh + ench}" if item.slot == "shield" else f"AC {item.ac + ench}"
@@ -95,8 +93,7 @@ class DungeonMenu:
         "DungeonSpellBook":  3,
         "DungeonPotion":     4,
         "DungeonScroll":     5,
-        "DungeonInventory":  6,
-        "DungeonShard":      7,
+        "DungeonShard":      6,
     }
 
     def _sort_inventory(self) -> None:
@@ -224,8 +221,6 @@ class DungeonMenu:
             verb = "quaff"
         elif isinstance(item, DungeonScroll):
             verb = "read"
-        elif isinstance(item, DungeonInventory):
-            verb = "wear"
         elif isinstance(item, DungeonArmour):
             verb = "unequip" if player.armour.get(item.slot) is item else "wear"
         elif isinstance(item, DungeonThrowable):
@@ -271,12 +266,6 @@ class DungeonMenu:
             return False
         if isinstance(item, DungeonArmour):
             return self._toggle_armour(item)
-        if isinstance(item, DungeonInventory):
-            player.max_inventory += item.inventory
-            player.inventory.pop(idx)
-            game.message(f"You sling the {style_text(item.name, 'item')} over your shoulders. "
-                         f"[inventory](+{item.inventory} slots)[/inventory]")
-            return False
         if isinstance(item, DungeonPotion):
             player.inventory.pop(idx)
             game.apply_potion(item)

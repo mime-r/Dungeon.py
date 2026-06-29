@@ -123,7 +123,7 @@ class DungeonUI:
             mp_ratio = p.mp / p.max_mp if p.max_mp else 0
             mp_filled = max(0, min(bar_w, round(mp_ratio * bar_w)))
             mp_bar = f"[haste]{'█' * mp_filled}[/haste][grey23]{'░' * (bar_w - mp_filled)}[/grey23]"
-            lines.append(f"[haste]MP[/haste] {int(p.mp)}/{p.max_mp} {mp_bar}")
+            lines.append(f"[haste]MP[/haste] {int(p.mp)}/{int(p.max_mp)} {mp_bar}")
         if p.status.any():
             tags = ", ".join(f"[{s}]{lbl}[/{s}]" for lbl, s in p.status.summary())
             lines.append(f"[warn]Status[/warn]: {tags}")
