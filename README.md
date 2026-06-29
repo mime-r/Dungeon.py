@@ -13,31 +13,6 @@ floors, and escape back to the surface alive.
 
 For prior release notes, see [CHANGELOG.md](CHANGELOG.md).
 
-## What's new in v2.7.4
-
-- **Spell resistance** - `bypass_mr` now actually works; all spell damage applies target's damage-type resistance (33% per level) by default
-- **Caster LOS** - enemy casters can no longer cast through walls
-- **Per-spell summon caps** - player summons cap per spell (e.g. 2 small mammals + 1 wolf) instead of globally
-- **Caster death despawns summons** - kill a lich, its demons dissolve (DCSS authentic)
-- **Channel save/load** - Searing Ray resumes after loading the game
-- **Scroll of Summoning** - now spawns allied summons (80-turn duration) instead of hostile mobs
-
-For prior release notes, see [CHANGELOG.md](CHANGELOG.md).
-
-## What's new in v2.7.1
-
-- **531 monsters** (was 20) - dragons, demons, liches, slimes, beholders, and a menagerie from the DCSS bestiary
-- **8 themed floors** - each floor spawns a thematically consistent mob mix (vermin on the surface, liches in the deep halls, hellbinders in pandemonium) with tier-mix balancing (weak on floor 1, strong on floor 8)
-- **8 new status effects** - paralysis, blind, bleed, drain_max_hp, drain_mp, constricted, invisible, corrosion
-- **Spellcasting AI** - 113 casters (oracles, pyromancers, liches, demonspawn) pick from their spell list with cooldowns
-- **Cone breath weapons** - 39 dragons and elementals breathe fire/cold/lightning/poison/steam/acid
-- **Death FX** - explode, spore cloud, split, shriek, ally buff, demon spawn, minion spawn
-- **Inventory auto-sort** - press `s` in the pack screen; equipped items are always shown first
-- **Item spawn display** - weapons/armour now print their enchantment + brand/ego effect when they spawn
-- **Floor intro** - on descent, the message log shows the floor's name and description
-- **Splash screen** - multi-colour banner, version, `g` key to open the project on GitHub
-- **Save v3** - per-instance cooldowns, breath cooldown, and shriek tracker now persist
-
 ## Features
 
 ### Gameplay
