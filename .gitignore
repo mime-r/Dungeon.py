@@ -6,3 +6,4 @@ temp_venv.bat
 .claude/
 Reference-Resources/
 .opencode/
+build/
