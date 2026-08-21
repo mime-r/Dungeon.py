@@ -7,8 +7,7 @@
         "potential_sales": [
             { "item": "Weak Healing Potion", "chance": 100 },
             { "item": "Medium Healing Potion", "chance": 100 },
-            { "item": "Strong Healing Potion", "chance": 60 },
-            { "item": "Scroll of Teleportation", "chance": 40 }
+            { "item": "Strong Healing Potion", "chance": 60 }
         ]
     },
     {
@@ -70,7 +69,6 @@
         "type": "TRADER",
         "personality": "Sly, flattering, and always angling for a better deal. Uses flowery language and vague promises. Hides their anxiety about being this deep underground behind a merchant's smile.",
         "potential_sales": [
-            { "item": "Medium Healing Potion", "chance": 80 },
             { "item": "Scroll of Revelation", "chance": 70 },
             { "item": "Scroll of Teleportation", "chance": 60 },
             { "item": "Scroll of Identification", "chance": 70 },
@@ -91,6 +89,6 @@
         "symbol": "H",
         "type": "HEALER",
         "personality": "Serene and unhurried, speaks softly and never wastes words. Has seen too much death to be surprised by anything. Quietly disapproves of unnecessary violence.",
-        "heal_cost_per_hp": 2
+        "heal_cost_per_hp": 3
     }
 ]
